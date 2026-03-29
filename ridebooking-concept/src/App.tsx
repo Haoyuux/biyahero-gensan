@@ -874,6 +874,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(null);
   const [selectedRide, setSelectedRide] = useState('eco');
   const [deviceLocation, setDeviceLocation] = useState<[number, number] | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
   const [currentRideId, setCurrentRideId] = useState<string | null>(null);
@@ -1004,6 +1005,15 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
     setDeviceLocation(loc => { if (loc) setMapFocus({ coords: loc, key: Date.now() }); return loc; });
   };
 
+  // Check location permission on mount
+  useEffect(() => {
+    if (!('permissions' in navigator)) return;
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (result.state === 'denied') setLocationDenied(true);
+      result.onchange = () => setLocationDenied(result.state === 'denied');
+    });
+  }, []);
+
   useEffect(() => {
     if ('geolocation' in navigator) {
       const watchId = navigator.geolocation.watchPosition(
@@ -1017,6 +1027,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
           }
         },
         () => {
+          setLocationDenied(true);
           const fallback: [number, number] = [6.1164, 125.1716];
           setDeviceLocation(fallback);
           if (!initialFocusDone.current) {
@@ -1300,7 +1311,20 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
                     </div>
                   </motion.div>
                 )}
+                {locationDenied && (
+                  <div className="mx-3 mb-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
+                    <MapPin size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-[13px] font-bold text-amber-800">Location access is off</p>
+                      <p className="text-[12px] text-amber-600 mt-0.5">Enable location in your browser settings to book a ride.</p>
+                    </div>
+                  </div>
+                )}
                 <HomePanel key="home" setStep={(s) => {
+                  if (s === 'select' && locationDenied) {
+                    showNotification('Please enable location access to book a ride.');
+                    return;
+                  }
                   if (s === 'select' && currentRideId) {
                     showNotification('You have an ongoing ride. Finish it before booking another.');
                     return;
@@ -2016,12 +2040,24 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
   const [isOnline, setIsOnline] = useState(false);
+  const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   const [requestAccepted, setRequestAccepted] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
   const [riderTab, setRiderTab] = useState<'home' | 'history'>('home');
+
+  // Check location permission on mount
+  useEffect(() => {
+    if (!('permissions' in navigator)) return;
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (result.state === 'denied') setRiderLocationDenied(true);
+      result.onchange = () => {
+        setRiderLocationDenied(result.state === 'denied');
+      };
+    });
+  }, []);
   const [recentTrips, setRecentTrips] = useState<any[]>([]);
   const [allTrips, setAllTrips] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -2121,10 +2157,18 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
   useEffect(() => {
     const riderId = currentProfile.id;
     if (!isOnline) {
-      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId);
+      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId)
+        .then(({ error }) => { if (error) console.error('Rider go-offline error:', error.message); });
       return;
     }
-    supabase.from('profiles').update({ is_online: true, last_seen_at: new Date().toISOString() }).eq('id', riderId);
+    supabase.auth.getSession().then(({ data }) => {
+      console.log('Rider session uid:', data.session?.user?.id, '| riderId:', riderId);
+    });
+    supabase.from('profiles').update({ is_online: true, last_seen_at: new Date().toISOString() }).eq('id', riderId)
+      .then(({ error, status }) => {
+        if (error) console.error('Rider go-online error:', error.message, 'status:', status);
+        else console.log('Rider online status saved ✓');
+      });
     const watchId = navigator.geolocation.watchPosition(
       pos => {
         supabase.from('profiles').update({
@@ -2132,9 +2176,17 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
           last_lat: pos.coords.latitude,
           last_lng: pos.coords.longitude,
           last_seen_at: new Date().toISOString(),
-        }).eq('id', riderId);
+        }).eq('id', riderId)
+          .then(({ error }) => { if (error) console.error('Rider location update error:', error.message); });
       },
-      () => {},
+      (err) => {
+        console.error('Geolocation error:', err.message);
+        if (err.code === err.PERMISSION_DENIED) {
+          setRiderLocationDenied(true);
+          setIsOnline(false);
+        }
+        // TIMEOUT or POSITION_UNAVAILABLE — don't force offline, just keep waiting
+      },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
     );
     return () => {
@@ -2571,9 +2623,25 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
                 <p className="text-gray-400 text-sm mb-5">Go online to start receiving ride requests.</p>
               </>
             )}
+            {riderLocationDenied && !isOnline && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
+                <MapPin size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[12px] font-bold text-amber-800">Location access is off</p>
+                  <p className="text-[11px] text-amber-600 mt-0.5">Enable location in your device settings to go online.</p>
+                </div>
+              </div>
+            )}
             <button
-              onClick={() => setIsOnline(prev => !prev)}
-              className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${isOnline ? 'bg-white text-gray-950 hover:bg-gray-100' : 'bg-gray-950 text-white hover:bg-gray-800'}`}
+              onClick={() => {
+                if (!isOnline && riderLocationDenied) return;
+                setIsOnline(prev => !prev);
+              }}
+              className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
+                isOnline ? 'bg-white text-gray-950 hover:bg-gray-100'
+                : riderLocationDenied ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-950 text-white hover:bg-gray-800'
+              }`}
             >
               {isOnline ? 'Go Offline' : 'Go Online'}
             </button>
