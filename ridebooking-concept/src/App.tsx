@@ -8,7 +8,7 @@ import {
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
   FileText, Upload, AlertCircle, Eye
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, type Profile, type RiderStatus } from '@/src/lib/supabase';
@@ -2157,18 +2157,10 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
   useEffect(() => {
     const riderId = currentProfile.id;
     if (!isOnline) {
-      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId)
-        .then(({ error }) => { if (error) console.error('Rider go-offline error:', error.message); });
+      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId);
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      console.log('Rider session uid:', data.session?.user?.id, '| riderId:', riderId);
-    });
-    supabase.from('profiles').update({ is_online: true, last_seen_at: new Date().toISOString() }).eq('id', riderId)
-      .then(({ error, status }) => {
-        if (error) console.error('Rider go-online error:', error.message, 'status:', status);
-        else console.log('Rider online status saved ✓');
-      });
+    supabase.from('profiles').update({ is_online: true, last_seen_at: new Date().toISOString() }).eq('id', riderId);
     const watchId = navigator.geolocation.watchPosition(
       pos => {
         supabase.from('profiles').update({
@@ -2176,8 +2168,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
           last_lat: pos.coords.latitude,
           last_lng: pos.coords.longitude,
           last_seen_at: new Date().toISOString(),
-        }).eq('id', riderId)
-          .then(({ error }) => { if (error) console.error('Rider location update error:', error.message); });
+        }).eq('id', riderId);
       },
       (err) => {
         console.error('Geolocation error:', err.message);
@@ -2854,6 +2845,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
   }, [activeTab]);
 
   const [liveRefreshTick, setLiveRefreshTick] = useState(0);
+  const hasOnlineRiders = React.useRef(false);
 
   const loadOnlineRiders = async () => {
     // Query all riders and filter client-side (avoids PostgREST timestamp escaping issues with .or())
@@ -2862,9 +2854,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
       .select('id, first_name, last_name, full_name, avatar_url, last_lat, last_lng, is_online, last_seen_at')
       .eq('role', 'rider');
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
-    if (error) { console.warn('loadOnlineRiders error:', error.message); return; }
-    if (!data) return;
-    console.log('loadOnlineRiders: fetched', data.length, 'riders', data.map((r: any) => ({ id: r.id, is_online: r.is_online, last_lat: r.last_lat, last_seen_at: r.last_seen_at })));
+    if (error || !data) return;
     const withGps: typeof liveRiderLocations = {};
     const withoutGps: typeof onlineNoGps = {};
     data.forEach((r: any) => {
@@ -2877,6 +2867,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
         withoutGps[r.id] = { riderName: name, riderAvatar: r.avatar_url };
       }
     });
+    hasOnlineRiders.current = Object.keys(withGps).length > 0 || Object.keys(withoutGps).length > 0;
     setLiveRiderLocations(withGps);
     setOnlineNoGps(withoutGps);
   };
@@ -2910,16 +2901,10 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
       .channel('admin-rider-locations')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, handleRiderUpdate)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, handleRiderUpdate)
-      .subscribe((status) => {
-        console.log('Admin live channel status:', status);
-        // If realtime is not available, fall back to polling every 3s
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Realtime unavailable — using 3s poll fallback');
-        }
-      });
+      .subscribe();
 
-    // 3-second poll as guaranteed fallback when realtime is not configured
-    const poll = setInterval(loadOnlineRiders, 3_000);
+    // Only poll when there are online riders — realtime handles instant updates
+    const poll = setInterval(() => { if (hasOnlineRiders.current) loadOnlineRiders(); }, 30_000);
 
     return () => { clearInterval(poll); supabase.removeChannel(channel); };
   }, [activeTab, liveRefreshTick]);
@@ -3110,7 +3095,19 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                         iconSize: [40, 40],
                         iconAnchor: [20, 20],
                       });
-                      return <Marker key={key} position={[loc.lat, loc.lng]} icon={icon} />;
+                      return (
+                        <Marker key={key} position={[loc.lat, loc.lng]} icon={icon}>
+                          <Popup offset={[0, -16]}>
+                            <div className="flex items-center gap-2 py-0.5">
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${loc.status === 'on_trip' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                              <span className="font-bold text-[13px] text-gray-900 whitespace-nowrap">{loc.riderName || 'Rider'}</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${loc.status === 'on_trip' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {loc.status === 'on_trip' ? 'On Trip' : 'Online'}
+                              </span>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
                     })}
                   </MapContainer>
                 </div>
