@@ -11,7 +11,7 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRole, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
+import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
@@ -2797,6 +2797,11 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [roleAssigning, setRoleAssigning] = useState<string | null>(null);
 
+  // Load roles on mount — needed for tab filtering for non-super-admins
+  useEffect(() => {
+    getAdminRoles().then(data => setAdminRoles(data));
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'users' && isSuperAdmin && allUsers.length === 0) {
       setUsersLoading(true);
@@ -2809,11 +2814,10 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
       setRidersLoading(true);
       getRiderProfiles().then(data => { setRiders(data); setRidersLoading(false); });
     }
-    if ((activeTab === 'roles' || activeTab === 'users') && isSuperAdmin) {
-      getAdminRoles().then(data => setAdminRoles(data));
-      if (activeTab === 'roles') setRolesLoading(true);
+    if (activeTab === 'roles' && isSuperAdmin) {
+      setRolesLoading(true);
+      getAdminRoles().then(data => { setAdminRoles(data); setRolesLoading(false); });
     }
-    if (activeTab === 'roles') setRolesLoading(false);
   }, [activeTab, isSuperAdmin]);
 
   useEffect(() => {
@@ -3017,9 +3021,9 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
     { id: 'pricing' as AdminTab, label: 'Pricing Config', icon: DollarSign },
   ];
 
-  // Super admin sees everything + Roles tab; regular admin sees only their role's modules
-  const adminRoleModules = !isSuperAdmin && profile.admin_role_id
-    ? adminRoles.find(r => r.id === profile.admin_role_id)?.modules ?? []
+  // Super admin sees everything + Roles tab; regular admin sees union of all assigned roles' modules
+  const adminRoleModules = !isSuperAdmin && (profile.admin_role_ids?.length ?? 0) > 0
+    ? [...new Set(adminRoles.filter(r => profile.admin_role_ids?.includes(r.id)).flatMap(r => r.modules))]
     : null;
 
   const tabs = [
@@ -3822,22 +3826,33 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                                 roleAssigning === u.id ? (
                                   <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
                                 ) : (
-                                  <select
-                                    value={u.admin_role_id ?? ''}
-                                    onChange={async e => {
-                                      setRoleAssigning(u.id);
-                                      const rid = e.target.value || null;
-                                      await assignAdminRole(u.id, rid);
-                                      setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, admin_role_id: rid } : x));
-                                      setRoleAssigning(null);
-                                    }}
-                                    className="text-[13px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white max-w-[160px]"
-                                  >
-                                    <option value="">— No role —</option>
-                                    {adminRoles.map(r => (
-                                      <option key={r.id} value={r.id}>{r.name}</option>
-                                    ))}
-                                  </select>
+                                  <div className="flex flex-wrap gap-1.5 min-w-[180px]">
+                                    {adminRoles.map(r => {
+                                      const assigned = (u.admin_role_ids ?? []).includes(r.id);
+                                      return (
+                                        <button
+                                          key={r.id}
+                                          onClick={async () => {
+                                            setRoleAssigning(u.id);
+                                            const current = u.admin_role_ids ?? [];
+                                            const next = assigned ? current.filter(x => x !== r.id) : [...current, r.id];
+                                            await assignAdminRoles(u.id, next);
+                                            setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, admin_role_ids: next } : x));
+                                            setRoleAssigning(null);
+                                          }}
+                                          className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                                            assigned
+                                              ? 'bg-gray-950 text-white border-gray-950'
+                                              : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
+                                          }`}
+                                        >
+                                          {assigned && <Check size={9} className="inline mr-1" strokeWidth={3} />}
+                                          {r.name}
+                                        </button>
+                                      );
+                                    })}
+                                    {adminRoles.length === 0 && <span className="text-[12px] text-gray-300 italic">No roles created</span>}
+                                  </div>
                                 )
                               ) : (
                                 <span className="text-[12px] text-gray-300">—</span>

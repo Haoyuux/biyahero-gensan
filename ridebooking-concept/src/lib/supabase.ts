@@ -44,6 +44,7 @@ export interface Profile {
   reviewed_by_name: string | null;
   reviewed_at: string | null;
   admin_role_id: string | null;
+  admin_role_ids: string[];
   created_at: string;
 }
 
@@ -117,8 +118,8 @@ export async function deleteAdminRole(id: string): Promise<boolean> {
   return !error;
 }
 
-export async function assignAdminRole(userId: string, roleId: string | null): Promise<boolean> {
-  const { error } = await supabase.from('profiles').update({ admin_role_id: roleId }).eq('id', userId);
+export async function assignAdminRoles(userId: string, roleIds: string[]): Promise<boolean> {
+  const { error } = await supabase.from('profiles').update({ admin_role_ids: roleIds }).eq('id', userId);
   return !error;
 }
 
