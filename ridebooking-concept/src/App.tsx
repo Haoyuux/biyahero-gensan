@@ -3927,6 +3927,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
   const [query, setQuery] = useState(dropoff);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (query.length < 3) { setSuggestions([]); return; }
@@ -3944,6 +3945,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     setActiveField(field);
     setQuery(field === 'pickup' ? (pickup === 'Current Location' ? '' : pickup) : dropoff);
     setSuggestions([]);
+    setIsExpanded(true);
   };
 
   const handleSelect = (place: any) => {
@@ -3954,6 +3956,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     } else {
       setDropoff(shortName); setDestinationCoords(coords); setStep('select');
     }
+    setIsExpanded(false);
   };
 
   const handleSaveSuggestion = (place: any) => {
@@ -3970,10 +3973,18 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     <motion.div
       initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-6 pb-10 pointer-events-auto flex flex-col max-h-[88vh] md:max-h-none md:flex-1 md:overflow-y-auto"
+      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:flex-1 md:overflow-y-auto"
     >
-      <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-7 md:hidden" />
-      <h2 className="text-[1.75rem] font-black tracking-tight leading-tight mb-5">Where to?</h2>
+      {/* Handle — tap to expand/collapse on mobile */}
+      <button onClick={() => setIsExpanded(e => !e)} className="w-full pt-4 pb-2 md:hidden">
+        <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto" />
+      </button>
+
+      <div className="px-6 pb-2 md:pt-6">
+        <div className="flex items-center justify-between mb-4 md:mb-5">
+          <h2 className="text-[1.75rem] font-black tracking-tight leading-tight">Where to?</h2>
+          <ChevronLeft size={20} className={`text-gray-300 md:hidden transition-transform duration-200 ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+        </div>
 
       {/* Location Inputs */}
       <div className="rounded-2xl overflow-hidden mb-4 border border-gray-100">
@@ -4011,111 +4022,103 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
       </div>
 
       {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden max-h-60 overflow-y-auto">
-          {loading && <div className="p-4 text-center text-xs text-gray-400 tracking-wide">Searching...</div>}
-          {suggestions.map((place, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-              <div onClick={() => handleSelect(place)} className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer py-0.5">
-                <MapPin size={13} className="text-gray-300 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 leading-tight truncate">{place.name || place.display_name.split(',')[0]}</p>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{place.display_name}</p>
-                </div>
-              </div>
-              {onSaveFavorite && !favorites.some((f: any) => f.label === place.display_name) && (
-                <button
-                  onClick={e => { e.stopPropagation(); handleSaveSuggestion(place); }}
-                  className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-300 hover:text-gray-600"
-                  title="Save to favorites"
-                >
-                  <Star size={13} />
-                </button>
-              )}
-              {onSaveFavorite && favorites.some((f: any) => f.label === place.display_name) && (
-                <div className="shrink-0 w-7 h-7 flex items-center justify-center">
-                  <Star size={13} className="text-amber-400 fill-amber-400" />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!suggestions.length && (
-        <div className="flex-1 overflow-y-auto">
-          {activeField === 'pickup' && (
-            <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-              onClick={() => { setPickup('Current Location'); setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); }}>
-              <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Navigation size={16} className="text-gray-600" /></div>
-              <div>
-                <p className="font-semibold text-sm text-gray-900">Current Location</p>
-                <p className="text-xs text-gray-400 mt-0.5">Use GPS location</p>
-              </div>
-            </div>
-          )}
-          {activeField === 'dropoff' && (
-            <>
-              {favorites.length > 0 && (
-                <>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Saved Places</p>
-                  {favorites.map((fav: any) => (
-                    <div key={fav.id} className="flex items-center gap-3 px-3.5 py-3 hover:bg-gray-50 rounded-xl transition-colors">
-                      <div
-                        className="flex items-center gap-3 flex-1 cursor-pointer"
-                        onClick={() => { setDropoff(fav.name); setDestinationCoords(fav.coords); setStep('select'); }}
-                      >
-                        <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
-                          <Star size={15} className="text-amber-400 fill-amber-400" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-gray-900">{fav.name}</p>
-                          <p className="text-xs text-gray-400 truncate mt-0.5 max-w-[200px]">{fav.label.split(',').slice(0,2).join(',')}</p>
+      {/* Collapsible content — hidden on mobile when collapsed */}
+      <AnimatePresence initial={false}>
+        {(isExpanded || suggestions.length > 0) && (
+          <motion.div
+            key="home-expanded"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            className="overflow-hidden md:overflow-visible"
+          >
+            <div className="max-h-[55vh] overflow-y-auto pb-6 md:max-h-none md:pb-10">
+              {suggestions.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+                  {loading && <div className="p-4 text-center text-xs text-gray-400 tracking-wide">Searching...</div>}
+                  {suggestions.map((place, i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                      <div onClick={() => handleSelect(place)} className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer py-0.5">
+                        <MapPin size={13} className="text-gray-300 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 leading-tight truncate">{place.name || place.display_name.split(',')[0]}</p>
+                          <p className="text-xs text-gray-400 truncate mt-0.5">{place.display_name}</p>
                         </div>
                       </div>
-                      {onRemoveFavorite && (
-                        <button
-                          onClick={() => onRemoveFavorite(fav.id)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-300 hover:text-red-400 shrink-0"
-                        >
-                          <X size={13} />
+                      {onSaveFavorite && !favorites.some((f: any) => f.label === place.display_name) && (
+                        <button onClick={e => { e.stopPropagation(); handleSaveSuggestion(place); }} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-300 hover:text-gray-600">
+                          <Star size={13} />
                         </button>
+                      )}
+                      {onSaveFavorite && favorites.some((f: any) => f.label === place.display_name) && (
+                        <div className="shrink-0 w-7 h-7 flex items-center justify-center"><Star size={13} className="text-amber-400 fill-amber-400" /></div>
                       )}
                     </div>
                   ))}
-                  <div className="h-px bg-gray-100 mx-3.5 my-2" />
+                </div>
+              )}
+
+              {!suggestions.length && (
+                <>
+                  {activeField === 'pickup' && (
+                    <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                      onClick={() => { setPickup('Current Location'); setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); }}>
+                      <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Navigation size={16} className="text-gray-600" /></div>
+                      <div>
+                        <p className="font-semibold text-sm text-gray-900">Current Location</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Use GPS location</p>
+                      </div>
+                    </div>
+                  )}
+                  {activeField === 'dropoff' && (
+                    <>
+                      {favorites.length > 0 && (
+                        <>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Saved Places</p>
+                          {favorites.map((fav: any) => (
+                            <div key={fav.id} className="flex items-center gap-3 px-3.5 py-3 hover:bg-gray-50 rounded-xl transition-colors">
+                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => { setDropoff(fav.name); setDestinationCoords(fav.coords); setStep('select'); }}>
+                                <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0"><Star size={15} className="text-amber-400 fill-amber-400" /></div>
+                                <div>
+                                  <p className="font-semibold text-sm text-gray-900">{fav.name}</p>
+                                  <p className="text-xs text-gray-400 truncate mt-0.5 max-w-[200px]">{fav.label.split(',').slice(0,2).join(',')}</p>
+                                </div>
+                              </div>
+                              {onRemoveFavorite && (
+                                <button onClick={() => onRemoveFavorite(fav.id)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-300 hover:text-red-400 shrink-0"><X size={13} /></button>
+                              )}
+                            </div>
+                          ))}
+                          <div className="h-px bg-gray-100 mx-3.5 my-2" />
+                        </>
+                      )}
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Quick Destinations</p>
+                      <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                        onClick={() => { setDropoff('Home'); setDestinationCoords([6.1000, 125.1700]); setStep('select'); }}>
+                        <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Home size={16} className="text-gray-600" /></div>
+                        <div><p className="font-semibold text-sm text-gray-900">Home</p><p className="text-xs text-gray-400 mt-0.5">General Santos City</p></div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                        onClick={() => { setDropoff('Work'); setDestinationCoords([6.1164, 125.1716]); setStep('select'); }}>
+                        <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Briefcase size={16} className="text-gray-600" /></div>
+                        <div><p className="font-semibold text-sm text-gray-900">Work</p><p className="text-xs text-gray-400 mt-0.5">CBD, General Santos</p></div>
+                      </div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mt-5 mb-2">Recent</p>
+                      <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                        onClick={() => { setDropoff('SM City GenSan'); setDestinationCoords([6.1070, 125.1640]); setStep('select'); }}>
+                        <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Clock size={16} className="text-gray-400" /></div>
+                        <div><p className="font-semibold text-sm text-gray-900">SM City GenSan</p><p className="text-xs text-gray-400 mt-0.5">General Santos City</p></div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Quick Destinations</p>
-              <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                onClick={() => { setDropoff('Home'); setDestinationCoords([6.1000, 125.1700]); setStep('select'); }}>
-                <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Home size={16} className="text-gray-600" /></div>
-                <div>
-                  <p className="font-semibold text-sm text-gray-900">Home</p>
-                  <p className="text-xs text-gray-400 mt-0.5">General Santos City</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                onClick={() => { setDropoff('Work'); setDestinationCoords([6.1164, 125.1716]); setStep('select'); }}>
-                <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Briefcase size={16} className="text-gray-600" /></div>
-                <div>
-                  <p className="font-semibold text-sm text-gray-900">Work</p>
-                  <p className="text-xs text-gray-400 mt-0.5">CBD, General Santos</p>
-                </div>
-              </div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mt-5 mb-2">Recent</p>
-              <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                onClick={() => { setDropoff('SM City GenSan'); setDestinationCoords([6.1070, 125.1640]); setStep('select'); }}>
-                <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Clock size={16} className="text-gray-400" /></div>
-                <div>
-                  <p className="font-semibold text-sm text-gray-900">SM City GenSan</p>
-                  <p className="text-xs text-gray-400 mt-0.5">General Santos City</p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      </div>
     </motion.div>
   );
 };
