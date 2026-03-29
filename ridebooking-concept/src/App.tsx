@@ -3980,7 +3980,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     if (activeField === 'pickup') {
       setPickup(shortName); setPickupCoords(coords); setActiveField('dropoff'); setQuery(dropoff);
     } else {
-      setDropoff(shortName); setDestinationCoords(coords); setStep('select');
+      setDropoff(shortName); setDestinationCoords(coords);
     }
     setIsExpanded(false);
   };
@@ -4060,19 +4060,17 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
         </div>
       </div>
 
-      {/* Find a Rider button — shown when destination is set */}
-      <AnimatePresence>
-        {dropoff && (
-          <motion.button
-            key="find-rider-btn"
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
-            onClick={() => setStep('select')}
-            className="w-full py-4 bg-gray-950 text-white font-black text-[15px] rounded-2xl mb-3 hover:bg-gray-800 active:scale-[0.98] transition-all shadow-[0_4px_24px_rgba(0,0,0,0.18)]"
-          >
-            Find a Rider
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* Find a Rider button — always visible, active only when destination is set */}
+      <button
+        onClick={() => dropoff ? setStep('select') : handleFocus('dropoff')}
+        className={`w-full py-4 font-black text-[15px] rounded-2xl mb-3 transition-all active:scale-[0.98] ${
+          dropoff
+            ? 'bg-gray-950 text-white hover:bg-gray-800 shadow-[0_4px_24px_rgba(0,0,0,0.18)]'
+            : 'bg-gray-100 text-gray-400 cursor-default'
+        }`}
+      >
+        {dropoff ? 'Find a Rider' : 'Where are you going?'}
+      </button>
 
       {/* Suggestions */}
       {/* Collapsible content — hidden on mobile when collapsed */}
@@ -4131,7 +4129,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Saved Places</p>
                           {favorites.map((fav: any) => (
                             <div key={fav.id} className="flex items-center gap-3 px-3.5 py-3 hover:bg-gray-50 rounded-xl transition-colors">
-                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => { setDropoff(fav.name); setDestinationCoords(fav.coords); setStep('select'); }}>
+                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => { setDropoff(fav.name); setDestinationCoords(fav.coords); setIsExpanded(false); }}>
                                 <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0"><Star size={15} className="text-amber-400 fill-amber-400" /></div>
                                 <div>
                                   <p className="font-semibold text-sm text-gray-900">{fav.name}</p>
@@ -4148,18 +4146,18 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                       )}
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Quick Destinations</p>
                       <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                        onClick={() => { setDropoff('Home'); setDestinationCoords([6.1000, 125.1700]); setStep('select'); }}>
+                        onClick={() => { setDropoff('Home'); setDestinationCoords([6.1000, 125.1700]); setIsExpanded(false); }}>
                         <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Home size={16} className="text-gray-600" /></div>
                         <div><p className="font-semibold text-sm text-gray-900">Home</p><p className="text-xs text-gray-400 mt-0.5">General Santos City</p></div>
                       </div>
                       <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                        onClick={() => { setDropoff('Work'); setDestinationCoords([6.1164, 125.1716]); setStep('select'); }}>
+                        onClick={() => { setDropoff('Work'); setDestinationCoords([6.1164, 125.1716]); setIsExpanded(false); }}>
                         <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Briefcase size={16} className="text-gray-600" /></div>
                         <div><p className="font-semibold text-sm text-gray-900">Work</p><p className="text-xs text-gray-400 mt-0.5">CBD, General Santos</p></div>
                       </div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mt-5 mb-2">Recent</p>
                       <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                        onClick={() => { setDropoff('SM City GenSan'); setDestinationCoords([6.1070, 125.1640]); setStep('select'); }}>
+                        onClick={() => { setDropoff('SM City GenSan'); setDestinationCoords([6.1070, 125.1640]); setIsExpanded(false); }}>
                         <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Clock size={16} className="text-gray-400" /></div>
                         <div><p className="font-semibold text-sm text-gray-900">SM City GenSan</p><p className="text-xs text-gray-400 mt-0.5">General Santos City</p></div>
                       </div>
