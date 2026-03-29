@@ -125,6 +125,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [impersonating, setImpersonating] = useState<Profile | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -150,9 +151,29 @@ export default function App() {
   if (!profile.onboarded) return <OnboardingScreen profile={profile} onComplete={setProfile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
     return <ProfileSetupScreen profile={profile} onComplete={setProfile} />;
+
+  if (impersonating) {
+    const exitBanner = (
+      <div className="fixed top-0 inset-x-0 z-[200] bg-amber-400 text-amber-950 px-4 py-2 flex items-center justify-between text-[13px] font-bold shadow-lg">
+        <span>👁 Viewing as <strong>{impersonating.full_name || impersonating.email}</strong> ({impersonating.role})</span>
+        <button onClick={() => setImpersonating(null)} className="underline hover:no-underline">Exit</button>
+      </div>
+    );
+    const p = impersonating;
+    return (
+      <div className="pt-9">
+        {exitBanner}
+        {p.role === 'rider' ? <RiderDashboard profile={p} /> :
+         p.role === 'admin' ? <AdminDashboard profile={p} isSuperAdmin={false} /> :
+         p.role === 'super_admin' ? <AdminDashboard profile={p} isSuperAdmin={true} /> :
+         <UserApp profile={p} />}
+      </div>
+    );
+  }
+
   if (profile.role === 'rider') return <RiderDashboard profile={profile} />;
   if (profile.role === 'admin') return <AdminDashboard profile={profile} isSuperAdmin={false} />;
-  if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} />;
+  if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} onImpersonate={setImpersonating} />;
   return <UserApp profile={profile} />;
 }
 
@@ -2766,7 +2787,7 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'pricing', label: 'Pricing Config' },
 ];
 
-const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAdmin: boolean }) => {
+const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Profile, isSuperAdmin: boolean, onImpersonate?: (p: Profile) => void }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('live');
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -2799,7 +2820,14 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
 
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
-    getAdminRoles().then(data => setAdminRoles(data));
+    getAdminRoles().then(data => {
+      setAdminRoles(data);
+      // After roles load, if current tab isn't allowed, jump to first allowed tab
+      if (!isSuperAdmin && profile.admin_role_ids?.length) {
+        const allowed = new Set(data.filter(r => profile.admin_role_ids?.includes(r.id)).flatMap(r => r.modules));
+        setActiveTab(prev => allowed.has(prev) ? prev : (allowed.values().next().value as AdminTab ?? 'live'));
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -3780,6 +3808,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Role</th>
+                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">View As</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3858,10 +3887,20 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                                 <span className="text-[12px] text-gray-300">—</span>
                               )}
                             </td>
+                            <td className="px-5 py-4">
+                              {onImpersonate && u.id !== profile.id && (
+                                <button
+                                  onClick={() => onImpersonate(u)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                >
+                                  <Eye size={12} /> View As
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         ))}
                         {allUsers.length === 0 && (
-                          <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
+                          <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
                         )}
                       </tbody>
                     </table>
