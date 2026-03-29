@@ -1716,6 +1716,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
   const [ridePhase, setRidePhase] = useState<'pickup' | 'dropoff'>('pickup');
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [showRestoredBanner, setShowRestoredBanner] = useState(restored);
   useEffect(() => {
     if (!restored) return;
@@ -1834,61 +1835,75 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         </div>
       </div>
 
-      {/* Bottom Panel */}
-      <div className="bg-white rounded-t-[28px] px-6 pt-5 pb-8 shadow-2xl">
-        <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-400 hover:text-gray-700 transition-colors mb-4"
-          >
-            <ChevronLeft size={14} /> Back to dashboard
-          </button>
-        )}
+      {/* Bottom Panel — collapsible */}
+      <div className="bg-white rounded-t-[28px] shadow-2xl">
+        {/* Handle + summary — always visible, tap to expand/collapse */}
+        <button
+          onClick={() => setIsPanelExpanded(e => !e)}
+          className="w-full pt-4 pb-3 px-6 text-left"
+        >
+          <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+              {request.user?.first_name?.[0] || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-gray-900 text-sm truncate">{request.user?.first_name} {request.user?.last_name || ''}</p>
+              <p className="text-xs text-gray-400">{ridePhase === 'pickup' ? 'Heading to pickup' : 'On the way to destination'}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <p className="font-black text-lg text-emerald-600">₱{request.fare}</p>
+              <ChevronLeft size={18} className={`text-gray-400 transition-transform duration-200 ${isPanelExpanded ? 'rotate-90' : '-rotate-90'}`} />
+            </div>
+          </div>
+        </button>
 
-        {/* User + fare */}
-        <div className="flex items-center gap-4 mb-5">
-          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 text-lg">
-            {request.user?.first_name?.[0] || request.user?.email?.[0] || 'U'}
-          </div>
-          <div className="flex-1">
-            <p className="font-black text-gray-900 text-base">{request.user?.first_name} {request.user?.last_name || ''}</p>
-            <p className="text-xs text-gray-400 font-medium">Passenger</p>
-          </div>
-          <div className="text-right">
-            <p className="font-black text-2xl text-emerald-600">₱{request.fare}</p>
-            <div className="flex items-center gap-2 justify-end text-xs text-gray-400 font-medium">
-              <span>{distanceLabel}</span>
-              <span>·</span>
-              <span>{durationLabel} away</span>
-            </div>
-          </div>
-        </div>
+        {/* Collapsible details */}
+        <AnimatePresence initial={false}>
+          {isPanelExpanded && (
+            <motion.div
+              key="rider-details"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              className="overflow-hidden"
+            >
+              <div className="px-6 pb-2">
+                {onBack && (
+                  <button onClick={onBack} className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-400 hover:text-gray-700 transition-colors mb-4">
+                    <ChevronLeft size={14} /> Back to dashboard
+                  </button>
+                )}
+                {/* Route */}
+                <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-3">
+                  <div className={`flex items-center gap-3 transition-opacity ${ridePhase === 'dropoff' ? 'opacity-40' : ''}`}>
+                    <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium">Pick up</p>
+                      <p className="text-sm font-bold text-gray-800">{request.pickup.label}</p>
+                    </div>
+                  </div>
+                  <div className="ml-3.5 w-px h-4 bg-gray-300" />
+                  <div className={`flex items-center gap-3 transition-opacity ${ridePhase === 'pickup' ? 'opacity-40' : ''}`}>
+                    <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium">Drop off</p>
+                      <p className="text-sm font-bold text-gray-800">{request.dropoff.label}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Route */}
-        <div className="bg-gray-50 rounded-2xl p-4 mb-5 space-y-3">
-          <div className={`flex items-center gap-3 transition-opacity ${ridePhase === 'dropoff' ? 'opacity-40' : ''}`}>
-            <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Pick up</p>
-              <p className="text-sm font-bold text-gray-800">{request.pickup.label}</p>
-            </div>
-          </div>
-          <div className="ml-3.5 w-px h-4 bg-gray-300" />
-          <div className={`flex items-center gap-3 transition-opacity ${ridePhase === 'pickup' ? 'opacity-40' : ''}`}>
-            <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Drop off</p>
-              <p className="text-sm font-bold text-gray-800">{request.dropoff.label}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3">
+        {/* Action buttons — always visible */}
+        <div className="px-6 pb-8 pt-2 flex gap-3">
           <button
             onClick={() => setIsChatOpen(true)}
             className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors shrink-0"
@@ -2625,6 +2640,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
   const [analyticsData, setAnalyticsData] = useState<{ dayCounts: number[]; totalThisWeek: number; totalLastWeek: number } | null>(null);
   const [financeData, setFinanceData] = useState<{ grossTotal: number; grossThisWeek: number; grossLastWeek: number; recentRides: any[] } | null>(null);
   const [liveRiderLocations, setLiveRiderLocations] = useState<Record<string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }>>({});
+  const [onlineNoGps, setOnlineNoGps] = useState<Record<string, { riderName: string; riderAvatar?: string }>>({});
   const rideInfoCache = React.useRef<Record<string, any>>({});
 
   useEffect(() => {
@@ -2698,27 +2714,26 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
   useEffect(() => {
     if (activeTab !== 'live') return;
 
-    // Initial load
+    // Initial load — fetch ALL online riders, split by GPS availability
     const loadOnlineRiders = async () => {
       const { data } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, full_name, avatar_url, last_lat, last_lng')
         .eq('is_online', true)
-        .eq('role', 'rider')
-        .not('last_lat', 'is', null);
+        .eq('role', 'rider');
       if (!data) return;
-      setLiveRiderLocations(prev => {
-        const next: typeof prev = {};
-        data.forEach((r: any) => {
-          next[r.id] = {
-            lat: r.last_lat, lng: r.last_lng,
-            riderName: r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider',
-            riderAvatar: r.avatar_url,
-            status: 'online',
-          };
-        });
-        return next;
+      const withGps: typeof liveRiderLocations = {};
+      const withoutGps: typeof onlineNoGps = {};
+      data.forEach((r: any) => {
+        const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
+        if (r.last_lat != null && r.last_lng != null) {
+          withGps[r.id] = { lat: r.last_lat, lng: r.last_lng, riderName: name, riderAvatar: r.avatar_url, status: 'online' };
+        } else {
+          withoutGps[r.id] = { riderName: name, riderAvatar: r.avatar_url };
+        }
       });
+      setLiveRiderLocations(withGps);
+      setOnlineNoGps(withoutGps);
     };
     loadOnlineRiders();
 
@@ -2728,18 +2743,22 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload: any) => {
         const r = payload.new;
         if (r.role !== 'rider') return;
-        if (r.is_online && r.last_lat != null && r.last_lng != null) {
+        const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
+        if (!r.is_online) {
+          // Rider went offline — remove from both lists
+          setLiveRiderLocations(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+          setOnlineNoGps(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+        } else if (r.last_lat != null && r.last_lng != null) {
+          // Online with GPS — show on map, remove from no-GPS list
           setLiveRiderLocations(prev => ({
             ...prev,
-            [r.id]: {
-              lat: r.last_lat, lng: r.last_lng,
-              riderName: r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider',
-              riderAvatar: r.avatar_url,
-              status: 'online',
-            },
+            [r.id]: { lat: r.last_lat, lng: r.last_lng, riderName: name, riderAvatar: r.avatar_url, status: 'online' },
           }));
+          setOnlineNoGps(prev => { const n = { ...prev }; delete n[r.id]; return n; });
         } else {
+          // Online but no GPS yet — show in list only
           setLiveRiderLocations(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+          setOnlineNoGps(prev => ({ ...prev, [r.id]: { riderName: name, riderAvatar: r.avatar_url } }));
         }
       })
       .subscribe();
@@ -2908,7 +2927,9 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                 <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
                   <div>
                     <h3 className="font-bold text-sm text-gray-900">Live Rider Map</h3>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{Object.keys(liveRiderLocations).length} active rider{Object.keys(liveRiderLocations).length !== 1 ? 's' : ''} on map</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length} online rider{(Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length) !== 1 ? 's' : ''} · {Object.keys(liveRiderLocations).length} on map
+                    </p>
                   </div>
                   <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> LIVE
@@ -2932,6 +2953,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                     })}
                   </MapContainer>
                 </div>
+                {/* Riders with GPS */}
                 {Object.keys(liveRiderLocations).length > 0 && (
                   <div className="border-t border-gray-100 divide-y divide-gray-50">
                     {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([key, loc]) => (
@@ -2958,9 +2980,30 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                     ))}
                   </div>
                 )}
-                {Object.keys(liveRiderLocations).length === 0 && (
+                {/* Riders online but GPS not yet received */}
+                {Object.keys(onlineNoGps).length > 0 && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                    {(Object.entries(onlineNoGps) as [string, { riderName: string; riderAvatar?: string }][]).map(([key, r]) => (
+                      <div key={key} className="px-5 py-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border-2 border-emerald-400">
+                          {r.riderAvatar
+                            ? <img src={r.riderAvatar} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center font-bold text-xs bg-emerald-100 text-emerald-700">{r.riderName[0]}</div>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 truncate">{r.riderName}</p>
+                          <p className="text-[11px] text-gray-400">Waiting for GPS…</p>
+                        </div>
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Online
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {Object.keys(liveRiderLocations).length === 0 && Object.keys(onlineNoGps).length === 0 && (
                   <div className="px-5 py-4 text-center text-[12px] text-gray-400">
-                    Rider positions will appear here when they are on an active trip.
+                    No riders are online. Rider positions appear here when they go online.
                   </div>
                 )}
               </div>
@@ -4205,6 +4248,7 @@ const SearchingPanel = () => (
 const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, activeRider, fareBreakdown, pricingConfig, rideId, userId, userName }: any) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [riderReviews, setRiderReviews] = useState<{ rating: number; comment: string | null; user_name: string | null; completed_at: string }[]>([]);
 
   useEffect(() => {
@@ -4264,101 +4308,157 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
     <motion.div
       initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-6 pb-8 pointer-events-auto flex flex-col md:flex-1 md:overflow-y-auto"
+      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:flex-1 md:overflow-y-auto"
     >
-      <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-7 md:hidden" />
-      {/* ETA header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">On the way</p>
-          <h3 className="text-[1.75rem] font-black tracking-tight leading-tight">Arriving in 4 min</h3>
-          <p className="text-gray-400 text-sm font-medium mt-0.5">Toyota Vios · ABC 1234</p>
-        </div>
-        <div className="bg-gray-950 text-white text-sm font-black px-4 py-2 rounded-xl shrink-0">₱{activeFare.totalFare}</div>
-      </div>
-      {/* Driver card */}
-      <div className="flex items-center gap-3.5 p-4 bg-gray-50 rounded-2xl border border-gray-100 mb-5">
-        <div className="w-[52px] h-[52px] bg-gray-200 rounded-full overflow-hidden shrink-0">
-          {activeRider?.avatar_url ? (
-            <img src={activeRider.avatar_url} alt="Driver" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-400">{activeRider?.first_name?.[0] || 'D'}</div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="font-black text-[15px] truncate">{activeRider ? `${activeRider.first_name || ''} ${activeRider.last_name || ''}`.trim() : 'Juan Dela Cruz'}</h4>
-          <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-            <Star size={11} className="text-amber-400 fill-amber-400" />
-            <span>4.9</span>
-            <span className="text-gray-200">·</span>
-            <span>1.2k rides</span>
+      {/* Handle + always-visible header — tap to expand/collapse */}
+      <button
+        onClick={() => setIsExpanded(e => !e)}
+        className="w-full pt-4 pb-4 px-6 text-left md:hidden"
+      >
+        <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">On the way</p>
+            <h3 className="text-xl font-black tracking-tight leading-tight">Arriving in 4 min</h3>
+            <p className="text-gray-400 text-xs font-medium mt-0.5">
+              {activeRider ? `${activeRider.vehicle_make || ''} ${activeRider.vehicle_model || ''}`.trim() || 'Vehicle' : 'Toyota Vios'} · {activeRider?.vehicle_plate || 'ABC 1234'}
+            </p>
           </div>
-          <p className="text-[11px] font-semibold text-gray-500 mt-0.5 truncate">{activeRider?.vehicle_make} {activeRider?.vehicle_model} · {activeRider?.vehicle_plate}</p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <button onClick={() => setIsChatOpen(true)}
-            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
-            <MessageSquare size={16} />
-          </button>
-          <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
-            <Phone size={16} />
-          </button>
-        </div>
-      </div>
-      {/* Fare breakdown */}
-      <div className="mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
-        <div className="space-y-2 text-[13px]">
-          {[
-            { label: 'Base Fare',    value: activeFare.baseFare },
-            { label: 'Distance',     value: activeFare.distanceFee },
-            { label: 'Time',         value: activeFare.timeFee },
-            { label: 'Booking Fee',  value: activeFare.bookingFee },
-          ].map(row => (
-            <div key={row.label} className="flex justify-between text-gray-500">
-              <span>{row.label}</span><span>₱{row.value}</span>
-            </div>
-          ))}
-          <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
-            <span>Total</span><span>₱{activeFare.totalFare}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="bg-gray-950 text-white text-sm font-black px-3 py-1.5 rounded-xl">₱{activeFare.totalFare}</div>
+            <ChevronLeft size={18} className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
           </div>
         </div>
-      </div>
+      </button>
 
-      {riderReviews.length > 0 && (
-        <div className="mb-6 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Recent Reviews</p>
-          <div className="space-y-3">
-            {riderReviews.map((r, i) => (
-              <div key={i} className="flex gap-3">
-                <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center font-bold text-xs text-gray-600 shrink-0">{(r.user_name || 'P')[0].toUpperCase()}</div>
+      {/* Full details — collapsible on mobile, always visible on desktop */}
+      <AnimatePresence initial={false}>
+        {(isExpanded) && (
+          <motion.div
+            key="details"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            className="overflow-hidden"
+          >
+            <div className="px-6 pb-8 md:pt-6">
+              {/* ETA header (desktop only — already shown in handle on mobile) */}
+              <div className="hidden md:flex items-start justify-between mb-6">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">On the way</p>
+                  <h3 className="text-[1.75rem] font-black tracking-tight leading-tight">Arriving in 4 min</h3>
+                  <p className="text-gray-400 text-sm font-medium mt-0.5">
+                    {activeRider ? `${activeRider.vehicle_make || ''} ${activeRider.vehicle_model || ''}`.trim() || 'Vehicle' : 'Toyota Vios'} · {activeRider?.vehicle_plate || 'ABC 1234'}
+                  </p>
+                </div>
+                <div className="bg-gray-950 text-white text-sm font-black px-4 py-2 rounded-xl shrink-0">₱{activeFare.totalFare}</div>
+              </div>
+              {/* Driver card */}
+              <div className="flex items-center gap-3.5 p-4 bg-gray-50 rounded-2xl border border-gray-100 mb-5">
+                <div className="w-[52px] h-[52px] bg-gray-200 rounded-full overflow-hidden shrink-0">
+                  {activeRider?.avatar_url ? (
+                    <img src={activeRider.avatar_url} alt="Driver" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-400">{activeRider?.first_name?.[0] || 'D'}</div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    {[1,2,3,4,5].map(s => <Star key={s} size={10} className={s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-200'} />)}
+                  <h4 className="font-black text-[15px] truncate">{activeRider ? `${activeRider.first_name || ''} ${activeRider.last_name || ''}`.trim() : 'Juan Dela Cruz'}</h4>
+                  <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+                    <Star size={11} className="text-amber-400 fill-amber-400" />
+                    <span>4.9</span>
+                    <span className="text-gray-200">·</span>
+                    <span>1.2k rides</span>
                   </div>
-                  {r.comment && <p className="text-sm text-gray-700">"{r.comment}"</p>}
-                  <p className="text-xs text-gray-400 mt-0.5">{r.user_name} · {r.completed_at ? new Date(r.completed_at).toLocaleDateString() : ''}</p>
+                  <p className="text-[11px] font-semibold text-gray-500 mt-0.5 truncate">{activeRider?.vehicle_make} {activeRider?.vehicle_model} · {activeRider?.vehicle_plate}</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => setIsChatOpen(true)}
+                    className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
+                    <MessageSquare size={16} />
+                  </button>
+                  <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
+                    <Phone size={16} />
+                  </button>
                 </div>
               </div>
-            ))}
+              {/* Fare breakdown */}
+              <div className="mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
+                <div className="space-y-2 text-[13px]">
+                  {[
+                    { label: 'Base Fare',   value: activeFare.baseFare },
+                    { label: 'Distance',    value: activeFare.distanceFee },
+                    { label: 'Time',        value: activeFare.timeFee },
+                    { label: 'Booking Fee', value: activeFare.bookingFee },
+                  ].map(row => (
+                    <div key={row.label} className="flex justify-between text-gray-500">
+                      <span>{row.label}</span><span>₱{row.value}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                    <span>Total</span><span>₱{activeFare.totalFare}</span>
+                  </div>
+                </div>
+              </div>
+              {riderReviews.length > 0 && (
+                <div className="mb-6 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Recent Reviews</p>
+                  <div className="space-y-3">
+                    {riderReviews.map((r, i) => (
+                      <div key={i} className="flex gap-3">
+                        <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center font-bold text-xs text-gray-600 shrink-0">{(r.user_name || 'P')[0].toUpperCase()}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1 mb-0.5">
+                            {[1,2,3,4,5].map(s => <Star key={s} size={10} className={s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-200'} />)}
+                          </div>
+                          {r.comment && <p className="text-sm text-gray-700">"{r.comment}"</p>}
+                          <p className="text-xs text-gray-400 mt-0.5">{r.user_name} · {r.completed_at ? new Date(r.completed_at).toLocaleDateString() : ''}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {showCancelConfirm ? (
+                <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
+                  <h4 className="font-black text-sm text-red-800 mb-1">Cancel your ride?</h4>
+                  <p className="text-red-500 text-xs mb-4">You may be charged a small cancellation fee if the driver is already on the way.</p>
+                  <div className="flex gap-2.5">
+                    <button onClick={() => setShowCancelConfirm(false)} className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 transition-colors">Keep Ride</button>
+                    <button onClick={onCancel} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-red-700 transition-colors">Yes, Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">Share ETA</button>
+                  <button onClick={() => setShowCancelConfirm(true)} className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors">Cancel</button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop: always show actions */}
+      <div className="hidden md:block px-6 pb-8">
+        {showCancelConfirm ? (
+          <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
+            <h4 className="font-black text-sm text-red-800 mb-1">Cancel your ride?</h4>
+            <p className="text-red-500 text-xs mb-4">You may be charged a small cancellation fee if the driver is already on the way.</p>
+            <div className="flex gap-2.5">
+              <button onClick={() => setShowCancelConfirm(false)} className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm">Keep Ride</button>
+              <button onClick={onCancel} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm">Yes, Cancel</button>
+            </div>
           </div>
-        </div>
-      )}
-      {showCancelConfirm ? (
-        <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
-          <h4 className="font-black text-sm text-red-800 mb-1">Cancel your ride?</h4>
-          <p className="text-red-500 text-xs mb-4">You may be charged a small cancellation fee if the driver is already on the way.</p>
-          <div className="flex gap-2.5">
-            <button onClick={() => setShowCancelConfirm(false)} className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 transition-colors">Keep Ride</button>
-            <button onClick={onCancel} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-red-700 transition-colors">Yes, Cancel</button>
+        ) : (
+          <div className="flex gap-3">
+            <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm">Share ETA</button>
+            <button onClick={() => setShowCancelConfirm(true)} className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm">Cancel</button>
           </div>
-        </div>
-      ) : (
-        <div className="flex gap-3">
-          <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">Share ETA</button>
-          <button onClick={() => setShowCancelConfirm(true)} className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors">Cancel</button>
-        </div>
-      )}
+        )}
+      </div>
     </motion.div>
   );
 };
