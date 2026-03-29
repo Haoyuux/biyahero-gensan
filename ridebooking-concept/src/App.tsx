@@ -1128,56 +1128,85 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
       <ConnectionBanner state={connectionState} />
       <NotificationToast message={notification} />
 
-      {/* ── Sidebar (desktop) / Floating UI (mobile) ── */}
+      {/* ── Floating nav — mobile only, overlays the map ── */}
+      <div className="absolute top-0 inset-x-0 z-30 p-4 flex justify-between items-center pointer-events-none md:hidden">
+        <div className="flex items-center gap-2">
+          {step === 'home' ? (
+            <button className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
+              <Menu size={22} />
+            </button>
+          ) : step === 'matched' ? (
+            <button onClick={() => setStep('home')} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
+              <ChevronLeft size={22} />
+            </button>
+          ) : (
+            <button onClick={() => handleCancelBooking(step === 'searching')} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
+              <ChevronLeft size={22} />
+            </button>
+          )}
+          <button onClick={() => setShowChatHistory(true)} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto relative">
+            <MessageSquare size={20} />
+          </button>
+          {step === 'home' && (
+            <button onClick={() => setShowRideHistory(true)} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
+              <Clock size={20} />
+            </button>
+          )}
+          <button
+            onClick={() => { setShowNotifications(true); setAppNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
+            className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto relative"
+          >
+            <Bell size={20} />
+            {appNotifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] font-black flex items-center justify-center leading-none">
+                {appNotifications.filter(n => !n.read).length > 9 ? '9+' : appNotifications.filter(n => !n.read).length}
+              </span>
+            )}
+          </button>
+        </div>
+        <button
+          onClick={() => setShowProfile(true)}
+          className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden border-2 border-white cursor-pointer hover:scale-105 transition-transform pointer-events-auto"
+        >
+          {currentProfile.avatar_url
+            ? <img src={currentProfile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+            : <User size={22} className="text-gray-600" />}
+        </button>
+      </div>
+
+      {/* ── Sidebar — below map on mobile (flex-none), left panel on desktop ── */}
       <div className="
-        absolute inset-0 z-20 pointer-events-none
-        md:relative md:inset-auto md:w-[420px] md:flex md:flex-col md:shrink-0
-        md:bg-white md:shadow-[4px_0_24px_rgba(0,0,0,0.1)] md:z-20 md:pointer-events-auto md:overflow-hidden
+        flex flex-col flex-none order-2
+        md:order-1 md:w-[420px] md:shrink-0
+        md:bg-white md:shadow-[4px_0_24px_rgba(0,0,0,0.1)] md:z-20 md:overflow-hidden
       ">
-        {/* Top Nav — floating on mobile, header on desktop */}
-        <div className="
-          absolute top-0 inset-x-0 z-20 p-4 flex justify-between items-center pointer-events-none
-          md:relative md:flex-none md:border-b md:border-gray-100 md:bg-white md:pointer-events-auto md:z-auto
-        ">
+        {/* Desktop nav header — hidden on mobile (floating nav used instead) */}
+        <div className="hidden md:flex flex-none border-b border-gray-100 bg-white p-4 justify-between items-center">
           <div className="flex items-center gap-2">
-            {/* Back arrow */}
             {step === 'home' ? (
-              <button className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto md:shadow-none md:border md:border-gray-200">
+              <button className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
                 <Menu size={22} />
               </button>
             ) : step === 'matched' ? (
-              // During matched: back goes to home view but keeps the ride active
-              <button onClick={() => setStep('home')} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto md:shadow-none md:border md:border-gray-200">
+              <button onClick={() => setStep('home')} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
                 <ChevronLeft size={22} />
               </button>
             ) : (
-              // select / searching: back cancels/resets
-              <button onClick={() => handleCancelBooking(step === 'searching')} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto md:shadow-none md:border md:border-gray-200">
+              <button onClick={() => handleCancelBooking(step === 'searching')} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
                 <ChevronLeft size={22} />
               </button>
             )}
-
-            {/* Always-visible utility buttons — no longer gated to home step */}
-            <button
-              onClick={() => setShowChatHistory(true)}
-              className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto md:shadow-none md:border md:border-gray-200 relative"
-            >
+            <button onClick={() => setShowChatHistory(true)} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full relative">
               <MessageSquare size={20} />
             </button>
             {step === 'home' && (
-              <button
-                onClick={() => setShowRideHistory(true)}
-                className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto md:shadow-none md:border md:border-gray-200"
-              >
+              <button onClick={() => setShowRideHistory(true)} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
                 <Clock size={20} />
               </button>
             )}
             <button
-              onClick={() => {
-                setShowNotifications(true);
-                setAppNotifications(prev => prev.map(n => ({ ...n, read: true })));
-              }}
-              className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto md:shadow-none md:border md:border-gray-200 relative"
+              onClick={() => { setShowNotifications(true); setAppNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
+              className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full relative"
             >
               <Bell size={20} />
               {appNotifications.filter(n => !n.read).length > 0 && (
@@ -1187,10 +1216,9 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
               )}
             </button>
           </div>
-
           <button
             onClick={() => setShowProfile(true)}
-            className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden border-2 border-white cursor-pointer hover:scale-105 transition-transform pointer-events-auto"
+            className="w-11 h-11 flex items-center justify-center overflow-hidden border-2 border-white rounded-full cursor-pointer hover:scale-105 transition-transform"
           >
             {currentProfile.avatar_url
               ? <img src={currentProfile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
@@ -1198,11 +1226,8 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
           </button>
         </div>
 
-        {/* Panel slot — bottom sheet on mobile, fills sidebar on desktop */}
-        <div className="
-          absolute bottom-0 inset-x-0 pointer-events-none
-          md:relative md:inset-auto md:flex-1 md:overflow-hidden md:flex md:flex-col
-        ">
+        {/* Panel slot — natural height on mobile, fills sidebar on desktop */}
+        <div className="relative md:flex-1 md:overflow-hidden md:flex md:flex-col">
           <AnimatePresence mode="wait">
             {step === 'home' && (
               <>
@@ -1299,9 +1324,9 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
         </div>
       </div>
 
-      {/* Map — full screen behind on mobile, fills right on desktop */}
-      <div className="absolute inset-0 z-0 md:relative md:inset-auto md:flex-1 relative">
-        <MapContainer center={startLoc} zoom={15} zoomControl={false} className="w-full h-full">
+      {/* Map — flex-1 above panels on mobile, fills right on desktop */}
+      <div className="flex-1 relative min-h-0 order-1 md:order-2">
+        <MapContainer center={startLoc} zoom={15} zoomControl={false} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -1343,7 +1368,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
           <MapBounds start={startLoc} routeCoords={routeCoords} step={step} />
         </MapContainer>
         {(step === 'home' || step === 'select') && (
-          <div className="absolute bottom-40 inset-x-0 flex justify-center z-10 pointer-events-none md:bottom-6">
+          <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
             <div className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
               Drag pin to adjust {step === 'select' ? 'pickup or destination' : 'pickup location'}
             </div>
