@@ -142,7 +142,7 @@ export default function App() {
 // ─── Splash Screen ────────────────────────────────────────────────────────────
 
 const SplashScreen = () => (
-  <div className="w-full h-screen bg-[#080808] flex flex-col items-center justify-center font-sans">
+  <div className="w-full h-[100dvh] bg-[#080808] flex flex-col items-center justify-center font-sans">
     <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center mb-8">
       <Car size={22} className="text-white" />
     </div>
@@ -156,7 +156,7 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="relative w-full h-screen bg-[#080808] flex flex-col items-center justify-center font-sans overflow-hidden">
+    <div className="relative w-full h-[100dvh] bg-[#080808] flex flex-col items-center justify-center font-sans overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(16,185,129,0.07),transparent)]" />
 
       <motion.div
@@ -210,7 +210,7 @@ const OnboardingScreen = ({ profile, onComplete }: { profile: Profile, onComplet
   };
 
   return (
-    <div className="w-full min-h-screen bg-white flex flex-col items-center justify-center font-sans px-6 py-10">
+    <div className="w-full min-h-[100dvh] bg-white flex flex-col items-center justify-center font-sans px-6 py-10">
       <motion.div
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }}
         className="w-full max-w-[360px]"
@@ -323,8 +323,8 @@ const ProfileSetupScreen = ({ profile, onComplete }: { profile: Profile, onCompl
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-100 font-sans overflow-y-auto">
-      <div className="max-w-2xl mx-auto bg-gray-50 min-h-screen md:shadow-xl">
+    <div className="w-full min-h-[100dvh] bg-gray-100 font-sans overflow-y-auto">
+      <div className="max-w-2xl mx-auto bg-gray-50 min-h-[100dvh] md:shadow-xl">
       {/* Cover Photo */}
       <div className="relative h-48 bg-gradient-to-br from-emerald-400 to-emerald-600 overflow-hidden">
         {coverUrl && <img src={coverUrl} alt="cover" className="w-full h-full object-cover" />}
@@ -522,9 +522,9 @@ const UserProfileScreen = ({ profile, onBack, onUpdate }: { profile: Profile, on
     <motion.div
       initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-      className="w-full min-h-screen bg-gray-100 font-sans overflow-y-auto"
+      className="w-full min-h-[100dvh] bg-gray-100 font-sans overflow-y-auto"
     >
-      <div className="max-w-2xl mx-auto bg-gray-50 min-h-screen md:shadow-xl">
+      <div className="max-w-2xl mx-auto bg-gray-50 min-h-[100dvh] md:shadow-xl">
       {/* Cover Photo */}
       <div className="relative h-52 bg-gradient-to-br from-emerald-400 to-emerald-600 overflow-hidden">
         {coverUrl && <img src={coverUrl} alt="cover" className="w-full h-full object-cover" />}
@@ -704,7 +704,7 @@ const NotificationsPanel = ({
   };
 
   return (
-    <div className="w-full h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="w-full h-[100dvh] bg-gray-50 flex flex-col font-sans">
       <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3 shrink-0">
         <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
           <ChevronLeft size={22} />
@@ -1124,12 +1124,12 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
   }
 
   return (
-    <div className="w-full h-screen overflow-hidden flex flex-col md:flex-row font-sans text-gray-900">
+    <div className="w-full h-[100dvh] overflow-hidden flex flex-col md:flex-row font-sans text-gray-900">
       <ConnectionBanner state={connectionState} />
       <NotificationToast message={notification} />
 
       {/* ── Floating nav — mobile only, overlays the map ── */}
-      <div className="absolute top-0 inset-x-0 z-30 p-4 flex justify-between items-center pointer-events-none md:hidden">
+      <div className="absolute top-0 inset-x-0 z-30 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center pointer-events-none md:hidden">
         <div className="flex items-center gap-2">
           {step === 'home' ? (
             <button className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
@@ -1497,9 +1497,9 @@ const RiderProfileScreen = ({ profile, onBack, onUpdate }: { profile: Profile, o
     <motion.div
       initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-      className="w-full min-h-screen bg-gray-100 font-sans overflow-y-auto"
+      className="w-full min-h-[100dvh] bg-gray-100 font-sans overflow-y-auto"
     >
-      <div className="max-w-2xl mx-auto bg-gray-50 min-h-screen md:shadow-xl">
+      <div className="max-w-2xl mx-auto bg-gray-50 min-h-[100dvh] md:shadow-xl">
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-br from-emerald-500 to-emerald-700 overflow-hidden">
           {coverUrl && <img src={coverUrl} alt="cover" className="w-full h-full object-cover" />}
@@ -1801,7 +1801,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
 
   if (isChatOpen) {
     return (
-      <div className="w-full h-screen flex flex-col">
+      <div className="w-full h-[100dvh] flex flex-col">
         <RealtimeChat
           rideId={request.rideId}
           senderId={profile.id}
@@ -1816,7 +1816,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   }
 
   return (
-    <div className="w-full h-screen flex flex-col bg-gray-900 font-sans">
+    <div className="w-full h-[100dvh] flex flex-col bg-gray-900 font-sans">
       {/* Restored-session banner */}
       <AnimatePresence>
         {showRestoredBanner && (
@@ -1928,7 +1928,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         </AnimatePresence>
 
         {/* Action buttons — always visible */}
-        <div className="px-6 pb-8 pt-2 flex gap-3">
+        <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-2 flex gap-3">
           <button
             onClick={() => setIsChatOpen(true)}
             className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors shrink-0"
@@ -2205,48 +2205,48 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
   }
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900">
       <ConnectionBanner state={riderConnectionState} />
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gray-950 rounded-xl flex items-center justify-center">
-            <Car size={17} className="text-white" />
+      <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+          <div className="w-8 h-8 md:w-9 md:h-9 bg-gray-950 rounded-xl flex items-center justify-center shrink-0">
+            <Car size={16} className="text-white" />
           </div>
-          <div>
-            <h1 className="font-black text-[15px] text-gray-950 leading-tight">Fetch Driver</h1>
-            <p className="text-[11px] text-gray-400 mt-0.5">{currentProfile.full_name || currentProfile.email}</p>
+          <div className="min-w-0">
+            <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">Fetch Driver</h1>
+            <p className="text-[10px] md:text-[11px] text-gray-400 mt-0.5 truncate max-w-[120px] md:max-w-none">{currentProfile.full_name || currentProfile.email}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wide ${isOnline && !requestAccepted ? 'bg-emerald-50 text-emerald-700' : requestAccepted ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-500'}`}>
+        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+          <div className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black tracking-wide ${isOnline && !requestAccepted ? 'bg-emerald-50 text-emerald-700' : requestAccepted ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-500'}`}>
             {requestAccepted ? 'ON TRIP' : isOnline ? 'ONLINE' : 'OFFLINE'}
           </div>
-          <button onClick={() => setShowChatHistory(true)} className="w-9 h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors">
-            <MessageSquare size={16} className="text-gray-600" />
+          <button onClick={() => setShowChatHistory(true)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors">
+            <MessageSquare size={15} className="text-gray-600" />
           </button>
           <button
             onClick={() => {
               setShowNotifications(true);
               setAppNotifications(prev => prev.map(n => ({ ...n, read: true })));
             }}
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="relative w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
           >
-            <Bell size={16} className="text-gray-600" />
+            <Bell size={15} className="text-gray-600" />
             {appNotifications.filter(n => !n.read).length > 0 && (
-              <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-red-500 rounded-full text-white text-[9px] font-black flex items-center justify-center leading-none">
+              <span className="absolute top-1 right-1 w-3 h-3 md:w-3.5 md:h-3.5 bg-red-500 rounded-full text-white text-[8px] md:text-[9px] font-black flex items-center justify-center leading-none">
                 {appNotifications.filter(n => !n.read).length > 9 ? '9+' : appNotifications.filter(n => !n.read).length}
               </span>
             )}
           </button>
-          <button onClick={() => setShowProfile(true)} className="w-9 h-9 rounded-xl overflow-hidden border border-gray-200 cursor-pointer hover:border-gray-400 transition-colors">
+          <button onClick={() => setShowProfile(true)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl overflow-hidden border border-gray-200 cursor-pointer hover:border-gray-400 transition-colors">
             {currentProfile.avatar_url
               ? <img src={currentProfile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-              : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><User size={16} className="text-gray-500" /></div>}
+              : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><User size={15} className="text-gray-500" /></div>}
           </button>
           <button
             onClick={() => signOut()}
-            className="w-9 h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-colors"
+            className="hidden md:flex w-9 h-9 rounded-xl items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-colors"
           >
             <LogOut size={16} />
           </button>
@@ -2254,7 +2254,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
       </div>
 
       {/* Tab Bar */}
-      <div className="bg-white border-b border-gray-100 px-5 flex gap-1">
+      <div className="bg-white border-b border-gray-100 px-4 md:px-5 flex gap-1">
         {(['home', 'history'] as const).map(tab => (
           <button
             key={tab}
@@ -2266,7 +2266,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
         ))}
       </div>
 
-      <div className="max-w-xl mx-auto p-5 space-y-4">
+      <div className="max-w-xl mx-auto p-4 md:p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4">
 
         {/* Ongoing ride banner — shown when rider backed out to dashboard */}
         <AnimatePresence>
@@ -2876,7 +2876,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
   ];
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans text-gray-900">
+    <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col md:flex-row font-sans text-gray-900">
       {/* Sidebar */}
       <div className="w-full md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0">
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/[0.06]">
@@ -3860,7 +3860,7 @@ const ChatHistoryScreen = ({ userId, userName, role = 'user', onBack }: { userId
   }
 
   return (
-    <div className="w-full h-screen bg-white flex flex-col font-sans">
+    <div className="w-full h-[100dvh] bg-white flex flex-col font-sans">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100 bg-white shrink-0">
         <button onClick={onBack} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
           <ChevronLeft size={22} />
@@ -4007,7 +4007,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
 
       <div className="px-6 pb-2 md:pt-6">
         <div className="flex items-center justify-between mb-4 md:mb-5">
-          <h2 className="text-[1.75rem] font-black tracking-tight leading-tight">Where to?</h2>
+          <h2 className="text-[1.35rem] md:text-[1.75rem] font-black tracking-tight leading-tight">Where to?</h2>
           <ChevronLeft size={20} className={`text-gray-300 md:hidden transition-transform duration-200 ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
         </div>
 
@@ -4058,7 +4058,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="overflow-hidden md:overflow-visible"
           >
-            <div className="max-h-[55vh] overflow-y-auto pb-6 md:max-h-none md:pb-10">
+            <div className="max-h-[55vh] overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))] md:max-h-none md:pb-10">
               {suggestions.length > 0 && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
                   {loading && <div className="p-4 text-center text-xs text-gray-400 tracking-wide">Searching...</div>}
@@ -4164,7 +4164,7 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
     <motion.div
       initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-6 pb-8 pointer-events-auto flex flex-col max-h-[80vh] md:max-h-none md:flex-1 md:overflow-y-auto"
+      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-6 md:pb-8 pointer-events-auto flex flex-col max-h-[80vh] md:max-h-none md:flex-1 md:overflow-y-auto"
     >
       <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-7 md:hidden" />
       <h3 className="text-[1.5rem] font-black tracking-tight mb-5">Choose a ride</h3>
@@ -4244,7 +4244,7 @@ const SearchingPanel = () => (
   <motion.div
     initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-    className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none px-8 pt-8 pb-16 pointer-events-auto flex flex-col items-center justify-center min-h-[40vh] md:min-h-0 md:flex-1"
+    className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none px-6 pt-6 pb-[max(2rem,env(safe-area-inset-bottom))] md:px-8 md:pt-8 md:pb-16 pointer-events-auto flex flex-col items-center justify-center min-h-[38vh] md:min-h-0 md:flex-1"
   >
     <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-10 md:hidden" />
     <div className="relative w-[72px] h-[72px] mb-8">
@@ -4370,7 +4370,7 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="overflow-hidden"
           >
-            <div className="px-6 pb-8 md:pt-6">
+            <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] md:pb-8 md:pt-6">
               {/* ETA header (desktop only — already shown in handle on mobile) */}
               <div className="hidden md:flex items-start justify-between mb-6">
                 <div>
@@ -4671,7 +4671,7 @@ const RideHistoryScreen = ({ userId, onBack }: { userId: string; onBack: () => v
   const totalSpent = rides.reduce((s, r) => s + (r.fare || 0), 0);
 
   return (
-    <div className="w-full h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="w-full h-[100dvh] bg-gray-50 flex flex-col font-sans">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3 shrink-0">
         <button onClick={onBack} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">

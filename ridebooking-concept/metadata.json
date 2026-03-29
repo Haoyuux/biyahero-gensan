@@ -1,5 +1,5 @@
 {
-  "name": "RideBooking Concept",
+  "name": "Fetch Gensan",
   "description": "A premium ride-booking application prototype featuring location selection, ride options, and fare estimation.",
   "requestFramePermissions": [
     "geolocation"
