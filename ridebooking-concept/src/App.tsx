@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
 import {
   Car, Bike, CreditCard, Menu, User, Clock, Star,
   ChevronLeft, Search, Phone, MessageSquare, MoreHorizontal,
@@ -3953,6 +3953,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const dragControls = useDragControls();
 
   useEffect(() => {
     if (query.length < 3) { setSuggestions([]); return; }
@@ -3998,15 +3999,28 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     <motion.div
       initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      drag="y"
+      dragControls={dragControls}
+      dragListener={false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0.15, bottom: 0.3 }}
+      onDragEnd={(_, info) => {
+        if (info.offset.y < -35 || info.velocity.y < -300) setIsExpanded(true);
+        if (info.offset.y > 35 || info.velocity.y > 300) setIsExpanded(false);
+      }}
       className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:flex-1 md:overflow-y-auto"
     >
-      {/* Handle — tap to expand/collapse on mobile */}
-      <button onClick={() => setIsExpanded(e => !e)} className="w-full pt-4 pb-2 md:hidden">
-        <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto" />
-      </button>
+      {/* Handle — tap to expand/collapse, drag up/down on mobile */}
+      <div
+        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-none"
+        onPointerDown={e => { dragControls.start(e); }}
+        onClick={() => setIsExpanded(e => !e)}
+      >
+        <div className="w-10 h-1.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full mx-auto transition-colors" />
+      </div>
 
-      <div className="px-6 pb-2 md:pt-6">
-        <div className="flex items-center justify-between mb-4 md:mb-5">
+      <div className="px-5 pb-2 md:px-6 md:pt-6">
+        <div className="flex items-center justify-between mb-3 md:mb-5">
           <h2 className="text-[1.35rem] md:text-[1.75rem] font-black tracking-tight leading-tight">Where to?</h2>
           <ChevronLeft size={20} className={`text-gray-300 md:hidden transition-transform duration-200 ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
         </div>
@@ -4045,6 +4059,20 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
           )}
         </div>
       </div>
+
+      {/* Find a Rider button — shown when destination is set */}
+      <AnimatePresence>
+        {dropoff && (
+          <motion.button
+            key="find-rider-btn"
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+            onClick={() => setStep('select')}
+            className="w-full py-4 bg-gray-950 text-white font-black text-[15px] rounded-2xl mb-3 hover:bg-gray-800 active:scale-[0.98] transition-all shadow-[0_4px_24px_rgba(0,0,0,0.18)]"
+          >
+            Find a Rider
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Suggestions */}
       {/* Collapsible content — hidden on mobile when collapsed */}
