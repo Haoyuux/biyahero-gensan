@@ -4178,6 +4178,8 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
   const distanceM = routeInfo?.distance ?? 0;
   const durationS = routeInfo?.duration ?? 0;
   const durationMin = Math.round(durationS / 60);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const dragControls = useDragControls();
 
   const dynamicRides = RIDE_OPTIONS.map(ride => {
     const breakdown = calculateFare(ride.id as keyof PricingConfig, distanceM, durationS, pricingConfig ?? DEFAULT_PRICING);
@@ -4185,14 +4187,58 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
   });
 
   const selectedBreakdown = dynamicRides.find(r => r.id === selectedRide)?.breakdown;
+  const selectedRideLabel = dynamicRides.find(r => r.id === selectedRide)?.name ?? 'Select a ride';
 
   return (
     <motion.div
       initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-6 md:pb-8 pointer-events-auto flex flex-col max-h-[80vh] md:max-h-none md:flex-1 md:overflow-y-auto"
+      drag="y"
+      dragControls={dragControls}
+      dragListener={false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0.1, bottom: 0.3 }}
+      onDragEnd={(_, info) => {
+        if (info.offset.y > 40 || info.velocity.y > 300) setIsCollapsed(true);
+        if (info.offset.y < -40 || info.velocity.y < -300) setIsCollapsed(false);
+      }}
+      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:max-h-none md:flex-1 md:overflow-y-auto"
     >
-      <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-7 md:hidden" />
+      {/* Draggable handle */}
+      <div
+        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-none flex flex-col items-center gap-3"
+        onPointerDown={e => dragControls.start(e)}
+        onClick={() => setIsCollapsed(c => !c)}
+      >
+        <div className="w-10 h-1.5 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors" />
+        {isCollapsed && (
+          <div className="flex items-center justify-between w-full px-5">
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Selected</p>
+              <p className="font-black text-[15px] text-gray-950">{selectedRideLabel}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedBreakdown && (
+                <span className="font-black text-[15px] text-gray-950">₱{selectedBreakdown.totalFare}</span>
+              )}
+              <ChevronLeft size={18} className="text-gray-400 -rotate-90" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Collapsible content */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            key="select-content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            className="overflow-hidden"
+          >
+      <div className="p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-6 md:pb-8 flex flex-col max-h-[75vh] md:max-h-none overflow-y-auto">
       <h3 className="text-[1.5rem] font-black tracking-tight mb-5">Choose a ride</h3>
       <div className="flex-1 overflow-y-auto space-y-2.5 mb-5 pb-1">
         {dynamicRides.map((ride) => (
@@ -4262,6 +4308,10 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
       >
         Book {dynamicRides.find(r => r.id === selectedRide)?.name}
       </button>
+      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
