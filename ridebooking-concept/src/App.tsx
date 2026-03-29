@@ -1060,7 +1060,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
   }, [currentRideId, reconnectTick]);
 
   useEffect(() => {
-    if (startLoc && endLoc && step !== 'home') {
+    if (startLoc && endLoc) {
       fetch(`https://router.project-osrm.org/route/v1/driving/${startLoc[1]},${startLoc[0]};${endLoc[1]},${endLoc[0]}?overview=full&geometries=geojson`)
         .then(r => r.json())
         .then(data => {
@@ -1344,12 +1344,12 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
               }
             }}
           />
-          {endLoc && step !== 'home' && (
+          {endLoc && (
             <>
               <Marker
                 position={endLoc}
-                icon={step === 'select' ? draggableDestIcon : destinationIcon}
-                draggable={step === 'select'}
+                icon={(step === 'home' || step === 'select') ? draggableDestIcon : destinationIcon}
+                draggable={step === 'home' || step === 'select'}
                 eventHandlers={{
                   dragend: async (e) => {
                     const { lat, lng } = e.target.getLatLng();
@@ -1370,7 +1370,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
             <div className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
-              Drag pin to adjust {step === 'select' ? 'pickup or destination' : 'pickup location'}
+              Drag pin to adjust {(step === 'select' || (step === 'home' && endLoc)) ? 'pickup or destination' : 'pickup location'}
             </div>
           </div>
         )}
