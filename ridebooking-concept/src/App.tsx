@@ -2785,60 +2785,76 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
     })();
   }, [activeTab]);
 
+  const [liveRefreshTick, setLiveRefreshTick] = useState(0);
+
+  const loadOnlineRiders = async () => {
+    // Query all riders and filter client-side (avoids PostgREST timestamp escaping issues with .or())
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, full_name, avatar_url, last_lat, last_lng, is_online, last_seen_at')
+      .eq('role', 'rider');
+    const tenMinAgo = Date.now() - 10 * 60 * 1000;
+    if (error) { console.warn('loadOnlineRiders error:', error.message); return; }
+    if (!data) return;
+    console.log('loadOnlineRiders: fetched', data.length, 'riders', data.map((r: any) => ({ id: r.id, is_online: r.is_online, last_lat: r.last_lat, last_seen_at: r.last_seen_at })));
+    const withGps: typeof liveRiderLocations = {};
+    const withoutGps: typeof onlineNoGps = {};
+    data.forEach((r: any) => {
+      const recentlySeen = r.last_seen_at && new Date(r.last_seen_at).getTime() > tenMinAgo;
+      if (!r.is_online && !recentlySeen) return; // skip idle riders
+      const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
+      if (r.last_lat != null && r.last_lng != null) {
+        withGps[r.id] = { lat: r.last_lat, lng: r.last_lng, riderName: name, riderAvatar: r.avatar_url, status: r.is_online ? 'online' : 'recent' };
+      } else if (r.is_online) {
+        withoutGps[r.id] = { riderName: name, riderAvatar: r.avatar_url };
+      }
+    });
+    setLiveRiderLocations(withGps);
+    setOnlineNoGps(withoutGps);
+  };
+
   useEffect(() => {
     if (activeTab !== 'live') return;
 
-    // Initial load — fetch ALL online riders, split by GPS availability
-    const loadOnlineRiders = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, full_name, avatar_url, last_lat, last_lng')
-        .eq('is_online', true)
-        .eq('role', 'rider');
-      if (!data) return;
-      const withGps: typeof liveRiderLocations = {};
-      const withoutGps: typeof onlineNoGps = {};
-      data.forEach((r: any) => {
-        const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
-        if (r.last_lat != null && r.last_lng != null) {
-          withGps[r.id] = { lat: r.last_lat, lng: r.last_lng, riderName: name, riderAvatar: r.avatar_url, status: 'online' };
-        } else {
-          withoutGps[r.id] = { riderName: name, riderAvatar: r.avatar_url };
-        }
-      });
-      setLiveRiderLocations(withGps);
-      setOnlineNoGps(withoutGps);
-    };
     loadOnlineRiders();
 
-    // Real-time updates via Postgres Changes
+    // Postgres Changes — instant updates when Realtime is enabled on profiles table
+    const handleRiderUpdate = (payload: any) => {
+      const r = payload.new;
+      if (r.role !== 'rider') return;
+      const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
+      if (!r.is_online && r.last_lat == null) {
+        setLiveRiderLocations(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+        setOnlineNoGps(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+      } else if (r.last_lat != null && r.last_lng != null) {
+        setLiveRiderLocations(prev => ({
+          ...prev,
+          [r.id]: { lat: r.last_lat, lng: r.last_lng, riderName: name, riderAvatar: r.avatar_url, status: r.is_online ? 'online' : 'recent' },
+        }));
+        setOnlineNoGps(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+      } else if (r.is_online) {
+        setLiveRiderLocations(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+        setOnlineNoGps(prev => ({ ...prev, [r.id]: { riderName: name, riderAvatar: r.avatar_url } }));
+      }
+    };
+
     const channel = supabase
       .channel('admin-rider-locations')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload: any) => {
-        const r = payload.new;
-        if (r.role !== 'rider') return;
-        const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
-        if (!r.is_online) {
-          // Rider went offline — remove from both lists
-          setLiveRiderLocations(prev => { const n = { ...prev }; delete n[r.id]; return n; });
-          setOnlineNoGps(prev => { const n = { ...prev }; delete n[r.id]; return n; });
-        } else if (r.last_lat != null && r.last_lng != null) {
-          // Online with GPS — show on map, remove from no-GPS list
-          setLiveRiderLocations(prev => ({
-            ...prev,
-            [r.id]: { lat: r.last_lat, lng: r.last_lng, riderName: name, riderAvatar: r.avatar_url, status: 'online' },
-          }));
-          setOnlineNoGps(prev => { const n = { ...prev }; delete n[r.id]; return n; });
-        } else {
-          // Online but no GPS yet — show in list only
-          setLiveRiderLocations(prev => { const n = { ...prev }; delete n[r.id]; return n; });
-          setOnlineNoGps(prev => ({ ...prev, [r.id]: { riderName: name, riderAvatar: r.avatar_url } }));
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, handleRiderUpdate)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, handleRiderUpdate)
+      .subscribe((status) => {
+        console.log('Admin live channel status:', status);
+        // If realtime is not available, fall back to polling every 3s
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Realtime unavailable — using 3s poll fallback');
         }
-      })
-      .subscribe();
+      });
 
-    return () => { supabase.removeChannel(channel); };
-  }, [activeTab]);
+    // 3-second poll as guaranteed fallback when realtime is not configured
+    const poll = setInterval(loadOnlineRiders, 3_000);
+
+    return () => { clearInterval(poll); supabase.removeChannel(channel); };
+  }, [activeTab, liveRefreshTick]);
 
   useEffect(() => {
     if (activeTab !== 'analytics') return;
@@ -3005,9 +3021,12 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                       {Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length} online rider{(Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length) !== 1 ? 's' : ''} · {Object.keys(liveRiderLocations).length} on map
                     </p>
                   </div>
-                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> LIVE
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setLiveRefreshTick(t => t + 1)} className="text-[11px] text-gray-400 hover:text-gray-600 underline">Refresh</button>
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> LIVE
+                    </span>
+                  </div>
                 </div>
                 <div className="h-[580px] w-full">
                   <MapContainer center={[6.1164, 125.1716]} zoom={13} zoomControl={true} className="w-full h-full">
