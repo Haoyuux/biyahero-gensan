@@ -6,12 +6,12 @@ import {
   Home, Briefcase, ThumbsUp, X, Send, Bell, Shield, Users, Activity,
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
-  FileText, Upload, AlertCircle, Eye
+  FileText, Upload, AlertCircle, Eye, Plus, Check
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, type Profile, type RiderStatus } from '@/src/lib/supabase';
+import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRole, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
@@ -2753,7 +2753,18 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
 
 // ─── Admin / Super Admin Dashboard ───────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing';
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles';
+
+const ALL_MODULES: { id: AdminTab; label: string }[] = [
+  { id: 'live', label: 'Live Operations' },
+  { id: 'drivers', label: 'Driver Management' },
+  { id: 'riders', label: 'Rider Verification' },
+  { id: 'analytics', label: 'Booking Analytics' },
+  { id: 'finances', label: 'Revenue Dashboard' },
+  { id: 'reviews', label: 'Ride Reviews' },
+  { id: 'users', label: 'User Management' },
+  { id: 'pricing', label: 'Pricing Config' },
+];
 
 const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAdmin: boolean }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('live');
@@ -2776,6 +2787,16 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
   const [onlineNoGps, setOnlineNoGps] = useState<Record<string, { riderName: string; riderAvatar?: string }>>({});
   const rideInfoCache = React.useRef<Record<string, any>>({});
 
+  // Roles management state
+  const [adminRoles, setAdminRoles] = useState<AdminRole[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [editingRole, setEditingRole] = useState<AdminRole | null>(null);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleDesc, setNewRoleDesc] = useState('');
+  const [newRoleModules, setNewRoleModules] = useState<string[]>([]);
+  const [showRoleForm, setShowRoleForm] = useState(false);
+  const [roleAssigning, setRoleAssigning] = useState<string | null>(null);
+
   useEffect(() => {
     if (activeTab === 'users' && isSuperAdmin && allUsers.length === 0) {
       setUsersLoading(true);
@@ -2788,6 +2809,11 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
       setRidersLoading(true);
       getRiderProfiles().then(data => { setRiders(data); setRidersLoading(false); });
     }
+    if ((activeTab === 'roles' || activeTab === 'users') && isSuperAdmin) {
+      getAdminRoles().then(data => setAdminRoles(data));
+      if (activeTab === 'roles') setRolesLoading(true);
+    }
+    if (activeTab === 'roles') setRolesLoading(false);
   }, [activeTab, isSuperAdmin]);
 
   useEffect(() => {
@@ -2980,17 +3006,28 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
     setRoleUpdating(null);
   };
 
-  const tabs = [
+  const allTabs = [
     { id: 'live' as AdminTab, label: 'Live Operations', icon: Activity },
     { id: 'drivers' as AdminTab, label: 'Driver Management', icon: Users },
     { id: 'riders' as AdminTab, label: 'Rider Verification', icon: FileText },
     { id: 'analytics' as AdminTab, label: 'Booking Analytics', icon: TrendingUp },
     { id: 'finances' as AdminTab, label: 'Revenue Dashboard', icon: BarChart },
     { id: 'reviews' as AdminTab, label: 'Ride Reviews', icon: Star },
-    ...(isSuperAdmin ? [
-      { id: 'users' as AdminTab, label: 'User Management', icon: Settings },
-      { id: 'pricing' as AdminTab, label: 'Pricing Config', icon: DollarSign },
-    ] : []),
+    { id: 'users' as AdminTab, label: 'User Management', icon: Settings },
+    { id: 'pricing' as AdminTab, label: 'Pricing Config', icon: DollarSign },
+  ];
+
+  // Super admin sees everything + Roles tab; regular admin sees only their role's modules
+  const adminRoleModules = !isSuperAdmin && profile.admin_role_id
+    ? adminRoles.find(r => r.id === profile.admin_role_id)?.modules ?? []
+    : null;
+
+  const tabs = [
+    ...( isSuperAdmin
+      ? allTabs
+      : allTabs.filter(t => adminRoleModules === null || adminRoleModules.includes(t.id))
+    ),
+    ...(isSuperAdmin ? [{ id: 'roles' as AdminTab, label: 'Roles & Permissions', icon: Shield }] : []),
   ];
 
   return (
@@ -3738,6 +3775,7 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
+                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Role</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3779,16 +3817,192 @@ const AdminDashboard = ({ profile, isSuperAdmin }: { profile: Profile, isSuperAd
                                 </select>
                               )}
                             </td>
+                            <td className="px-5 py-4">
+                              {u.role === 'admin' ? (
+                                roleAssigning === u.id ? (
+                                  <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <select
+                                    value={u.admin_role_id ?? ''}
+                                    onChange={async e => {
+                                      setRoleAssigning(u.id);
+                                      const rid = e.target.value || null;
+                                      await assignAdminRole(u.id, rid);
+                                      setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, admin_role_id: rid } : x));
+                                      setRoleAssigning(null);
+                                    }}
+                                    className="text-[13px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white max-w-[160px]"
+                                  >
+                                    <option value="">— No role —</option>
+                                    {adminRoles.map(r => (
+                                      <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                  </select>
+                                )
+                              ) : (
+                                <span className="text-[12px] text-gray-300">—</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                         {allUsers.length === 0 && (
-                          <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
+                          <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
                         )}
                       </tbody>
                     </table>
                   </div>
                 )}
               </div>
+            </>
+          )}
+
+          {/* Roles & Permissions (Super Admin only) */}
+          {activeTab === 'roles' && isSuperAdmin && (
+            <>
+              <div className="mb-8 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-gray-950">Roles & Permissions</h2>
+                  <p className="text-gray-400 text-sm mt-1">Create roles and control which modules each admin can access</p>
+                </div>
+                <button
+                  onClick={() => { setEditingRole(null); setNewRoleName(''); setNewRoleDesc(''); setNewRoleModules([]); setShowRoleForm(true); }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+                >
+                  <Plus size={15} /> New Role
+                </button>
+              </div>
+
+              {/* Role form */}
+              <AnimatePresence>
+                {showRoleForm && (
+                  <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                    className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+                    <h3 className="font-bold text-sm text-gray-900 mb-4">{editingRole ? 'Edit Role' : 'Create New Role'}</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Role Name</label>
+                        <input
+                          value={newRoleName}
+                          onChange={e => setNewRoleName(e.target.value)}
+                          placeholder="e.g. Operations Manager"
+                          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
+                        <input
+                          value={newRoleDesc}
+                          onChange={e => setNewRoleDesc(e.target.value)}
+                          placeholder="Optional description"
+                          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Modules Access</label>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {ALL_MODULES.map(m => {
+                            const checked = newRoleModules.includes(m.id);
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => setNewRoleModules(prev => checked ? prev.filter(x => x !== m.id) : [...prev, m.id])}
+                                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors text-left ${
+                                  checked ? 'bg-gray-950 text-white border-gray-950' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                }`}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${checked ? 'bg-emerald-400 border-emerald-400' : 'border-gray-300'}`}>
+                                  {checked && <Check size={9} strokeWidth={3} className="text-white" />}
+                                </div>
+                                {m.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={async () => {
+                            if (!newRoleName.trim()) return;
+                            if (editingRole) {
+                              const updated = await updateAdminRole(editingRole.id, { name: newRoleName, description: newRoleDesc, modules: newRoleModules });
+                              if (updated) setAdminRoles(prev => prev.map(r => r.id === updated.id ? updated : r));
+                            } else {
+                              const created = await createAdminRole(newRoleName.trim(), newRoleDesc.trim(), newRoleModules);
+                              if (created) setAdminRoles(prev => [...prev, created]);
+                            }
+                            setShowRoleForm(false);
+                          }}
+                          className="px-5 py-2.5 bg-gray-950 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+                        >
+                          {editingRole ? 'Save Changes' : 'Create Role'}
+                        </button>
+                        <button onClick={() => setShowRoleForm(false)} className="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {rolesLoading ? (
+                <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+              ) : adminRoles.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 px-5 py-16 text-center">
+                  <Shield size={32} className="text-gray-200 mx-auto mb-3" />
+                  <p className="font-bold text-gray-400 text-sm">No roles yet</p>
+                  <p className="text-gray-300 text-[13px] mt-1">Create a role to control what admins can see.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {adminRoles.map(role => (
+                    <div key={role.id} className="bg-white rounded-2xl border border-gray-100 p-5">
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div>
+                          <h3 className="font-bold text-gray-900">{role.name}</h3>
+                          {role.description && <p className="text-[13px] text-gray-400 mt-0.5">{role.description}</p>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingRole(role);
+                              setNewRoleName(role.name);
+                              setNewRoleDesc(role.description ?? '');
+                              setNewRoleModules(role.modules);
+                              setShowRoleForm(true);
+                            }}
+                            className="px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete role "${role.name}"?`)) return;
+                              await deleteAdminRole(role.id);
+                              setAdminRoles(prev => prev.filter(r => r.id !== role.id));
+                            }}
+                            className="px-3 py-1.5 text-[12px] font-bold border border-red-100 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {role.modules.length === 0 ? (
+                          <span className="text-[12px] text-gray-300 italic">No modules assigned</span>
+                        ) : role.modules.map(m => {
+                          const mod = ALL_MODULES.find(x => x.id === m);
+                          return (
+                            <span key={m} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[12px] font-semibold">
+                              {mod?.label ?? m}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 

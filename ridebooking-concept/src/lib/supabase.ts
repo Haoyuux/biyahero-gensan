@@ -43,6 +43,7 @@ export interface Profile {
   reviewed_by: string | null;
   reviewed_by_name: string | null;
   reviewed_at: string | null;
+  admin_role_id: string | null;
   created_at: string;
 }
 
@@ -83,6 +84,41 @@ export async function setRiderStatus(targetUserId: string, status: RiderStatus):
     target_user_id: targetUserId,
     new_status: status,
   });
+  return !error;
+}
+
+export interface AdminRole {
+  id: string;
+  name: string;
+  description: string | null;
+  modules: string[];
+  created_at: string;
+}
+
+export async function getAdminRoles(): Promise<AdminRole[]> {
+  const { data } = await supabase.from('admin_roles').select('*').order('created_at', { ascending: true });
+  return (data as AdminRole[]) || [];
+}
+
+export async function createAdminRole(name: string, description: string, modules: string[]): Promise<AdminRole | null> {
+  const { data, error } = await supabase.from('admin_roles').insert({ name, description, modules }).select().single();
+  if (error) return null;
+  return data as AdminRole;
+}
+
+export async function updateAdminRole(id: string, updates: Partial<Pick<AdminRole, 'name' | 'description' | 'modules'>>): Promise<AdminRole | null> {
+  const { data, error } = await supabase.from('admin_roles').update(updates).eq('id', id).select().single();
+  if (error) return null;
+  return data as AdminRole;
+}
+
+export async function deleteAdminRole(id: string): Promise<boolean> {
+  const { error } = await supabase.from('admin_roles').delete().eq('id', id);
+  return !error;
+}
+
+export async function assignAdminRole(userId: string, roleId: string | null): Promise<boolean> {
+  const { error } = await supabase.from('profiles').update({ admin_role_id: roleId }).eq('id', userId);
   return !error;
 }
 
