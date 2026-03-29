@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'motion/react';
 import {
   Car, Bike, CreditCard, Menu, User, Clock, Star,
@@ -8,7 +8,7 @@ import {
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
   FileText, Upload, AlertCircle, Eye
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, type Profile, type RiderStatus } from '@/src/lib/supabase';
@@ -90,15 +90,32 @@ const RIDE_OPTIONS = [
   { id: 'premium', name: 'Premium Car', time: '6 min', price: 250, icon: Car, capacity: 4 },
 ];
 
-function MapBounds({ start, routeCoords, step }: { start: [number, number], routeCoords: [number, number][] | null, step: string }) {
+type MapFocus = { coords: [number, number] | 'route'; key: number } | null;
+
+function MapBounds({ mapFocus, routeCoords }: { mapFocus: MapFocus; routeCoords: [number, number][] | null }) {
   const map = useMap();
+  const userInteracted = useRef(false);
+
+  // Any manual pan/zoom locks out auto-centering until next explicit selection
+  useMapEvents({
+    dragstart: () => { userInteracted.current = true; },
+    zoomstart: () => { userInteracted.current = true; },
+  });
+
   useEffect(() => {
-    if (routeCoords && routeCoords.length > 0 && step !== 'home') {
-      map.fitBounds(L.latLngBounds(routeCoords), { padding: [50, 50], animate: true });
-    } else if (step === 'home') {
-      map.setView(start, 15, { animate: true });
+    if (!mapFocus) return;
+    // Explicit location selection always overrides user interaction
+    userInteracted.current = false;
+
+    if (mapFocus.coords === 'route' && routeCoords && routeCoords.length > 0) {
+      map.fitBounds(L.latLngBounds(routeCoords), { padding: [80, 80], animate: true });
+    } else if (mapFocus.coords !== 'route') {
+      map.flyTo(mapFocus.coords, 16, { animate: true, duration: 0.8 });
     }
-  }, [map, start, routeCoords, step]);
+  // Only key changes trigger this — GPS ticks never touch mapFocus so they never move the camera
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapFocus?.key]);
+
   return null;
 }
 
@@ -871,6 +888,8 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
+  const [mapFocus, setMapFocus] = useState<MapFocus>(null);
+  const initialFocusDone = useRef(false);
   // Ref keeps latest ride data accessible in stale closures inside channel useEffect
   const completionDataRef = React.useRef({ pickup: '', dropoff: '', fareBreakdown: null as FareBreakdown | null, selectedRide: 'eco', activeRider: null as any });
 
@@ -981,18 +1000,38 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
     setCompletedRider(null);
     setFareBreakdown(null);
     setRiderLocation(null);
+    // Re-center on user's current position after cancelling
+    setDeviceLocation(loc => { if (loc) setMapFocus({ coords: loc, key: Date.now() }); return loc; });
   };
 
   useEffect(() => {
     if ('geolocation' in navigator) {
       const watchId = navigator.geolocation.watchPosition(
-        (pos) => setDeviceLocation([pos.coords.latitude, pos.coords.longitude]),
-        () => setDeviceLocation([14.5547, 121.0244]),
+        (pos) => {
+          const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          setDeviceLocation(coords);
+          // Center map on first GPS fix only — never again from GPS ticks
+          if (!initialFocusDone.current) {
+            initialFocusDone.current = true;
+            setMapFocus({ coords, key: Date.now() });
+          }
+        },
+        () => {
+          const fallback: [number, number] = [6.1164, 125.1716];
+          setDeviceLocation(fallback);
+          if (!initialFocusDone.current) {
+            initialFocusDone.current = true;
+            setMapFocus({ coords: fallback, key: Date.now() });
+          }
+        },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
       );
       return () => navigator.geolocation.clearWatch(watchId);
     } else {
-      setDeviceLocation([14.5547, 121.0244]);
+      const fallback: [number, number] = [6.1164, 125.1716];
+      setDeviceLocation(fallback);
+      setMapFocus({ coords: fallback, key: Date.now() });
+      initialFocusDone.current = true;
     }
   }, []);
 
@@ -1071,8 +1110,14 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
             setRouteCoords([startLoc, endLoc]);
             setRouteInfo(null);
           }
+          // Fit both pins into view whenever route (re)loads
+          setMapFocus({ coords: 'route', key: Date.now() });
         })
-        .catch(() => { setRouteCoords([startLoc, endLoc]); setRouteInfo(null); });
+        .catch(() => {
+          setRouteCoords([startLoc, endLoc]);
+          setRouteInfo(null);
+          setMapFocus({ coords: 'route', key: Date.now() });
+        });
     } else {
       setRouteCoords(null);
       setRouteInfo(null);
@@ -1264,7 +1309,9 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
                 }} pickup={pickup} setPickup={setPickup}
                   setPickupCoords={setPickupCoords} dropoff={dropoff} setDropoff={setDropoff}
                   setDestinationCoords={setDestinationCoords}
-                  favorites={favorites} onSaveFavorite={saveFavorite} onRemoveFavorite={removeFavorite} />
+                  favorites={favorites} onSaveFavorite={saveFavorite} onRemoveFavorite={removeFavorite}
+                  onPickupFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })}
+                  onDropoffFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })} />
               </>
             )}
             {step === 'select' && (
@@ -1339,6 +1386,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
               dragend: async (e) => {
                 const { lat, lng } = e.target.getLatLng();
                 setPickupCoords([lat, lng]);
+                setMapFocus({ coords: [lat, lng], key: Date.now() });
                 const name = await reverseGeocode(lat, lng);
                 setPickup(name);
               }
@@ -1354,6 +1402,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
                   dragend: async (e) => {
                     const { lat, lng } = e.target.getLatLng();
                     setDestinationCoords([lat, lng]);
+                    setMapFocus({ coords: [lat, lng], key: Date.now() });
                     const name = await reverseGeocode(lat, lng);
                     setDropoff(name);
                   }
@@ -1365,7 +1414,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
           {riderLocation && step === 'matched' && (
             <Marker position={riderLocation} icon={riderIcon} />
           )}
-          <MapBounds start={startLoc} routeCoords={routeCoords} step={step} />
+          <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
         </MapContainer>
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -3947,7 +3996,7 @@ const ChatHistoryScreen = ({ userId, userName, role = 'user', onBack }: { userId
 
 // ─── Panel Components ─────────────────────────────────────────────────────────
 
-const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, favorites = [], onSaveFavorite, onRemoveFavorite }: any) => {
+const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, favorites = [], onSaveFavorite, onRemoveFavorite, onPickupFocus, onDropoffFocus }: any) => {
   const [activeField, setActiveField] = useState<'pickup' | 'dropoff'>('dropoff');
   const [query, setQuery] = useState(dropoff);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -3979,8 +4028,10 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     const coords: [number, number] = [parseFloat(place.lat), parseFloat(place.lon)];
     if (activeField === 'pickup') {
       setPickup(shortName); setPickupCoords(coords); setActiveField('dropoff'); setQuery(dropoff);
+      onPickupFocus?.(coords);
     } else {
       setDropoff(shortName); setDestinationCoords(coords);
+      onDropoffFocus?.(coords);
     }
     setIsExpanded(false);
   };
@@ -4114,7 +4165,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                 <>
                   {activeField === 'pickup' && (
                     <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                      onClick={() => { setPickup('Current Location'); setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); }}>
+                      onClick={() => { setPickup('Current Location'); setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); /* mapFocus will be current deviceLocation — no explicit coords needed */ }}>
                       <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Navigation size={16} className="text-gray-600" /></div>
                       <div>
                         <p className="font-semibold text-sm text-gray-900">Current Location</p>
@@ -4129,7 +4180,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Saved Places</p>
                           {favorites.map((fav: any) => (
                             <div key={fav.id} className="flex items-center gap-3 px-3.5 py-3 hover:bg-gray-50 rounded-xl transition-colors">
-                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => { setDropoff(fav.name); setDestinationCoords(fav.coords); setIsExpanded(false); }}>
+                              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => { setDropoff(fav.name); setDestinationCoords(fav.coords); setIsExpanded(false); onDropoffFocus?.(fav.coords); }}>
                                 <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0"><Star size={15} className="text-amber-400 fill-amber-400" /></div>
                                 <div>
                                   <p className="font-semibold text-sm text-gray-900">{fav.name}</p>
@@ -4146,18 +4197,18 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                       )}
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">Quick Destinations</p>
                       <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                        onClick={() => { setDropoff('Home'); setDestinationCoords([6.1000, 125.1700]); setIsExpanded(false); }}>
+                        onClick={() => { setDropoff('Home'); setDestinationCoords([6.1000, 125.1700]); setIsExpanded(false); onDropoffFocus?.([6.1000, 125.1700]); }}>
                         <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Home size={16} className="text-gray-600" /></div>
                         <div><p className="font-semibold text-sm text-gray-900">Home</p><p className="text-xs text-gray-400 mt-0.5">General Santos City</p></div>
                       </div>
                       <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                        onClick={() => { setDropoff('Work'); setDestinationCoords([6.1164, 125.1716]); setIsExpanded(false); }}>
+                        onClick={() => { setDropoff('Work'); setDestinationCoords([6.1164, 125.1716]); setIsExpanded(false); onDropoffFocus?.([6.1164, 125.1716]); }}>
                         <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Briefcase size={16} className="text-gray-600" /></div>
                         <div><p className="font-semibold text-sm text-gray-900">Work</p><p className="text-xs text-gray-400 mt-0.5">CBD, General Santos</p></div>
                       </div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mt-5 mb-2">Recent</p>
                       <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                        onClick={() => { setDropoff('SM City GenSan'); setDestinationCoords([6.1070, 125.1640]); setIsExpanded(false); }}>
+                        onClick={() => { setDropoff('SM City GenSan'); setDestinationCoords([6.1070, 125.1640]); setIsExpanded(false); onDropoffFocus?.([6.1070, 125.1640]); }}>
                         <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Clock size={16} className="text-gray-400" /></div>
                         <div><p className="font-semibold text-sm text-gray-900">SM City GenSan</p><p className="text-xs text-gray-400 mt-0.5">General Santos City</p></div>
                       </div>
