@@ -18,6 +18,8 @@ npm run clean        # Remove dist/
 Copy `.env.example` to `.env` and set:
 - `GEMINI_API_KEY` — required for Google Generative AI features
 - `APP_URL` — hosting URL (auto-injected by AI Studio)
+- `VITE_SUPABASE_URL` — Supabase project URL (client-side, prefixed with `VITE_`)
+- `VITE_SUPABASE_ANON_KEY` — Supabase anonymous key (client-side, prefixed with `VITE_`)
 
 ## Architecture
 
@@ -76,6 +78,16 @@ Note: `getDynamicRides` is duplicated in both `SelectPanel` and `MatchedPanel`.
 
 When geolocation is unavailable, the app defaults to Makati, Manila `[14.5547, 121.0244]`.
 
+### Supabase Integration
+
+`src/lib/supabase.ts` provides auth and data access:
+- **Auth**: Google OAuth via `signInWithGoogle()` / `signOut()`
+- **Profiles**: `getProfile()`, `updateProfile()` — reads/writes the `profiles` table
+- **Rider management**: `getRiderProfiles()`, `setRiderStatus()` (calls `set_rider_status` RPC)
+- **Storage**: `uploadImage(bucket, userId, file)` — buckets: `avatars`, `covers`, `documents`
+
+User roles: `super_admin | admin | rider | user`. Rider approval states: `unsubmitted | pending | approved | rejected`.
+
 ## Tech Stack
 
 - React 19 + TypeScript, Vite 6
@@ -83,5 +95,7 @@ When geolocation is unavailable, the app defaults to Makati, Manila `[14.5547, 1
 - Leaflet / React Leaflet for mapping
 - Motion (Framer Motion fork) for animations
 - `@google/genai` for AI integration
+- `@supabase/supabase-js` for auth, database, and storage
+- `lucide-react` for icons
 - Express + dotenv (server-side)
 - Path alias `@/` → project root
