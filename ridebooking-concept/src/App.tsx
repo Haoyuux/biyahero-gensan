@@ -4821,7 +4821,7 @@ const SearchingPanel = () => (
 const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, activeRider, fareBreakdown, pricingConfig, rideId, userId, userName }: any) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
   const [riderReviews, setRiderReviews] = useState<{ rating: number; comment: string | null; user_name: string | null; completed_at: string }[]>([]);
 
   useEffect(() => {
@@ -4994,21 +4994,23 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
                   </div>
                 </div>
               )}
-              {showCancelConfirm ? (
-                <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
-                  <h4 className="font-black text-sm text-red-800 mb-1">Cancel your ride?</h4>
-                  <p className="text-red-500 text-xs mb-4">You may be charged a small cancellation fee if the driver is already on the way.</p>
-                  <div className="flex gap-2.5">
-                    <button onClick={() => setShowCancelConfirm(false)} className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 transition-colors">Keep Ride</button>
-                    <button onClick={onCancel} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-red-700 transition-colors">Yes, Cancel</button>
+              <div className="md:hidden">
+                {showCancelConfirm ? (
+                  <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
+                    <h4 className="font-black text-sm text-red-800 mb-1">Cancel your ride?</h4>
+                    <p className="text-red-500 text-xs mb-4">You may be charged a small cancellation fee if the driver is already on the way.</p>
+                    <div className="flex gap-2.5">
+                      <button onClick={() => setShowCancelConfirm(false)} className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 transition-colors">Keep Ride</button>
+                      <button onClick={onCancel} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-red-700 transition-colors">Yes, Cancel</button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex gap-3">
-                  <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">Share ETA</button>
-                  <button onClick={() => setShowCancelConfirm(true)} className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors">Cancel</button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex gap-3">
+                    <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">Share ETA</button>
+                    <button onClick={() => setShowCancelConfirm(true)} className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors">Cancel</button>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
