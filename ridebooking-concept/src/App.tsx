@@ -6,7 +6,7 @@ import {
   Home, Briefcase, ThumbsUp, X, Send, Bell, Shield, Users, Activity,
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
-  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt
+  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -3363,7 +3363,8 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
     { id: 'remittances' as AdminTab, label: 'Remittances', icon: Receipt },
     { id: 'users' as AdminTab, label: 'User Management', icon: Settings },
     { id: 'pricing' as AdminTab, label: 'Pricing Config', icon: DollarSign },
-    { id: 'blocking' as AdminTab, label: 'User Blocking', icon: Ban },
+    {id: 'blocking' as AdminTab, label: 'User Blocking', icon: Ban },
+    { id: 'settings' as AdminTab, label: 'App Settings', icon: Cog },
   ];
 
   // Super admin sees everything + Roles tab; regular admin sees union of all assigned roles' modules
