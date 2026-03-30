@@ -15,6 +15,7 @@ import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadI
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
+import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, type Remittance } from '@/src/lib/remittanceService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY  = 'fetch_user_ride';
@@ -2147,7 +2148,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
-  const [riderTab, setRiderTab] = useState<'home' | 'history'>('home');
+  const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit'>('home');
 
   // Check location permission on mount
   useEffect(() => {
@@ -2165,6 +2166,14 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [todayStats, setTodayStats] = useState<{ trips: number; earnings: number; rating: number | null } | null>(null);
+
+  const [remitDate, setRemitDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [remitStats, setRemitStats] = useState<{ ridesCount: number; earnings: number; bookingFee: number }>({ ridesCount: 0, earnings: 0, bookingFee: 0 });
+  const [remitHistory, setRemitHistory] = useState<Remittance[]>([]);
+  const [remitLoading, setRemitLoading] = useState(false);
+  const [remitFile, setRemitFile] = useState<File | null>(null);
+  const [remitting, setRemitting] = useState(false);
+  const [hasPendingRemit, setHasPendingRemit] = useState(false);
 
   useEffect(() => {
     if (!initialProfile.id) return;
@@ -2208,6 +2217,23 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
       setHistoryLoading(false);
     })();
   }, [riderTab, initialProfile.id, selectedHistoryDate]);
+
+  useEffect(() => {
+    if (!initialProfile.id) return;
+    hasPendingRemittance(initialProfile.id).then(setHasPendingRemit);
+  }, [initialProfile.id, remitting]);
+
+  useEffect(() => {
+    if (riderTab !== 'remit' || !initialProfile.id) return;
+    setRemitLoading(true);
+    (async () => {
+      const stats = await getRiderDailyStats(initialProfile.id, remitDate);
+      setRemitStats({ ridesCount: stats.ridesCount, earnings: stats.totalEarnings, bookingFee: stats.totalBookingFee });
+      const history = await getRiderRemittances(initialProfile.id, remitDate);
+      setRemitHistory(history);
+      setRemitLoading(false);
+    })();
+  }, [riderTab, initialProfile.id, remitDate, remitting]);
 
   // ── Active-ride persistence ────────────────────────────────────────────────
   const [rideRestored, setRideRestored] = React.useState(false);
@@ -2448,13 +2474,13 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
 
       {/* Tab Bar */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 flex gap-1">
-        {(['home', 'history'] as const).map(tab => (
+        {(['home', 'history', 'remit'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
             className={`py-3 px-4 text-[13px] font-bold border-b-2 transition-colors capitalize ${riderTab === tab ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
-            {tab === 'home' ? 'Dashboard' : 'Trip History'}
+            {tab === 'home' ? 'Dashboard' : tab === 'history' ? 'Trip History' : 'Remittance'}
           </button>
         ))}
       </div>
@@ -2715,7 +2741,15 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
                 <p className="text-gray-400 text-sm mb-5">Go online to start receiving ride requests.</p>
               </>
             )}
-            {riderLocationDenied && !isOnline && (
+            {hasPendingRemit && !isOnline ? (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
+                <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[12px] font-bold text-amber-800">Remittance Pending</p>
+                  <p className="text-[11px] text-amber-600 mt-0.5">Please wait for admin to approve your recent remittance before going online.</p>
+                </div>
+              </div>
+            ) : riderLocationDenied && !isOnline ? (
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
                 <MapPin size={16} className="text-amber-500 shrink-0 mt-0.5" />
                 <div>
@@ -2723,15 +2757,15 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
                   <p className="text-[11px] text-amber-600 mt-0.5">Enable location in your device settings to go online.</p>
                 </div>
               </div>
-            )}
+            ) : null}
             <button
               onClick={() => {
-                if (!isOnline && riderLocationDenied) return;
+                if (!isOnline && (riderLocationDenied || hasPendingRemit)) return;
                 setIsOnline(prev => !prev);
               }}
               className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
                 isOnline ? 'bg-white text-gray-950 hover:bg-gray-100'
-                : riderLocationDenied ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : (riderLocationDenied || hasPendingRemit) ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-950 text-white hover:bg-gray-800'
               }`}
             >
@@ -2847,6 +2881,133 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
           ))}
         </div>
         </>}
+
+        {/* ── Remittance Tab ── */}
+        {riderTab === 'remit' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black tracking-tight text-gray-950 leading-tight">Remittances</h2>
+                <p className="text-[13px] text-gray-400 font-medium">View earnings and submit booking fees</p>
+              </div>
+              <input type="date" value={remitDate} onChange={e => setRemitDate(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-[13px] font-bold outline-none text-gray-600 shrink-0 focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
+            </div>
+
+            {remitLoading ? (
+              <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+            ) : (
+              <>
+                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-widest mb-4">Summary for {new Date(remitDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Earnings</p>
+                      <p className="text-xl font-black text-gray-900">₱{remitStats.earnings}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{remitStats.ridesCount} trip{remitStats.ridesCount !== 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                      <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Due Fee</p>
+                      <p className="text-xl font-black text-emerald-700">₱{remitStats.bookingFee}</p>
+                      <p className="text-[11px] text-emerald-600/70 mt-1">To remit</p>
+                    </div>
+                  </div>
+
+                  {remitStats.bookingFee > 0 && !hasPendingRemit && (
+                    <div className="mt-5 border-t border-gray-100 pt-5">
+                      <h4 className="text-[13px] font-bold text-gray-900 mb-3">Submit Remittance Record</h4>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setRemitFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[12px] file:font-semibold file:bg-gray-950 file:text-white hover:file:bg-gray-800 mb-4 cursor-pointer"
+                        disabled={remitting}
+                      />
+                      <button
+                        disabled={!remitFile || remitting}
+                        onClick={async () => {
+                          if (!remitFile || !initialProfile.id) return;
+                          setRemitting(true);
+                          try {
+                            const url = await uploadReceipt(initialProfile.id, remitFile);
+                            if (url) {
+                              await createRemittance(
+                                initialProfile.id,
+                                initialProfile.full_name || '',
+                                initialProfile.avatar_url,
+                                remitDate,
+                                remitStats.earnings,
+                                remitStats.bookingFee,
+                                remitStats.bookingFee, // default to paying full amount
+                                url,
+                                remitStats.ridesCount
+                              );
+                              setRemitFile(null);
+                            } else {
+                              alert("Failed to upload receipt.");
+                            }
+                          } catch (e) {
+                            console.error(e);
+                            alert("An error occurred during remittance.");
+                          } finally {
+                            setRemitting(false);
+                          }
+                        }}
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[13px] rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
+                      >
+                        {remitting ? <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" /> : 'Upload Receipt & Submit'}
+                      </button>
+                    </div>
+                  )}
+                  {hasPendingRemit && (
+                    <div className="mt-5 border-t border-gray-100 pt-5 text-center">
+                       <p className="text-amber-600 font-bold text-[13px] bg-amber-50 px-4 py-3 rounded-xl border border-amber-100">You have a pending remittance waiting for admin approval.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* History Section */}
+                <h3 className="text-lg font-black tracking-tight text-gray-950 mt-8 mb-4">Submission History</h3>
+                {remitHistory.length === 0 ? (
+                  <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p className="text-gray-400 font-medium text-[13px]">No remittances found for this date.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {remitHistory.map(r => (
+                      <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{new Date(r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="font-black text-[15px] text-gray-900">₱{r.amount_remitted}</p>
+                          </div>
+                          <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                            r.status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
+                            r.status === 'rejected' ? 'bg-red-50 text-red-600' :
+                            'bg-amber-50 text-amber-600'
+                          }`}>
+                            {r.status}
+                          </div>
+                        </div>
+                        {r.receipt_url && (
+                           <div className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden mb-3">
+                             <img src={r.receipt_url} alt="Receipt" className="w-full h-full object-cover" />
+                           </div>
+                        )}
+                        {r.admin_notes && (
+                          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Admin Note</p>
+                             <p className="text-[13px] text-gray-600 leading-relaxed">{r.admin_notes}</p>
+                             {r.reviewed_by && <p className="text-[10px] text-gray-400 font-medium mt-1">By {r.reviewed_by}</p>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2854,7 +3015,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
 
 // ─── Admin / Super Admin Dashboard ───────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking';
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances';
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'live', label: 'Live Operations' },
@@ -2863,6 +3024,7 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'analytics', label: 'Booking Analytics' },
   { id: 'finances', label: 'Revenue Dashboard' },
   { id: 'reviews', label: 'Ride Reviews' },
+  { id: 'remittances', label: 'Remittances' },
   { id: 'users', label: 'User Management' },
   { id: 'pricing', label: 'Pricing Config' },
   { id: 'blocking', label: 'User Blocking' },
@@ -2887,6 +3049,13 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [financeData, setFinanceData] = useState<{ grossTotal: number; grossThisWeek: number; grossLastWeek: number; recentRides: any[] } | null>(null);
   const [liveRiderLocations, setLiveRiderLocations] = useState<Record<string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }>>({});
   const [onlineNoGps, setOnlineNoGps] = useState<Record<string, { riderName: string; riderAvatar?: string }>>({});
+  
+  const [allRemits, setAllRemits] = useState<Remittance[]>([]);
+  const [remitsLoading, setRemitsLoading] = useState(false);
+  const [remitFilter, setRemitFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [remitActionLoading, setRemitActionLoading] = useState<string | null>(null);
+  const [remitNotes, setRemitNotes] = useState('');
+  const [selectedRemit, setSelectedRemit] = useState<Remittance | null>(null);
   const rideInfoCache = React.useRef<Record<string, any>>({});
 
   // Roles management state
@@ -2944,6 +3113,16 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
       getBlockableProfiles().then(data => { setBlockableUsers(data); setBlockingLoading(false); });
     }
   }, [activeTab, isSuperAdmin]);
+
+  useEffect(() => {
+    if (activeTab === 'remittances') {
+      setRemitsLoading(true);
+      getAllRemittances(remitFilter).then(data => {
+        setAllRemits(data);
+        setRemitsLoading(false);
+      });
+    }
+  }, [activeTab, remitFilter]);
 
   useEffect(() => {
     if (activeTab !== 'live') return;
@@ -4669,6 +4848,140 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
           })()}
 
         </div>
+
+        {/* Remittances Tab */}
+        {activeTab === 'remittances' && (
+          <div className="space-y-6">
+            <div className="mb-8">
+              <h2 className="text-2xl font-black tracking-tight text-gray-950">Remittances</h2>
+              <p className="text-gray-400 text-sm mt-1">Review and approve rider booking fee remittances</p>
+            </div>
+
+            {/* Filter */}
+            <div className="flex gap-2 border-b border-gray-100 pb-4">
+              {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setRemitFilter(f)}
+                  className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-colors capitalize ${
+                    remitFilter === f
+                      ? 'bg-gray-950 text-white'
+                      : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            {/* List */}
+            {remitsLoading ? (
+              <div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+            ) : allRemits.length === 0 ? (
+              <div className="text-center py-16 bg-gray-50 border border-gray-100 rounded-2xl">
+                <p className="text-gray-400 font-bold text-sm">No remittances found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {allRemits.map(r => (
+                  <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                          {r.rider_avatar ? <img src={r.rider_avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">{r.rider_name?.[0]}</div>}
+                        </div>
+                        <div>
+                          <p className="font-bold text-[15px] text-gray-900">{r.rider_name || 'Rider'}</p>
+                          <p className="text-[11px] font-medium text-gray-400">{new Date(r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                      </div>
+                      <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                        r.status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
+                        r.status === 'rejected' ? 'bg-red-50 text-red-600' :
+                        'bg-amber-50 text-amber-600'
+                      }`}>
+                        {r.status}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 mb-4 bg-gray-50 rounded-xl p-3">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Trips</p>
+                        <p className="font-black text-gray-900 text-[13px]">{r.rides_count}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Earnings</p>
+                        <p className="font-black text-gray-900 text-[13px]">₱{r.total_earnings}</p>
+                      </div>
+                      <div className="border-l border-gray-200 pl-3">
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">Remitted</p>
+                        <p className="font-black text-emerald-600 text-[13px]">₱{r.amount_remitted}</p>
+                      </div>
+                    </div>
+
+                    {r.receipt_url && (
+                       <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="block w-full h-40 bg-gray-100 rounded-xl overflow-hidden mb-4 hover:opacity-90 transition-opacity">
+                         <img src={r.receipt_url} alt="Receipt" className="w-full h-full object-cover" />
+                       </a>
+                    )}
+
+                    <div className="mt-auto">
+                      {r.status === 'pending' ? (
+                        <div className="space-y-3">
+                          <textarea
+                            placeholder="Admin notes (optional)..."
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none h-20"
+                            value={selectedRemit?.id === r.id ? remitNotes : ''}
+                            onChange={e => {
+                              if (selectedRemit?.id !== r.id) setSelectedRemit(r);
+                              setRemitNotes(e.target.value);
+                            }}
+                            onFocus={() => { if (selectedRemit?.id !== r.id) { setSelectedRemit(r); setRemitNotes(''); } }}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              disabled={remitActionLoading === r.id}
+                              onClick={async () => {
+                                setRemitActionLoading(r.id);
+                                await reviewRemittance(r.id, 'approved', (selectedRemit?.id === r.id ? remitNotes : ''), profile.full_name || 'Admin');
+                                setRemitFilter(prev => { setAllRemits([]); return prev; }); // Will trigger reload via effect deps
+                                setRemitActionLoading(null);
+                              }}
+                              className="flex-1 py-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 font-bold text-[13px] rounded-xl transition-colors disabled:opacity-50"
+                            >
+                              {remitActionLoading === r.id ? '...' : 'Approve'}
+                            </button>
+                            <button
+                              disabled={remitActionLoading === r.id}
+                              onClick={async () => {
+                                setRemitActionLoading(r.id);
+                                await reviewRemittance(r.id, 'rejected', (selectedRemit?.id === r.id ? remitNotes : ''), profile.full_name || 'Admin');
+                                setRemitFilter(prev => { setAllRemits([]); return prev; });
+                                setRemitActionLoading(null);
+                              }}
+                              className="flex-1 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 font-bold text-[13px] rounded-xl transition-colors disabled:opacity-50"
+                            >
+                              {remitActionLoading === r.id ? '...' : 'Reject'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        r.admin_notes && (
+                          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Admin Note</p>
+                            <p className="text-[13px] text-gray-600 leading-relaxed">{r.admin_notes}</p>
+                            <p className="text-[10px] text-gray-400 font-medium mt-1">Reviewed by {r.reviewed_by}</p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
