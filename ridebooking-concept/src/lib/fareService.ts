@@ -6,6 +6,7 @@ export interface TierPricing {
   perKmRate: number;          // includes maintenance cost internally
   perMinuteRate: number;
   bookingFee: number;
+  bookingFeeType: 'static' | 'per_km';  // 'static' = fixed amount, 'per_km' = multiplied by distance
   maintenanceCostPerKm: number; // internal operating cost, not billed to the user
 }
 
@@ -31,6 +32,7 @@ export const DEFAULT_PRICING: PricingConfig = {
     perKmRate: 12,        // ₱10 revenue + ₱2 maintenance
     perMinuteRate: 2,
     bookingFee: 5,
+    bookingFeeType: 'static',
     maintenanceCostPerKm: 2,
   },
   eco: {
@@ -38,6 +40,7 @@ export const DEFAULT_PRICING: PricingConfig = {
     perKmRate: 18,        // ₱15 revenue + ₱3 maintenance
     perMinuteRate: 3,
     bookingFee: 8,
+    bookingFeeType: 'static',
     maintenanceCostPerKm: 3,
   },
   premium: {
@@ -45,6 +48,7 @@ export const DEFAULT_PRICING: PricingConfig = {
     perKmRate: 30,        // ₱25 revenue + ₱5 maintenance
     perMinuteRate: 5,
     bookingFee: 12,
+    bookingFeeType: 'static',
     maintenanceCostPerKm: 5,
   },
 };
@@ -52,7 +56,11 @@ export const DEFAULT_PRICING: PricingConfig = {
 /**
  * Calculate the full fare breakdown for a ride.
  *
- * Total Fare = baseFare + (distanceKm × perKmRate) + (durationMin × perMinuteRate) + bookingFee
+ * Booking fee can be:
+ *   - 'static': bookingFee is a flat amount
+ *   - 'per_km': bookingFee × distanceKm
+ *
+ * Total Fare = baseFare + (distanceKm × perKmRate) + (durationMin × perMinuteRate) + computedBookingFee
  */
 export function calculateFare(
   tierId: keyof PricingConfig,
@@ -66,13 +74,16 @@ export function calculateFare(
 
   const distanceFee = Math.round(distanceKm * p.perKmRate * 10) / 10;
   const timeFee     = Math.round(durationMin * p.perMinuteRate * 10) / 10;
-  const totalFare   = Math.round(p.baseFare + distanceFee + timeFee + p.bookingFee);
+  const bookingFee  = p.bookingFeeType === 'per_km'
+    ? Math.round(distanceKm * p.bookingFee * 10) / 10
+    : p.bookingFee;
+  const totalFare   = Math.round(p.baseFare + distanceFee + timeFee + bookingFee);
 
   return {
     baseFare:    p.baseFare,
     distanceFee,
     timeFee,
-    bookingFee:  p.bookingFee,
+    bookingFee,
     totalFare,
   };
 }

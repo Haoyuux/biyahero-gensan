@@ -3847,7 +3847,62 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                         {field('baseFare', 'Base Fare')}
                         {field('perKmRate', 'Per KM Rate', '(incl. maint.)')}
                         {field('perMinuteRate', 'Per Minute Rate')}
-                        {field('bookingFee', 'Booking Fee')}
+
+                        {/* Booking Fee — with type toggle */}
+                        <div className="col-span-2 md:col-span-3">
+                          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Booking Fee</label>
+                              <div className="flex bg-gray-200 rounded-lg p-0.5">
+                                <button
+                                  onClick={() => {
+                                    setPricingCfg(prev => ({ ...prev, [tier]: { ...prev[tier], bookingFeeType: 'static' } }));
+                                    setPricingSaved(false);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                                    p.bookingFeeType === 'static' || !p.bookingFeeType
+                                      ? 'bg-white text-gray-900 shadow-sm'
+                                      : 'text-gray-500 hover:text-gray-700'
+                                  }`}
+                                >
+                                  Static (Fixed ₱)
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setPricingCfg(prev => ({ ...prev, [tier]: { ...prev[tier], bookingFeeType: 'per_km' } }));
+                                    setPricingSaved(false);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                                    p.bookingFeeType === 'per_km'
+                                      ? 'bg-white text-gray-900 shadow-sm'
+                                      : 'text-gray-500 hover:text-gray-700'
+                                  }`}
+                                >
+                                  Per KM (₱ × KM)
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-sm font-semibold">₱</span>
+                              <input
+                                type="number" min={0} step={0.5}
+                                value={p.bookingFee}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setPricingCfg(prev => ({ ...prev, [tier]: { ...prev[tier], bookingFee: val } }));
+                                  setPricingSaved(false);
+                                }}
+                                className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+                              />
+                              <span className="text-[11px] text-gray-400 font-medium">
+                                {p.bookingFeeType === 'per_km'
+                                  ? `× distance (e.g. 5 km = ₱${(p.bookingFee * 5).toFixed(0)})`
+                                  : 'flat fee per ride'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
                         {field('maintenanceCostPerKm', 'Maintenance / KM', '(internal)')}
                       </div>
                       <div className="px-5 pb-4">
@@ -3857,6 +3912,11 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                           <span className="mx-2 text-gray-300">·</span>
                           <span className="font-bold text-gray-700">Maint. per KM: </span>
                           ₱{p.maintenanceCostPerKm.toFixed(2)}
+                          <span className="mx-2 text-gray-300">·</span>
+                          <span className="font-bold text-gray-700">Booking Fee: </span>
+                          {p.bookingFeeType === 'per_km'
+                            ? `₱${p.bookingFee}/km`
+                            : `₱${p.bookingFee} flat`}
                         </div>
                       </div>
                     </div>
