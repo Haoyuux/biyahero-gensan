@@ -284,7 +284,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
           {profile.blocked_by && (
             <div>
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Blocked by</p>
-              <p className="text-sm font-medium text-gray-400">{profile.blocked_by}</p>
+              <p className="text-sm font-medium text-gray-400">Admin</p>
             </div>
           )}
 
@@ -2909,6 +2909,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [blockingTarget, setBlockingTarget] = useState<Profile | null>(null);
   const [blockReason, setBlockReason] = useState('');
   const [blockActionLoading, setBlockActionLoading] = useState<string | null>(null);
+  const [blockPage, setBlockPage] = useState(1);
 
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
@@ -4224,6 +4225,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
 
           {/* User Blocking */}
           {activeTab === 'blocking' && (() => {
+            const ITEMS_PER_PAGE = 10;
             const filtered = blockableUsers.filter(u => {
               const matchesSearch = !blockSearchQuery ||
                 (u.full_name || '').toLowerCase().includes(blockSearchQuery.toLowerCase()) ||
@@ -4237,6 +4239,10 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               return matchesSearch && matchesRole && matchesStatus;
             });
             const blockedCount = blockableUsers.filter(u => u.is_blocked).length;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+            const safePage = Math.min(blockPage, totalPages);
+            const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+            const paginated = filtered.slice(startIdx, startIdx + ITEMS_PER_PAGE);
 
             return (
               <>
@@ -4270,7 +4276,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                       <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         value={blockSearchQuery}
-                        onChange={e => setBlockSearchQuery(e.target.value)}
+                        onChange={e => { setBlockSearchQuery(e.target.value); setBlockPage(1); }}
                         placeholder="Search by name or email..."
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-transparent transition-all"
                       />
@@ -4278,7 +4284,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                     {/* Role filter */}
                     <div className="flex gap-1.5">
                       {(['all', 'user', 'rider'] as const).map(r => (
-                        <button key={r} onClick={() => setBlockFilterRole(r)}
+                        <button key={r} onClick={() => { setBlockFilterRole(r); setBlockPage(1); }}
                           className={`px-3.5 py-2 rounded-xl text-[12px] font-bold transition-colors ${
                             blockFilterRole === r
                               ? 'bg-gray-950 text-white'
@@ -4292,7 +4298,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                     {/* Status filter */}
                     <div className="flex gap-1.5">
                       {(['all', 'blocked', 'active'] as const).map(s => (
-                        <button key={s} onClick={() => setBlockFilterStatus(s)}
+                        <button key={s} onClick={() => { setBlockFilterStatus(s); setBlockPage(1); }}
                           className={`px-3.5 py-2 rounded-xl text-[12px] font-bold transition-colors ${
                             blockFilterStatus === s
                               ? (s === 'blocked' ? 'bg-red-600 text-white' : s === 'active' ? 'bg-emerald-600 text-white' : 'bg-gray-950 text-white')
@@ -4479,59 +4485,124 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                     <p className="text-gray-300 text-[13px] mt-1">Try adjusting your search or filters.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {filtered.map(u => (
-                      <div key={u.id} className={`bg-white rounded-2xl border p-4 flex items-center gap-4 transition-colors ${u.is_blocked ? 'border-red-100 bg-red-50/30' : 'border-gray-100'}`}>
-                        {/* Avatar */}
-                        <div className={`w-11 h-11 rounded-full overflow-hidden shrink-0 ${u.is_blocked ? 'ring-2 ring-red-200' : ''}`}>
-                          {u.avatar_url
-                            ? <img src={u.avatar_url} alt="" className={`w-full h-full object-cover ${u.is_blocked ? 'opacity-60 grayscale' : ''}`} />
-                            : <div className="w-full h-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 text-sm">{(u.first_name || u.email)?.[0]?.toUpperCase()}</div>}
-                        </div>
+                  <>
+                    <div className="space-y-2">
+                      {paginated.map(u => (
+                        <div key={u.id} className={`bg-white rounded-2xl border p-4 flex items-center gap-4 transition-colors ${u.is_blocked ? 'border-red-100 bg-red-50/30' : 'border-gray-100'}`}>
+                          {/* Avatar */}
+                          <div className={`w-11 h-11 rounded-full overflow-hidden shrink-0 ${u.is_blocked ? 'ring-2 ring-red-200' : ''}`}>
+                            {u.avatar_url
+                              ? <img src={u.avatar_url} alt="" className={`w-full h-full object-cover ${u.is_blocked ? 'opacity-60 grayscale' : ''}`} />
+                              : <div className="w-full h-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 text-sm">{(u.first_name || u.email)?.[0]?.toUpperCase()}</div>}
+                          </div>
 
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <p className={`font-bold text-sm truncate ${u.is_blocked ? 'text-red-800 line-through decoration-red-300' : 'text-gray-900'}`}>
-                              {u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.full_name || u.email}
-                            </p>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
-                              u.role === 'rider' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
-                            }`}>
-                              {u.role === 'rider' ? 'Rider' : 'User'}
-                            </span>
-                            {u.is_blocked && (
-                              <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] font-black uppercase shrink-0">Blocked</span>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className={`font-bold text-sm truncate ${u.is_blocked ? 'text-red-800 line-through decoration-red-300' : 'text-gray-900'}`}>
+                                {u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.full_name || u.email}
+                              </p>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
+                                u.role === 'rider' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                              }`}>
+                                {u.role === 'rider' ? 'Rider' : 'User'}
+                              </span>
+                              {u.is_blocked && (
+                                <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] font-black uppercase shrink-0">Blocked</span>
+                              )}
+                            </div>
+                            <p className="text-gray-400 text-xs truncate">{u.email}</p>
+                            {u.is_blocked && u.block_reason && (
+                              <p className="text-red-500 text-[11px] font-medium mt-1 truncate" title={u.block_reason}>
+                                Reason: {u.block_reason}
+                              </p>
+                            )}
+                            {u.is_blocked && u.blocked_at && (
+                              <p className="text-gray-400 text-[10px] mt-0.5">
+                                Blocked {new Date(u.blocked_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                {u.blocked_by ? ` by ${u.blocked_by}` : ''}
+                              </p>
                             )}
                           </div>
-                          <p className="text-gray-400 text-xs truncate">{u.email}</p>
-                          {u.is_blocked && u.block_reason && (
-                            <p className="text-red-500 text-[11px] font-medium mt-1 truncate" title={u.block_reason}>
-                              Reason: {u.block_reason}
-                            </p>
-                          )}
-                          {u.is_blocked && u.blocked_at && (
-                            <p className="text-gray-400 text-[10px] mt-0.5">
-                              Blocked {new Date(u.blocked_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                              {u.blocked_by ? ` by ${u.blocked_by}` : ''}
-                            </p>
-                          )}
-                        </div>
 
-                        {/* Action */}
-                        <button
-                          onClick={() => { setBlockingTarget(u); setBlockReason(''); }}
-                          className={`px-4 py-2 rounded-xl text-[12px] font-bold transition-colors shrink-0 flex items-center gap-1.5 ${
-                            u.is_blocked
-                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
-                              : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                          }`}
-                        >
-                          {u.is_blocked ? <><ShieldOff size={13} /> Unblock</> : <><Ban size={13} /> Block</>}
-                        </button>
+                          {/* Action */}
+                          <button
+                            onClick={() => { setBlockingTarget(u); setBlockReason(''); }}
+                            className={`px-4 py-2 rounded-xl text-[12px] font-bold transition-colors shrink-0 flex items-center gap-1.5 ${
+                              u.is_blocked
+                                ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                                : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                            }`}
+                          >
+                            {u.is_blocked ? <><ShieldOff size={13} /> Unblock</> : <><Ban size={13} /> Block</>}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-6 bg-white rounded-2xl border border-gray-100 px-5 py-3.5">
+                        <p className="text-[12px] font-medium text-gray-400">
+                          Showing {startIdx + 1}–{Math.min(startIdx + ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            disabled={safePage <= 1}
+                            onClick={() => setBlockPage(1)}
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                          >
+                            «
+                          </button>
+                          <button
+                            disabled={safePage <= 1}
+                            onClick={() => setBlockPage(p => Math.max(1, p - 1))}
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                          >
+                            ‹
+                          </button>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                            .reduce<(number | 'dot')[]>((acc, p, i, arr) => {
+                              if (i > 0 && p - (arr[i - 1]) > 1) acc.push('dot');
+                              acc.push(p);
+                              return acc;
+                            }, [])
+                            .map((item, i) =>
+                              item === 'dot'
+                                ? <span key={`dot-${i}`} className="px-1 text-gray-300 text-xs">…</span>
+                                : (
+                                  <button
+                                    key={item}
+                                    onClick={() => setBlockPage(item as number)}
+                                    className={`w-8 h-8 rounded-lg text-[12px] font-bold transition-colors ${
+                                      safePage === item
+                                        ? 'bg-gray-950 text-white'
+                                        : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {item}
+                                  </button>
+                                )
+                            )}
+                          <button
+                            disabled={safePage >= totalPages}
+                            onClick={() => setBlockPage(p => Math.min(totalPages, p + 1))}
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                          >
+                            ›
+                          </button>
+                          <button
+                            disabled={safePage >= totalPages}
+                            onClick={() => setBlockPage(totalPages)}
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                          >
+                            »
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </>
             );
