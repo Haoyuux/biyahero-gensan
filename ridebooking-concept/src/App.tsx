@@ -5053,7 +5053,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               )}
               </>
               );
-            })}
+            })()}
           </div>
         )}
 
