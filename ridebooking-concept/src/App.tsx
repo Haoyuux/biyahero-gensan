@@ -16,6 +16,7 @@ import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, t
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, type Remittance } from '@/src/lib/remittanceService';
+import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY  = 'fetch_user_ride';
@@ -127,6 +128,11 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [impersonating, setImpersonating] = useState<Profile | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<AppSettings | null>(null);
+
+  useEffect(() => {
+    getAppSettings().then(setGlobalSettings);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -147,9 +153,9 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (authLoading || (session && !profile)) return <SplashScreen />;
-  if (!session || !profile) return <LoginScreen />;
-  if (!profile.onboarded) return <OnboardingScreen profile={profile} onComplete={setProfile} />;
+  if (authLoading || (session && !profile)) return <SplashScreen settings={globalSettings} />;
+  if (!session || !profile) return <LoginScreen settings={globalSettings} />;
+  if (!profile.onboarded) return <OnboardingScreen profile={profile} settings={globalSettings} onComplete={setProfile} />;
   if (profile.is_blocked && profile.role !== 'super_admin' && profile.role !== 'admin')
     return <BlockedScreen profile={profile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
@@ -166,26 +172,26 @@ export default function App() {
     return (
       <div className="pt-9">
         {exitBanner}
-        {p.role === 'rider' ? <RiderDashboard profile={p} /> :
-         p.role === 'admin' ? <AdminDashboard profile={p} isSuperAdmin={false} /> :
-         p.role === 'super_admin' ? <AdminDashboard profile={p} isSuperAdmin={true} /> :
-         <UserApp profile={p} />}
+        {p.role === 'rider' ? <RiderDashboard profile={p} settings={globalSettings} /> :
+         p.role === 'admin' ? <AdminDashboard profile={p} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} /> :
+         p.role === 'super_admin' ? <AdminDashboard profile={p} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} /> :
+         <UserApp profile={p} settings={globalSettings} />}
       </div>
     );
   }
 
-  if (profile.role === 'rider') return <RiderDashboard profile={profile} />;
-  if (profile.role === 'admin') return <AdminDashboard profile={profile} isSuperAdmin={false} />;
-  if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} onImpersonate={setImpersonating} />;
-  return <UserApp profile={profile} />;
+  if (profile.role === 'rider') return <RiderDashboard profile={profile} settings={globalSettings} />;
+  if (profile.role === 'admin') return <AdminDashboard profile={profile} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} />;
+  if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} onImpersonate={setImpersonating} />;
+  return <UserApp profile={profile} settings={globalSettings} />;
 }
 
 // ─── Splash Screen ────────────────────────────────────────────────────────────
 
-const SplashScreen = () => (
+const SplashScreen = ({ settings }: { settings: AppSettings | null }) => (
   <div className="w-full h-[100dvh] bg-[#080808] flex flex-col items-center justify-center font-sans">
-    <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center mb-8">
-      <Car size={22} className="text-white" />
+    <div className="w-16 h-16 bg-white/[0.03] rounded-2xl flex items-center justify-center mb-8 overflow-hidden grayscale opacity-50">
+      {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-2" /> : <Car size={26} className="text-white" />}
     </div>
     <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
   </div>
@@ -193,7 +199,7 @@ const SplashScreen = () => (
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 
-const LoginScreen = () => {
+const LoginScreen = ({ settings }: { settings: AppSettings | null }) => {
   const [loading, setLoading] = useState(false);
 
   return (
@@ -205,10 +211,10 @@ const LoginScreen = () => {
         className="relative z-10 flex flex-col items-center px-8 w-full max-w-[320px]"
       >
         <div className="mb-14 text-center">
-          <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center mb-10 mx-auto">
-            <Car size={22} className="text-white" />
+          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center mb-10 mx-auto overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-2 invert" /> : <Car size={26} className="text-white" />}
           </div>
-          <h1 className="text-[3.25rem] font-black text-white tracking-tight leading-none mb-3">Fetch</h1>
+          <h1 className="text-[3.25rem] font-black text-white tracking-tighter leading-none mb-3">{settings?.app_name || 'Fetch'}</h1>
           <p className="text-gray-500 text-sm font-medium tracking-wide">Your ride, on demand</p>
         </div>
 
@@ -318,7 +324,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
 
 // ─── Onboarding Screen ────────────────────────────────────────────────────────
 
-const OnboardingScreen = ({ profile, onComplete }: { profile: Profile, onComplete: (p: Profile) => void }) => {
+const OnboardingScreen = ({ profile, settings, onComplete }: { profile: Profile, settings: AppSettings | null, onComplete: (p: Profile) => void }) => {
   const [loading, setLoading] = useState<'rider' | 'user' | null>(null);
 
   const handleSelect = async (role: 'rider' | 'user') => {
@@ -335,7 +341,7 @@ const OnboardingScreen = ({ profile, onComplete }: { profile: Profile, onComplet
         className="w-full max-w-[360px]"
       >
         <div className="mb-10">
-          <p className="text-xs font-semibold text-emerald-600 tracking-widest uppercase mb-4">Welcome to Fetch</p>
+          <p className="text-xs font-semibold text-emerald-600 tracking-widest uppercase mb-4">Welcome to {settings?.app_name || 'Fetch'}</p>
           <h1 className="text-[2rem] font-black text-gray-950 tracking-tight leading-tight mb-2">
             Hey {profile.full_name?.split(' ')[0] || 'there'} 👋
           </h1>
@@ -964,7 +970,7 @@ const ConnectionBanner = ({ state }: { state: 'online' | 'offline' | 'reconnecti
 
 // ─── User App (Ridebooking) ───────────────────────────────────────────────────
 
-const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
+const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, settings: AppSettings | null }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -1237,7 +1243,7 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
     }
   }, [startLoc, endLoc, step]);
 
-  if (!startLoc) return <SplashScreen />;
+  if (!startLoc) return <SplashScreen settings={settings} />;
 
   if (showProfile) {
     return (
@@ -1340,35 +1346,32 @@ const UserApp = ({ profile: initialProfile }: { profile: Profile }) => {
       ">
         {/* Desktop nav header — hidden on mobile (floating nav used instead) */}
         <div className="hidden md:flex flex-none border-b border-gray-100 bg-white p-4 justify-between items-center">
-          <div className="flex items-center gap-2">
-            {step === 'home' ? (
-              <button className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
-                <Menu size={22} />
-              </button>
-            ) : step === 'matched' ? (
-              <button onClick={() => setStep('home')} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
-                <ChevronLeft size={22} />
-              </button>
-            ) : (
-              <button onClick={() => handleCancelBooking(step === 'searching')} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
-                <ChevronLeft size={22} />
-              </button>
-            )}
-            <button onClick={() => setShowChatHistory(true)} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full relative">
-              <MessageSquare size={20} />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-950 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+              {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-1 invert" /> : <Shield size={18} className="text-white" />}
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-black text-[15px] text-gray-950 leading-tight truncate">{settings?.app_name || 'Fetch'}</h1>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Premium Service</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setShowChatHistory(true)} className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl relative">
+              <MessageSquare size={16} className="text-gray-600" />
             </button>
-            {step === 'home' && (
-              <button onClick={() => setShowRideHistory(true)} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full">
-                <Clock size={20} />
-              </button>
-            )}
+            <button onClick={() => setShowRideHistory(true)} className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl">
+              <Clock size={16} className="text-gray-600" />
+            </button>
             <button
               onClick={() => { setShowNotifications(true); setAppNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
-              className="w-11 h-11 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 rounded-full relative"
+              className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl relative"
             >
-              <Bell size={20} />
+              <Bell size={16} className="text-gray-600" />
               {appNotifications.filter(n => !n.read).length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] font-black flex items-center justify-center leading-none">
+                <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full text-white text-[8px] font-black flex items-center justify-center leading-none">
                   {appNotifications.filter(n => !n.read).length > 9 ? '9+' : appNotifications.filter(n => !n.read).length}
                 </span>
               )}
@@ -2135,7 +2138,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
 
 // ─── Rider Dashboard ──────────────────────────────────────────────────────────
 
-const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
+const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profile, settings: AppSettings | null }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -2429,11 +2432,11 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
-          <div className="w-8 h-8 md:w-9 md:h-9 bg-gray-950 rounded-xl flex items-center justify-center shrink-0">
-            <Car size={16} className="text-white" />
+          <div className="w-8 h-8 md:w-9 md:h-9 bg-gray-950 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-1 invert" /> : <Car size={16} className="text-white" />}
           </div>
           <div className="min-w-0">
-            <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">Fetch Driver</h1>
+            <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">{settings?.app_name || 'Fetch'} Driver</h1>
             <p className="text-[10px] md:text-[11px] text-gray-400 mt-0.5 truncate max-w-[120px] md:max-w-none">{currentProfile.full_name || currentProfile.email}</p>
           </div>
         </div>
@@ -2912,6 +2915,19 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
                     </div>
                   </div>
 
+                  {settings?.remittance_qr_url && (
+                    <div className="mt-5 bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col items-center">
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Scan to Pay Booking Fees</p>
+                      <div className="w-48 h-48 bg-white border border-gray-100 rounded-xl overflow-hidden mb-3 shadow-sm hover:scale-[1.5] transition-transform origin-center cursor-zoom-in relative group">
+                        <img src={settings.remittance_qr_url} alt="Remittance QR" className="w-full h-full object-contain p-2" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 flex items-center justify-center transition-colors">
+                           <Search className="text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-medium italic text-center leading-relaxed">Save or screenshot this QR code to pay via your preferred e-wallet. Then upload the receipt below.</p>
+                    </div>
+                  )}
+
                   {remitStats.bookingFee > 0 && !hasPendingRemit && (
                     <div className="mt-5 border-t border-gray-100 pt-5">
                       <h4 className="text-[13px] font-bold text-gray-900 mb-3">Submit Remittance Record</h4>
@@ -3015,7 +3031,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
 
 // ─── Admin / Super Admin Dashboard ───────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances';
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'settings';
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'live', label: 'Live Operations' },
@@ -3028,9 +3044,10 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'users', label: 'User Management' },
   { id: 'pricing', label: 'Pricing Config' },
   { id: 'blocking', label: 'User Blocking' },
+  { id: 'settings', label: 'App Settings' },
 ];
 
-const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Profile, isSuperAdmin: boolean, onImpersonate?: (p: Profile) => void }) => {
+const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, onImpersonate }: { profile: Profile, isSuperAdmin: boolean, settings: AppSettings | null, onRefreshSettings: () => void, onImpersonate?: (p: Profile) => void }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('live');
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -3088,6 +3105,12 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [userPage, setUserPage] = useState(1);
   const [financePage, setFinancePage] = useState(1);
 
+  // App Settings state
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsUpdating, setSettingsUpdating] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
     getAdminRoles().then(data => {
@@ -3120,7 +3143,10 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
       setBlockingLoading(true);
       getBlockableProfiles().then(data => { setBlockableUsers(data); setBlockingLoading(false); });
     }
-  }, [activeTab, isSuperAdmin]);
+    if (activeTab === 'settings' && isSuperAdmin) {
+      setAppSettings(settings);
+    }
+  }, [activeTab, isSuperAdmin, settings]);
 
   useEffect(() => {
     if (activeTab === 'remittances') {
@@ -3358,16 +3384,13 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
       {/* Sidebar */}
       <div className="w-full md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0">
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/[0.06]">
-          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0">
-            <Shield size={15} className="text-white" />
+          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-1 invert" /> : <Shield size={16} className="text-white" />}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-black text-[13px] leading-tight text-white">{isSuperAdmin ? 'Super Admin' : 'Admin'}</h1>
-            <p className="text-[11px] text-white/40 font-medium truncate">{profile.full_name || profile.email}</p>
+            <h1 className="font-black text-[14px] leading-tight text-white truncate">{settings?.app_name || 'Admin'}</h1>
+            <p className="text-[11px] text-white/40 font-medium truncate">{isSuperAdmin ? 'Super Admin' : 'Staff'}</p>
           </div>
-          {profile.avatar_url && (
-            <img src={profile.avatar_url} alt="avatar" className="w-7 h-7 rounded-full shrink-0 opacity-80" />
-          )}
         </div>
 
         <div className="flex-1 py-3 px-2.5 space-y-0.5">
@@ -5187,6 +5210,96 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               </>
               );
             })()}
+          </div>
+        )}
+
+        {/* App Settings Tab */}
+        {activeTab === 'settings' && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="mb-8">
+              <h2 className="text-2xl font-black tracking-tight text-gray-950">App Settings</h2>
+              <p className="text-gray-400 text-sm mt-1">Configure global application branding and remittance tools</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                <h3 className="font-bold text-gray-900 text-base mb-5">App Branding</h3>
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Application Name</label>
+                    <input 
+                      type="text" 
+                      value={appSettings?.app_name || ''} 
+                      onChange={e => setAppSettings(prev => prev ? {...prev, app_name: e.target.value} : null)}
+                      placeholder="App Name"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">App Logo</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                        {appSettings?.app_logo_url ? <img src={appSettings.app_logo_url} alt="Logo" className="w-full h-full object-contain p-2" /> : <Settings className="text-gray-300" size={24} />}
+                      </div>
+                      <div className="flex-1">
+                        <input 
+                          type="file" accept="image/*" 
+                          onChange={async e => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            setSettingsUpdating(true);
+                            const url = await uploadSettingImage(file, 'logos');
+                            if (url) setAppSettings(prev => prev ? {...prev, app_logo_url: url} : null);
+                            setSettingsUpdating(false);
+                          }}
+                          className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                <h3 className="font-bold text-gray-900 text-base mb-5">Remittance Tools</h3>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Merchant / Remittance QR Code</label>
+                  <div className="flex flex-col items-center p-5 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+                    <div className="w-40 h-40 bg-white border border-gray-100 rounded-xl overflow-hidden mb-4 shadow-sm flex items-center justify-center">
+                      {appSettings?.remittance_qr_url ? <img src={appSettings.remittance_qr_url} alt="QR" className="w-full h-full object-contain p-2" /> : <CreditCard className="text-gray-200" size={40} />}
+                    </div>
+                    <input 
+                      type="file" accept="image/*" 
+                      onChange={async e => {
+                        const file = e.target.files?.[0]; if (!file) return;
+                        setSettingsUpdating(true);
+                        const url = await uploadSettingImage(file, 'qrs');
+                        if (url) setAppSettings(prev => prev ? {...prev, remittance_qr_url: url} : null);
+                        setSettingsUpdating(false);
+                      }}
+                      className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 mt-8">
+              <button
+                disabled={settingsUpdating || !appSettings}
+                onClick={async () => {
+                  if (!appSettings) return;
+                  setSettingsUpdating(true);
+                  const ok = await updateAppSettings(appSettings);
+                  if (ok) { setSettingsSaved(true); onRefreshSettings(); setTimeout(() => setSettingsSaved(false), 3000); }
+                  setSettingsUpdating(false);
+                }}
+                className="px-10 py-3.5 bg-gray-950 text-white font-bold text-sm rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {settingsUpdating && <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />}
+                Save All Settings
+              </button>
+              {settingsSaved && <span className="text-emerald-600 font-bold text-sm flex items-center gap-2"><CheckCircle size={18} /> Updated!</span>}
+            </div>
           </div>
         )}
 
