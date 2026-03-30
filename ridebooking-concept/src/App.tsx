@@ -3080,6 +3080,13 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [blockActionLoading, setBlockActionLoading] = useState<string | null>(null);
   const [blockPage, setBlockPage] = useState(1);
   const [remitPage, setRemitPage] = useState(1);
+  const [driverSearch, setDriverSearch] = useState('');
+  const [driverPage, setDriverPage] = useState(1);
+  const [verifySearch, setVerifySearch] = useState('');
+  const [verifyPage, setVerifyPage] = useState(1);
+  const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
+  const [financePage, setFinancePage] = useState(1);
 
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
@@ -3522,16 +3529,34 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
           )}
 
           {/* Driver Management */}
-          {activeTab === 'drivers' && (
+          {activeTab === 'drivers' && (() => {
+            const ITEMS_PER_PAGE = 7;
+            const filtered = riders.filter(r => r.rider_status === 'approved' && (!driverSearch || (r.full_name || '').toLowerCase().includes(driverSearch.toLowerCase()) || (r.email || '').toLowerCase().includes(driverSearch.toLowerCase())));
+            const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+            const safePage = Math.min(driverPage, totalPages);
+            const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+            const paginated = filtered.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+            return (
             <>
               <div className="mb-8">
                 <h2 className="text-2xl font-black tracking-tight text-gray-950">Driver Management</h2>
                 <p className="text-gray-400 text-sm mt-1">Monitor and manage active drivers</p>
               </div>
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-bold text-sm text-gray-900">Active Drivers</h3>
-                  <button className="px-3.5 py-1.5 bg-gray-950 text-white rounded-lg text-[12px] font-bold hover:bg-gray-800 transition-colors">Add Driver</button>
+                <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-gray-50/50">
+                  <h3 className="font-bold text-sm text-gray-900">Active Drivers <span className="ml-2 text-[11px] text-gray-400 font-medium">{filtered.length} total</span></h3>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" placeholder="Search drivers..." 
+                        value={driverSearch} onChange={e => { setDriverSearch(e.target.value); setDriverPage(1); }}
+                        className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
+                      />
+                    </div>
+                    <button className="px-3.5 py-1.5 bg-gray-950 text-white rounded-lg text-[12px] font-bold hover:bg-gray-800 transition-colors whitespace-nowrap">Add Driver</button>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -3547,9 +3572,9 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                     <tbody>
                       {ridersLoading ? (
                         <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">Loading…</td></tr>
-                      ) : riders.filter(r => r.rider_status === 'approved').length === 0 ? (
-                        <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">No approved riders yet.</td></tr>
-                      ) : riders.filter(r => r.rider_status === 'approved').map(r => (
+                      ) : filtered.length === 0 ? (
+                        <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">No approved drivers found.</td></tr>
+                      ) : paginated.map(r => (
                         <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-2.5">
@@ -3568,9 +3593,25 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                     </tbody>
                   </table>
                 </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+                    <p className="text-[12px] text-gray-500 font-medium">
+                      Showing {startIdx + 1}-{Math.min(startIdx + ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+                    </p>
+                    <div className="flex gap-1">
+                      <button disabled={safePage <= 1} onClick={() => setDriverPage(1)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">«</button>
+                      <button disabled={safePage <= 1} onClick={() => setDriverPage(p => Math.max(1, p - 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">‹</button>
+                      <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">{safePage} / {totalPages}</span>
+                      <button disabled={safePage >= totalPages} onClick={() => setDriverPage(p => Math.min(totalPages, p + 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">›</button>
+                      <button disabled={safePage >= totalPages} onClick={() => setDriverPage(totalPages)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">»</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
-          )}
+            );
+          })()}
 
           {/* Booking Analytics */}
           {activeTab === 'analytics' && (
@@ -3672,16 +3713,24 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                       </div>
                     </div>
                     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                      <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
                         <h3 className="font-bold text-sm text-gray-900">Recent Transactions</h3>
                       </div>
                       {!financeData ? (
                         <p className="px-5 py-8 text-center text-sm text-gray-400">Loading…</p>
                       ) : financeData.recentRides.length === 0 ? (
                         <p className="px-5 py-8 text-center text-sm text-gray-400">No completed rides yet.</p>
-                      ) : (
+                      ) : (() => {
+                        const ITEMS_PER_PAGE = 7;
+                        const totalFinancePages = Math.max(1, Math.ceil(financeData.recentRides.length / ITEMS_PER_PAGE));
+                        const safeFPage = Math.min(financePage, totalFinancePages);
+                        const fStartIdx = (safeFPage - 1) * ITEMS_PER_PAGE;
+                        const paginatedF = financeData.recentRides.slice(fStartIdx, fStartIdx + ITEMS_PER_PAGE);
+
+                        return (
+                        <>
                         <div className="divide-y divide-gray-50">
-                          {financeData.recentRides.map((t: any) => (
+                          {paginatedF.map((t: any) => (
                             <div key={t.id} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/60 transition-colors">
                               <div className="flex items-center gap-3.5">
                                 <div className="w-8 h-8 bg-gray-100 rounded-xl overflow-hidden shrink-0">
@@ -3699,7 +3748,23 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                             </div>
                           ))}
                         </div>
-                      )}
+                        {totalFinancePages > 1 && (
+                          <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+                            <p className="text-[12px] text-gray-500 font-medium">
+                              Showing {fStartIdx + 1}-{Math.min(fStartIdx + ITEMS_PER_PAGE, financeData.recentRides.length)} of {financeData.recentRides.length}
+                            </p>
+                            <div className="flex gap-1">
+                              <button disabled={safeFPage <= 1} onClick={() => setFinancePage(1)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">«</button>
+                              <button disabled={safeFPage <= 1} onClick={() => setFinancePage(p => Math.max(1, p - 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">‹</button>
+                              <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">{safeFPage} / {totalFinancePages}</span>
+                              <button disabled={safeFPage >= totalFinancePages} onClick={() => setFinancePage(p => Math.min(totalFinancePages, p + 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">›</button>
+                              <button disabled={safeFPage >= totalFinancePages} onClick={() => setFinancePage(totalFinancePages)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">»</button>
+                            </div>
+                          </div>
+                        )}
+                        </>
+                        );
+                      })()}
                     </div>
                   </>
                 );
@@ -3861,79 +3926,113 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               </AnimatePresence>
 
               {/* Riders table */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-bold text-sm text-gray-900">All Riders</h3>
-                  <span className="text-[12px] text-gray-400">{riders.length} total</span>
-                </div>
-                {ridersLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+              {(() => {
+                const ITEMS_PER_PAGE = 7;
+                const filtered = riders.filter(r => !verifySearch || (r.full_name || '').toLowerCase().includes(verifySearch.toLowerCase()) || (r.email || '').toLowerCase().includes(verifySearch.toLowerCase()));
+                const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+                const safePage = Math.min(verifyPage, totalPages);
+                const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+                const paginated = filtered.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+                return (
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-gray-50/50">
+                    <h3 className="font-bold text-sm text-gray-900">All Riders <span className="ml-2 text-[11px] text-gray-400 font-medium">{filtered.length} total</span></h3>
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" placeholder="Search applicants..." 
+                        value={verifySearch} onChange={e => { setVerifySearch(e.target.value); setVerifyPage(1); }}
+                        className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
+                      />
+                    </div>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Rider</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vehicle</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Docs</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {riders.map(r => (
-                          <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-                            <td className="px-5 py-4">
-                              <div className="flex items-center gap-3">
-                                {r.avatar_url
-                                  ? <img src={r.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                                  : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">{r.full_name?.[0] || '?'}</div>}
-                                <div>
-                                  <p className="font-semibold text-gray-900 text-sm">{r.full_name || '—'}</p>
-                                  <p className="text-[11px] text-gray-400 mt-0.5">{r.email}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-5 py-4 text-sm text-gray-500">
-                              {r.vehicle_make && r.vehicle_model ? `${r.vehicle_make} ${r.vehicle_model}` : '—'}
-                              {r.vehicle_plate && <span className="block text-[11px] text-gray-400 mt-0.5">{r.vehicle_plate}</span>}
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex gap-1 mb-1">
-                                {[r.drivers_license_url, r.or_url, r.cr_url, r.vehicle_image_url].map((url, i) => (
-                                  <div key={i} className={`w-1.5 h-1.5 rounded-full ${url ? 'bg-emerald-500' : 'bg-gray-200'}`} title={['License', 'OR', 'CR', 'Vehicle'][i]} />
-                                ))}
-                              </div>
-                              <p className="text-[11px] text-gray-400">{[r.drivers_license_url, r.or_url, r.cr_url, r.vehicle_image_url].filter(Boolean).length}/4</p>
-                            </td>
-                            <td className="px-5 py-4">
-                              <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
-                                r.rider_status === 'approved' ? 'bg-emerald-50 text-emerald-700' :
-                                r.rider_status === 'pending' ? 'bg-amber-50 text-amber-700' :
-                                r.rider_status === 'rejected' ? 'bg-red-50 text-red-600' :
-                                'bg-gray-100 text-gray-500'
-                              }`}>{r.rider_status}</span>
-                            </td>
-                            <td className="px-5 py-4">
-                              <button
-                                onClick={() => setSelectedRider(r)}
-                                className="flex items-center gap-1.5 text-[12px] font-bold text-gray-500 hover:text-gray-900 transition-colors"
-                              >
-                                <Eye size={13} /> View
-                              </button>
-                            </td>
+                  {ridersLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Rider</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vehicle</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Docs</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Action</th>
                           </tr>
-                        ))}
-                        {riders.length === 0 && !ridersLoading && (
-                          <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">No riders found.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                        </thead>
+                        <tbody>
+                          {paginated.map(r => (
+                            <tr key={r.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                  {r.avatar_url
+                                    ? <img src={r.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                    : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">{r.full_name?.[0] || '?'}</div>}
+                                  <div>
+                                    <p className="font-semibold text-gray-900 text-sm">{r.full_name || '—'}</p>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">{r.email}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-5 py-4 text-sm text-gray-500">
+                                {r.vehicle_make && r.vehicle_model ? `${r.vehicle_make} ${r.vehicle_model}` : '—'}
+                                {r.vehicle_plate && <span className="block text-[11px] text-gray-400 mt-0.5">{r.vehicle_plate}</span>}
+                              </td>
+                              <td className="px-5 py-4">
+                                <div className="flex gap-1 mb-1">
+                                  {[r.drivers_license_url, r.or_url, r.cr_url, r.vehicle_image_url].map((url, i) => (
+                                    <div key={i} className={`w-1.5 h-1.5 rounded-full ${url ? 'bg-emerald-500' : 'bg-gray-200'}`} title={['License', 'OR', 'CR', 'Vehicle'][i]} />
+                                  ))}
+                                </div>
+                                <p className="text-[11px] text-gray-400">{[r.drivers_license_url, r.or_url, r.cr_url, r.vehicle_image_url].filter(Boolean).length}/4</p>
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
+                                  r.rider_status === 'approved' ? 'bg-emerald-50 text-emerald-700' :
+                                  r.rider_status === 'pending' ? 'bg-amber-50 text-amber-700' :
+                                  r.rider_status === 'rejected' ? 'bg-red-50 text-red-600' :
+                                  'bg-gray-100 text-gray-500'
+                                }`}>{r.rider_status}</span>
+                              </td>
+                              <td className="px-5 py-4">
+                                <button
+                                  onClick={() => setSelectedRider(r)}
+                                  className="flex items-center gap-1.5 text-[12px] font-bold text-gray-500 hover:text-gray-900 transition-colors"
+                                >
+                                  <Eye size={13} /> View
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filtered.length === 0 && (
+                            <tr><td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">No riders found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+                        <p className="text-[12px] text-gray-500 font-medium">
+                          Showing {startIdx + 1}-{Math.min(startIdx + ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+                        </p>
+                        <div className="flex gap-1">
+                          <button disabled={safePage <= 1} onClick={() => setVerifyPage(1)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">«</button>
+                          <button disabled={safePage <= 1} onClick={() => setVerifyPage(p => Math.max(1, p - 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">‹</button>
+                          <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">{safePage} / {totalPages}</span>
+                          <button disabled={safePage >= totalPages} onClick={() => setVerifyPage(p => Math.min(totalPages, p + 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">›</button>
+                          <button disabled={safePage >= totalPages} onClick={() => setVerifyPage(totalPages)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">»</button>
+                        </div>
+                      </div>
+                    )}
+                    </>
+                  )}
+                </div>
+                );
+              })()}
             </>
           )}
 
@@ -4132,31 +4231,48 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                 <h2 className="text-2xl font-black tracking-tight text-gray-950">User Management</h2>
                 <p className="text-gray-400 text-sm mt-1">Manage user roles and access</p>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-bold text-sm text-gray-900">All Users</h3>
-                  <span className="text-[12px] text-gray-400">{allUsers.length} total</span>
-                </div>
-                {usersLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+              {(() => {
+                const ITEMS_PER_PAGE = 7;
+                const filteredUsers = allUsers.filter(u => !userSearch || (u.full_name || '').toLowerCase().includes(userSearch.toLowerCase()) || (u.email || '').toLowerCase().includes(userSearch.toLowerCase()));
+                const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
+                const safePage = Math.min(userPage, totalPages);
+                const startIdx = (safePage - 1) * ITEMS_PER_PAGE;
+                const paginatedUsers = filteredUsers.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+                return (
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-gray-50/50">
+                    <h3 className="font-bold text-sm text-gray-900">All Users <span className="ml-2 text-[11px] text-gray-400 font-medium">{filteredUsers.length} total</span></h3>
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" placeholder="Search users by name or email..." 
+                        value={userSearch} onChange={e => { setUserSearch(e.target.value); setUserPage(1); }}
+                        className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
+                      />
+                    </div>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">User</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Email</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">View As</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allUsers.map((u) => (
+                  {usersLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">User</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Email</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">View As</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedUsers.map((u) => (
                           <tr key={u.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
@@ -4224,15 +4340,32 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                               )}
                             </td>
                           </tr>
-                        ))}
-                        {allUsers.length === 0 && (
-                          <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                          ))}
+                          {filteredUsers.length === 0 && (
+                            <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+                        <p className="text-[12px] text-gray-500 font-medium">
+                          Showing {startIdx + 1}-{Math.min(startIdx + ITEMS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
+                        </p>
+                        <div className="flex gap-1">
+                          <button disabled={safePage <= 1} onClick={() => setUserPage(1)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">«</button>
+                          <button disabled={safePage <= 1} onClick={() => setUserPage(p => Math.max(1, p - 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">‹</button>
+                          <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">{safePage} / {totalPages}</span>
+                          <button disabled={safePage >= totalPages} onClick={() => setUserPage(p => Math.min(totalPages, p + 1))} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">›</button>
+                          <button disabled={safePage >= totalPages} onClick={() => setUserPage(totalPages)} className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold">»</button>
+                        </div>
+                      </div>
+                    )}
+                    </>
+                  )}
+                </div>
+                );
+              })()}
             </>
           )}
 
