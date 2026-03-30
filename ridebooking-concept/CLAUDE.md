@@ -23,26 +23,34 @@ Copy `.env.example` to `.env` and set:
 
 ## Architecture
 
-Single-file React app (`src/App.tsx`, ~900+ lines) with no routing or external state library. All state lives in `App.tsx` via `useState`/`useEffect`.
+Monolithic React app (`src/App.tsx`, ~5,300 lines) with no routing library. All state lives in `App.tsx` via `useState`/`useEffect`. Service logic is extracted into `src/lib/`.
 
-### View State
+### Auth & Role-Based Routing
 
-Top-level `view` state switches between `'app'` (rider flow) and `'admin'` (dashboard). Clicking the user avatar (top-right) opens the admin view.
+On load: session check → profile fetch → onboarding → profile setup. After auth, the root renders one of three top-level dashboards based on `profile.role`:
 
-### UI Flow (step state machine)
+```
+user    → UserApp        (ride booking flow)
+rider   → RiderDashboard (driver view + earnings)
+admin   → AdminDashboard (operations + management)
+```
+
+`super_admin` can impersonate other users to test their experience. Clicking the user avatar (top-right) from `UserApp` opens `AdminDashboard` regardless of role.
+
+### User App — Step State Machine
 
 ```
 home → select → searching → matched
 ```
 
-- **home**: Pickup/dropoff location input with Nominatim autocomplete
-- **select**: Ride tier selection (Motorcycle / Economy Car / Premium Car) with dynamic pricing
+- **home**: Pickup/dropoff input with Nominatim autocomplete + saved favorites
+- **select**: Ride tier selection with dynamic pricing from `fareService`
 - **searching**: 3.5s simulated driver search animation
-- **matched**: Driver profile + in-app chat with simulated driver replies
+- **matched**: Driver profile, real-time fare breakdown, in-app chat, cancel/rating
 
 ### Admin Dashboard
 
-Separate full-screen view (`AdminDashboard` component) with 4 tabs: Live Operations, Driver Management, Booking Analytics, Revenue Dashboard. All data is static/mocked.
+8 tabs: Live Operations, Driver Management, Booking Analytics, Revenue Dashboard, Reviews, Users, Riders (filterable by approval status), Pricing (editable config), Admin Roles (CRUD + module permissions).
 
 ### Map Layer
 
@@ -51,7 +59,7 @@ Always-visible Leaflet map (CartoDB tiles) with:
 - Green `DivIcon` for destination
 - Route polyline from OSRM
 
-Custom `DivIcon`s are used instead of default markers to avoid broken image paths in Vite.
+Custom `DivIcon`s are used instead of default markers to avoid broken image paths in Vite. `dragstart`/`zoomstart` events disable auto-centering so the user can pan freely.
 
 ### External APIs
 
@@ -60,19 +68,28 @@ Custom `DivIcon`s are used instead of default markers to avoid broken image path
 | Nominatim | `nominatim.openstreetmap.org/search` | Location autocomplete (500ms debounce, min 3 chars) |
 | OSRM | `router.project-osrm.org/route/v1/driving` | Route geometry + distance/duration |
 
-Location coordinates: Nominatim returns `[lon, lat]`; Leaflet and state use `[lat, lon]` — convert when calling OSRM.
+**Coordinate convention**: Nominatim returns `[lon, lat]`; Leaflet and all internal state use `[lat, lon]` — convert when calling OSRM.
 
 ### Pricing
 
-Computed from `routeInfo` (distance in meters, duration in seconds) + selected ride tier:
+Pricing config lives in `src/lib/fareService.ts` and is persisted to localStorage under `fetch_pricing_config`. Defaults:
 
-| Tier | Base | Per-km | Per-min |
-|------|------|--------|---------|
-| Motorcycle (`moto`) | ₱40 | ₱10 | ₱2 |
-| Economy (`eco`) | ₱60 | ₱15 | ₱3 |
-| Premium (`premium`) | ₱100 | ₱25 | ₱5 |
+| Tier | Base | Per-km | Per-min | Booking Fee |
+|------|------|--------|---------|-------------|
+| Motorcycle (`moto`) | ₱40 | ₱12 | ₱2 | ₱5 |
+| Economy (`eco`) | ₱60 | ₱18 | ₱3 | ₱8 |
+| Premium (`premium`) | ₱100 | ₱30 | ₱5 | ₱12 |
 
-Note: `getDynamicRides` is duplicated in both `SelectPanel` and `MatchedPanel`.
+`calculateFare()` returns a `FareBreakdown` (baseFare, distanceFee, timeFee, bookingFee, totalFare). Admins can edit rates in the Pricing tab; changes are saved to localStorage.
+
+### localStorage Keys
+
+| Key | Purpose |
+|-----|---------|
+| `fetch_user_ride` | Active ride state recovery (user) |
+| `fetch_rider_ride` | Active ride state recovery (rider) |
+| `fetch_favorites` | Saved pickup/dropoff places |
+| `fetch_pricing_config` | Custom fare config overrides |
 
 ### Fallback
 
@@ -80,13 +97,26 @@ When geolocation is unavailable, the app defaults to Makati, Manila `[14.5547, 1
 
 ### Supabase Integration
 
-`src/lib/supabase.ts` provides auth and data access:
+**`src/lib/supabase.ts`** — auth, profiles, rider management, admin roles, storage:
 - **Auth**: Google OAuth via `signInWithGoogle()` / `signOut()`
 - **Profiles**: `getProfile()`, `updateProfile()` — reads/writes the `profiles` table
 - **Rider management**: `getRiderProfiles()`, `setRiderStatus()` (calls `set_rider_status` RPC)
+- **Admin roles**: `getAdminRoles()`, `createAdminRole()`, `updateAdminRole()`, `deleteAdminRole()`, `assignAdminRoles()`
 - **Storage**: `uploadImage(bucket, userId, file)` — buckets: `avatars`, `covers`, `documents`
 
 User roles: `super_admin | admin | rider | user`. Rider approval states: `unsubmitted | pending | approved | rejected`.
+
+**`src/lib/chatService.ts`** — real-time in-app messaging via Supabase Realtime (`postgres_changes`):
+- Tables: `messages` (ride_id, sender_id, sender_role, content, created_at), `conversation_deletions` (soft-delete per user)
+- Key functions: `sendMessage()`, `fetchMessages(rideId)`, `subscribeToMessages(rideId, cb)` → returns unsubscribe fn, `fetchUserConversations()`, `fetchRiderConversations()`, `deleteConversation()`
+
+**`src/lib/notificationService.ts`** — browser Notification API wrapper:
+- `requestNotificationPermission()` — one-time permission prompt
+- `pushNotification(title, body)` — native OS notification
+
+### Connection Status
+
+`useConnectionStatus()` hook detects online/offline state. `ConnectionBanner` displays a reconnection notice when the network drops.
 
 ## Tech Stack
 
@@ -95,7 +125,7 @@ User roles: `super_admin | admin | rider | user`. Rider approval states: `unsubm
 - Leaflet / React Leaflet for mapping
 - Motion (Framer Motion fork) for animations
 - `@google/genai` for AI integration
-- `@supabase/supabase-js` for auth, database, and storage
+- `@supabase/supabase-js` for auth, database, storage, and realtime
 - `lucide-react` for icons
 - Express + dotenv (server-side)
 - Path alias `@/` → project root

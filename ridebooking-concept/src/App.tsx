@@ -2817,6 +2817,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [newRoleModules, setNewRoleModules] = useState<string[]>([]);
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [roleAssigning, setRoleAssigning] = useState<string | null>(null);
+  const [roleAssignTarget, setRoleAssignTarget] = useState<Profile | null>(null);
 
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
@@ -2936,8 +2937,12 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
     loadOnlineRiders();
 
     // Postgres Changes — instant updates when Realtime is enabled on profiles table
+    // Note: requires REPLICA IDENTITY FULL on profiles table so payload.new contains the full row.
+    // Without it, partial payloads (missing role/name/coords) fall back to a re-fetch.
     const handleRiderUpdate = (payload: any) => {
       const r = payload.new;
+      // If role is missing the table lacks REPLICA IDENTITY FULL — re-fetch the full row instead
+      if (r.role == null) { loadOnlineRiders(); return; }
       if (r.role !== 'rider') return;
       const name = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Rider';
       if (!r.is_online && r.last_lat == null) {
@@ -2961,8 +2966,9 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, handleRiderUpdate)
       .subscribe();
 
-    // Only poll when there are online riders — realtime handles instant updates
-    const poll = setInterval(() => { if (hasOnlineRiders.current) loadOnlineRiders(); }, 30_000);
+    // Always poll — Realtime (WebSocket) may be blocked by corporate firewalls,
+    // and hasOnlineRiders would never flip true if the first load finds no riders.
+    const poll = setInterval(loadOnlineRiders, 15_000);
 
     return () => { clearInterval(poll); supabase.removeChannel(channel); };
   }, [activeTab, liveRefreshTick]);
@@ -3807,7 +3813,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Role</th>
+                          <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
                           <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">View As</th>
                         </tr>
                       </thead>
@@ -3852,37 +3858,19 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                             </td>
                             <td className="px-5 py-4">
                               {u.role === 'admin' ? (
-                                roleAssigning === u.id ? (
-                                  <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <div className="flex flex-wrap gap-1.5 min-w-[180px]">
-                                    {adminRoles.map(r => {
-                                      const assigned = (u.admin_role_ids ?? []).includes(r.id);
-                                      return (
-                                        <button
-                                          key={r.id}
-                                          onClick={async () => {
-                                            setRoleAssigning(u.id);
-                                            const current = u.admin_role_ids ?? [];
-                                            const next = assigned ? current.filter(x => x !== r.id) : [...current, r.id];
-                                            await assignAdminRoles(u.id, next);
-                                            setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, admin_role_ids: next } : x));
-                                            setRoleAssigning(null);
-                                          }}
-                                          className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                                            assigned
-                                              ? 'bg-gray-950 text-white border-gray-950'
-                                              : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
-                                          }`}
-                                        >
-                                          {assigned && <Check size={9} className="inline mr-1" strokeWidth={3} />}
-                                          {r.name}
-                                        </button>
-                                      );
-                                    })}
-                                    {adminRoles.length === 0 && <span className="text-[12px] text-gray-300 italic">No roles created</span>}
-                                  </div>
-                                )
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[12px] text-gray-500">
+                                    {(u.admin_role_ids ?? []).length === 0
+                                      ? 'None assigned'
+                                      : `${(u.admin_role_ids ?? []).length} role${(u.admin_role_ids ?? []).length !== 1 ? 's' : ''}`}
+                                  </span>
+                                  <button
+                                    onClick={() => setRoleAssignTarget(u)}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-gray-200 text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                  >
+                                    Assign
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-[12px] text-gray-300">—</span>
                               )}
@@ -3909,6 +3897,84 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               </div>
             </>
           )}
+
+          {/* Assign Admin Roles Modal */}
+          <AnimatePresence>
+            {roleAssignTarget && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+                onClick={() => setRoleAssignTarget(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="font-black text-gray-950 text-base">Assign Admin Roles</h3>
+                      <p className="text-[12px] text-gray-400 mt-0.5">{roleAssignTarget.full_name || roleAssignTarget.email}</p>
+                    </div>
+                    <button onClick={() => setRoleAssignTarget(null)} className="text-gray-400 hover:text-gray-700">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  {adminRoles.length === 0 ? (
+                    <p className="text-[13px] text-gray-400 text-center py-6">No roles created yet. Create roles in the Roles &amp; Permissions tab first.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {adminRoles.map(r => {
+                        const assigned = (roleAssignTarget.admin_role_ids ?? []).includes(r.id);
+                        return (
+                          <button
+                            key={r.id}
+                            disabled={roleAssigning === roleAssignTarget.id}
+                            onClick={async () => {
+                              setRoleAssigning(roleAssignTarget.id);
+                              const current = roleAssignTarget.admin_role_ids ?? [];
+                              const next = assigned ? current.filter(x => x !== r.id) : [...current, r.id];
+                              const ok = await assignAdminRoles(roleAssignTarget.id, next);
+                              if (ok) {
+                                const updated = { ...roleAssignTarget, admin_role_ids: next };
+                                setRoleAssignTarget(updated);
+                                setAllUsers(prev => prev.map(x => x.id === roleAssignTarget.id ? updated : x));
+                              }
+                              setRoleAssigning(null);
+                            }}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${
+                              assigned ? 'bg-gray-950 border-gray-950 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400'
+                            }`}
+                          >
+                            <div>
+                              <p className="font-bold text-[13px]">{r.name}</p>
+                              {r.description && <p className={`text-[11px] mt-0.5 ${assigned ? 'text-white/60' : 'text-gray-400'}`}>{r.description}</p>}
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {r.modules.map(m => (
+                                  <span key={m} className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${assigned ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>{m}</span>
+                                ))}
+                              </div>
+                            </div>
+                            {roleAssigning === roleAssignTarget.id
+                              ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0 ml-3" />
+                              : assigned && <Check size={16} className="shrink-0 ml-3" strokeWidth={3} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="mt-5 pt-4 border-t border-gray-100 flex justify-end">
+                    <button
+                      onClick={() => setRoleAssignTarget(null)}
+                      className="px-4 py-2 bg-gray-950 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Roles & Permissions (Super Admin only) */}
           {activeTab === 'roles' && isSuperAdmin && (

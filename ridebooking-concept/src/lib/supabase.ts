@@ -119,7 +119,10 @@ export async function deleteAdminRole(id: string): Promise<boolean> {
 }
 
 export async function assignAdminRoles(userId: string, roleIds: string[]): Promise<boolean> {
-  const { error } = await supabase.from('profiles').update({ admin_role_ids: roleIds }).eq('id', userId);
+  const { error } = await supabase.rpc('assign_admin_roles', {
+    target_user_id: userId,
+    role_ids: roleIds,
+  });
   return !error;
 }
 
