@@ -2176,14 +2176,16 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
 
   // Write location to DB in real-time using device GPS
   useEffect(() => {
+    const riderId = currentProfile.id;
     if (!isOnline) {
-      supabase.rpc('set_rider_online', { is_online_val: false });
+      supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: false });
       return;
     }
-    supabase.rpc('set_rider_online', { is_online_val: true });
+    supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: true });
     const watchId = navigator.geolocation.watchPosition(
       pos => {
         supabase.rpc('set_rider_online', {
+          target_user_id: riderId,
           is_online_val: true,
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -2201,7 +2203,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
     );
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      supabase.rpc('set_rider_online', { is_online_val: false });
+      supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: false });
     };
   }, [isOnline, currentProfile.id]);
 
