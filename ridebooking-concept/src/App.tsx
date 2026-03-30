@@ -3079,6 +3079,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [blockReason, setBlockReason] = useState('');
   const [blockActionLoading, setBlockActionLoading] = useState<string | null>(null);
   const [blockPage, setBlockPage] = useState(1);
+  const [remitPage, setRemitPage] = useState(1);
 
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
@@ -4465,7 +4466,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
 
           {/* User Blocking */}
           {activeTab === 'blocking' && (() => {
-            const ITEMS_PER_PAGE = 10;
+            const ITEMS_PER_PAGE = 5;
             const filtered = blockableUsers.filter(u => {
               const matchesSearch = !blockSearchQuery ||
                 (u.full_name || '').toLowerCase().includes(blockSearchQuery.toLowerCase()) ||
@@ -4863,7 +4864,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
                 <button
                   key={f}
-                  onClick={() => setRemitFilter(f)}
+                  onClick={() => { setRemitFilter(f); setRemitPage(1); }}
                   className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-colors capitalize ${
                     remitFilter === f
                       ? 'bg-gray-950 text-white'
@@ -4882,9 +4883,17 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               <div className="text-center py-16 bg-gray-50 border border-gray-100 rounded-2xl">
                 <p className="text-gray-400 font-bold text-sm">No remittances found</p>
               </div>
-            ) : (
+            ) : (() => {
+              const REMIT_ITEMS_PER_PAGE = 6;
+              const totalPages = Math.max(1, Math.ceil(allRemits.length / REMIT_ITEMS_PER_PAGE));
+              const safePage = Math.min(remitPage, totalPages);
+              const startIdx = (safePage - 1) * REMIT_ITEMS_PER_PAGE;
+              const paginated = allRemits.slice(startIdx, startIdx + REMIT_ITEMS_PER_PAGE);
+
+              return (
+              <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {allRemits.map(r => (
+                {paginated.map(r => (
                   <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
@@ -4979,7 +4988,72 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
                   </div>
                 ))}
               </div>
-            )}
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <p className="text-[12px] text-gray-500 font-medium">
+                    Showing {startIdx + 1}-{Math.min(startIdx + REMIT_ITEMS_PER_PAGE, allRemits.length)} of {allRemits.length}
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      disabled={safePage <= 1}
+                      onClick={() => setRemitPage(1)}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                    >
+                      «
+                    </button>
+                    <button
+                      disabled={safePage <= 1}
+                      onClick={() => setRemitPage(p => Math.max(1, p - 1))}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                    >
+                      ‹
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                      .reduce<(number | 'dot')[]>((acc, p, i, arr) => {
+                        if (i > 0 && p - (arr[i - 1]) > 1) acc.push('dot');
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((item, i) =>
+                        item === 'dot'
+                          ? <span key={`dot-${i}`} className="px-1 text-gray-300 text-xs">…</span>
+                          : (
+                            <button
+                              key={item}
+                              onClick={() => setRemitPage(item as number)}
+                              className={`w-8 h-8 rounded-lg text-[12px] font-bold transition-colors ${
+                                safePage === item
+                                  ? 'bg-gray-950 text-white'
+                                  : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              {item}
+                            </button>
+                          )
+                      )}
+                    <button
+                      disabled={safePage >= totalPages}
+                      onClick={() => setRemitPage(p => Math.min(totalPages, p + 1))}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                    >
+                      ›
+                    </button>
+                    <button
+                      disabled={safePage >= totalPages}
+                      onClick={() => setRemitPage(totalPages)}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                    >
+                      »
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
+              );
+            })}
           </div>
         )}
 
