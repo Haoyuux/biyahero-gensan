@@ -6,12 +6,12 @@ import {
   Home, Briefcase, ThumbsUp, X, Send, Bell, Shield, Users, Activity,
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
-  FileText, Upload, AlertCircle, Eye, Plus, Check
+  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
+import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, blockUser, unblockUser, getBlockableProfiles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
@@ -149,6 +149,8 @@ export default function App() {
   if (authLoading || (session && !profile)) return <SplashScreen />;
   if (!session || !profile) return <LoginScreen />;
   if (!profile.onboarded) return <OnboardingScreen profile={profile} onComplete={setProfile} />;
+  if (profile.is_blocked && profile.role !== 'super_admin' && profile.role !== 'admin')
+    return <BlockedScreen profile={profile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
     return <ProfileSetupScreen profile={profile} onComplete={setProfile} />;
 
@@ -230,6 +232,84 @@ const LoginScreen = () => {
         <p className="text-gray-700 text-[11px] mt-7 text-center leading-relaxed">
           By continuing you agree to our Terms &amp; Privacy Policy.
         </p>
+      </motion.div>
+    </div>
+  );
+};
+
+// ─── Blocked Screen ───────────────────────────────────────────────────────────
+
+const BlockedScreen = ({ profile }: { profile: Profile }) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-PH', {
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="relative w-full h-[100dvh] bg-[#080808] flex flex-col items-center justify-center font-sans overflow-hidden">
+      {/* Subtle red radial glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_30%,rgba(239,68,68,0.08),transparent)]" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="relative z-10 flex flex-col items-center px-8 w-full max-w-[400px]"
+      >
+        {/* Icon */}
+        <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mb-8 ring-1 ring-red-500/20">
+          <Ban size={36} className="text-red-500" />
+        </div>
+
+        {/* Heading */}
+        <h1 className="text-[2rem] font-black text-white tracking-tight leading-tight text-center mb-2">
+          Account Suspended
+        </h1>
+        <p className="text-gray-500 text-sm font-medium text-center mb-8">
+          Your account has been temporarily restricted from accessing Fetch.
+        </p>
+
+        {/* Block Details Card */}
+        <div className="w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl p-6 mb-6 space-y-4">
+          {/* Reason */}
+          <div>
+            <p className="text-[10px] font-bold text-red-400/70 uppercase tracking-widest mb-2">Reason</p>
+            <p className="text-[15px] font-semibold text-white/90 leading-relaxed">
+              {profile.block_reason || 'No specific reason provided.'}
+            </p>
+          </div>
+
+          {/* Blocked by */}
+          {profile.blocked_by && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Blocked by</p>
+              <p className="text-sm font-medium text-gray-400">{profile.blocked_by}</p>
+            </div>
+          )}
+
+          {/* Date */}
+          {profile.blocked_at && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Date</p>
+              <p className="text-sm font-medium text-gray-400">{formatDate(profile.blocked_at)}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Help text */}
+        <p className="text-gray-600 text-[12px] text-center leading-relaxed mb-6">
+          If you believe this is a mistake, please contact our support team for assistance.
+        </p>
+
+        {/* Sign Out */}
+        <button
+          onClick={() => signOut()}
+          className="w-full bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white font-semibold py-[14px] rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-150 border border-white/[0.06]"
+        >
+          <LogOut size={16} />
+          <span className="text-[14px]">Sign Out</span>
+        </button>
       </motion.div>
     </div>
   );
@@ -2774,7 +2854,7 @@ const RiderDashboard = ({ profile: initialProfile }: { profile: Profile }) => {
 
 // ─── Admin / Super Admin Dashboard ───────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles';
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking';
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'live', label: 'Live Operations' },
@@ -2785,6 +2865,7 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'reviews', label: 'Ride Reviews' },
   { id: 'users', label: 'User Management' },
   { id: 'pricing', label: 'Pricing Config' },
+  { id: 'blocking', label: 'User Blocking' },
 ];
 
 const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Profile, isSuperAdmin: boolean, onImpersonate?: (p: Profile) => void }) => {
@@ -2819,6 +2900,16 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
   const [roleAssigning, setRoleAssigning] = useState<string | null>(null);
   const [roleAssignTarget, setRoleAssignTarget] = useState<Profile | null>(null);
 
+  // Blocking management state
+  const [blockableUsers, setBlockableUsers] = useState<Profile[]>([]);
+  const [blockingLoading, setBlockingLoading] = useState(false);
+  const [blockSearchQuery, setBlockSearchQuery] = useState('');
+  const [blockFilterRole, setBlockFilterRole] = useState<'all' | 'user' | 'rider'>('all');
+  const [blockFilterStatus, setBlockFilterStatus] = useState<'all' | 'blocked' | 'active'>('all');
+  const [blockingTarget, setBlockingTarget] = useState<Profile | null>(null);
+  const [blockReason, setBlockReason] = useState('');
+  const [blockActionLoading, setBlockActionLoading] = useState<string | null>(null);
+
   // Load roles on mount — needed for tab filtering for non-super-admins
   useEffect(() => {
     getAdminRoles().then(data => {
@@ -2846,6 +2937,10 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
     if (activeTab === 'roles' && isSuperAdmin) {
       setRolesLoading(true);
       getAdminRoles().then(data => { setAdminRoles(data); setRolesLoading(false); });
+    }
+    if (activeTab === 'blocking') {
+      setBlockingLoading(true);
+      getBlockableProfiles().then(data => { setBlockableUsers(data); setBlockingLoading(false); });
     }
   }, [activeTab, isSuperAdmin]);
 
@@ -3053,6 +3148,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
     { id: 'reviews' as AdminTab, label: 'Ride Reviews', icon: Star },
     { id: 'users' as AdminTab, label: 'User Management', icon: Settings },
     { id: 'pricing' as AdminTab, label: 'Pricing Config', icon: DollarSign },
+    { id: 'blocking' as AdminTab, label: 'User Blocking', icon: Ban },
   ];
 
   // Super admin sees everything + Roles tab; regular admin sees union of all assigned roles' modules
@@ -4125,6 +4221,321 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
               )}
             </>
           )}
+
+          {/* User Blocking */}
+          {activeTab === 'blocking' && (() => {
+            const filtered = blockableUsers.filter(u => {
+              const matchesSearch = !blockSearchQuery ||
+                (u.full_name || '').toLowerCase().includes(blockSearchQuery.toLowerCase()) ||
+                (u.email || '').toLowerCase().includes(blockSearchQuery.toLowerCase()) ||
+                (u.first_name || '').toLowerCase().includes(blockSearchQuery.toLowerCase()) ||
+                (u.last_name || '').toLowerCase().includes(blockSearchQuery.toLowerCase());
+              const matchesRole = blockFilterRole === 'all' || u.role === blockFilterRole;
+              const matchesStatus = blockFilterStatus === 'all'
+                || (blockFilterStatus === 'blocked' && u.is_blocked)
+                || (blockFilterStatus === 'active' && !u.is_blocked);
+              return matchesSearch && matchesRole && matchesStatus;
+            });
+            const blockedCount = blockableUsers.filter(u => u.is_blocked).length;
+
+            return (
+              <>
+                {/* Header */}
+                <div className="mb-8">
+                  <h2 className="text-2xl font-black tracking-tight text-gray-950">User Blocking</h2>
+                  <p className="text-gray-400 text-sm mt-1">Block or unblock users and riders from accessing the platform</p>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-white p-5 rounded-2xl border border-gray-100">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Users & Riders</p>
+                    <p className="text-3xl font-black text-gray-950">{blockableUsers.length}</p>
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border border-red-100">
+                    <p className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-1">Currently Blocked</p>
+                    <p className="text-3xl font-black text-red-600">{blockedCount}</p>
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border border-emerald-100">
+                    <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Active</p>
+                    <p className="text-3xl font-black text-emerald-600">{blockableUsers.length - blockedCount}</p>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6">
+                  <div className="flex flex-col md:flex-row gap-3">
+                    {/* Search */}
+                    <div className="flex-1 relative">
+                      <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={blockSearchQuery}
+                        onChange={e => setBlockSearchQuery(e.target.value)}
+                        placeholder="Search by name or email..."
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    {/* Role filter */}
+                    <div className="flex gap-1.5">
+                      {(['all', 'user', 'rider'] as const).map(r => (
+                        <button key={r} onClick={() => setBlockFilterRole(r)}
+                          className={`px-3.5 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                            blockFilterRole === r
+                              ? 'bg-gray-950 text-white'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {r === 'all' ? 'All Roles' : r === 'user' ? 'Passengers' : 'Riders'}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Status filter */}
+                    <div className="flex gap-1.5">
+                      {(['all', 'blocked', 'active'] as const).map(s => (
+                        <button key={s} onClick={() => setBlockFilterStatus(s)}
+                          className={`px-3.5 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                            blockFilterStatus === s
+                              ? (s === 'blocked' ? 'bg-red-600 text-white' : s === 'active' ? 'bg-emerald-600 text-white' : 'bg-gray-950 text-white')
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {s === 'all' ? 'All Status' : s === 'blocked' ? 'Blocked' : 'Active'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Block Modal */}
+                <AnimatePresence>
+                  {blockingTarget && (
+                    <motion.div
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+                      onClick={() => { setBlockingTarget(null); setBlockReason(''); }}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                        onClick={e => e.stopPropagation()}
+                        className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
+                      >
+                        {blockingTarget.is_blocked ? (
+                          /* Unblock Dialog */
+                          <>
+                            <div className="flex items-center gap-3 mb-5">
+                              <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                                <ShieldOff size={22} className="text-emerald-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-black text-gray-900 text-lg">Unblock User</h3>
+                                <p className="text-gray-400 text-sm font-medium">Restore access to the platform</p>
+                              </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                                  {blockingTarget.avatar_url
+                                    ? <img src={blockingTarget.avatar_url} alt="" className="w-full h-full object-cover" />
+                                    : <div className="w-full h-full flex items-center justify-center font-bold text-gray-500">{(blockingTarget.first_name || blockingTarget.email)?.[0]?.toUpperCase()}</div>}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-gray-900 text-sm truncate">{blockingTarget.first_name} {blockingTarget.last_name}</p>
+                                  <p className="text-gray-400 text-xs truncate">{blockingTarget.email}</p>
+                                </div>
+                                <span className="ml-auto px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[10px] font-black uppercase">Blocked</span>
+                              </div>
+                              {blockingTarget.block_reason && (
+                                <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Current Block Reason</p>
+                                  <p className="text-sm text-red-700 font-medium">{blockingTarget.block_reason}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            <p className="text-gray-500 text-sm font-medium mb-5">
+                              Are you sure you want to unblock <strong>{blockingTarget.first_name || blockingTarget.email}</strong>? They will regain full access to the platform.
+                            </p>
+
+                            <div className="flex gap-3">
+                              <button onClick={() => { setBlockingTarget(null); setBlockReason(''); }}
+                                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors text-sm">
+                                Cancel
+                              </button>
+                              <button
+                                disabled={blockActionLoading === blockingTarget.id}
+                                onClick={async () => {
+                                  setBlockActionLoading(blockingTarget.id);
+                                  const updated = await unblockUser(blockingTarget.id);
+                                  if (updated) {
+                                    setBlockableUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+                                  }
+                                  setBlockActionLoading(null);
+                                  setBlockingTarget(null);
+                                  setBlockReason('');
+                                }}
+                                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-2xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60"
+                              >
+                                {blockActionLoading === blockingTarget.id
+                                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Unblocking...</>
+                                  : <><ShieldOff size={15} /> Unblock User</>}
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          /* Block Dialog */
+                          <>
+                            <div className="flex items-center gap-3 mb-5">
+                              <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
+                                <Ban size={22} className="text-red-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-black text-gray-900 text-lg">Block User</h3>
+                                <p className="text-gray-400 text-sm font-medium">Restrict access to the platform</p>
+                              </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                                  {blockingTarget.avatar_url
+                                    ? <img src={blockingTarget.avatar_url} alt="" className="w-full h-full object-cover" />
+                                    : <div className="w-full h-full flex items-center justify-center font-bold text-gray-500">{(blockingTarget.first_name || blockingTarget.email)?.[0]?.toUpperCase()}</div>}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-gray-900 text-sm truncate">{blockingTarget.first_name} {blockingTarget.last_name}</p>
+                                  <p className="text-gray-400 text-xs truncate">{blockingTarget.email}</p>
+                                </div>
+                                <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${blockingTarget.role === 'rider' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                                  {blockingTarget.role === 'rider' ? 'Rider' : 'Passenger'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mb-4">
+                              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                                Block Reason <span className="text-red-400">*</span>
+                              </label>
+                              <textarea
+                                value={blockReason}
+                                onChange={e => setBlockReason(e.target.value)}
+                                placeholder="e.g. Violation of community guidelines, inappropriate behavior, fraudulent activity..."
+                                rows={3}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-300 transition-all resize-none"
+                              />
+                              <p className="text-[11px] text-gray-400 mt-1.5">This message will be displayed to the user when they try to access the app.</p>
+                            </div>
+
+                            <div className="bg-amber-50 rounded-2xl p-3.5 border border-amber-100 mb-5 flex items-start gap-2.5">
+                              <AlertCircle size={16} className="text-amber-500 mt-0.5 shrink-0" />
+                              <p className="text-amber-700 text-[12px] font-medium leading-relaxed">
+                                Blocking this user will immediately prevent them from using the app. Any active rides will not be affected.
+                              </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                              <button onClick={() => { setBlockingTarget(null); setBlockReason(''); }}
+                                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors text-sm">
+                                Cancel
+                              </button>
+                              <button
+                                disabled={!blockReason.trim() || blockActionLoading === blockingTarget.id}
+                                onClick={async () => {
+                                  if (!blockReason.trim()) return;
+                                  setBlockActionLoading(blockingTarget.id);
+                                  const updated = await blockUser(
+                                    blockingTarget.id,
+                                    blockReason.trim(),
+                                    profile.full_name || profile.email,
+                                  );
+                                  if (updated) {
+                                    setBlockableUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+                                  }
+                                  setBlockActionLoading(null);
+                                  setBlockingTarget(null);
+                                  setBlockReason('');
+                                }}
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-40"
+                              >
+                                {blockActionLoading === blockingTarget.id
+                                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Blocking...</>
+                                  : <><Ban size={15} /> Block User</>}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* User List */}
+                {blockingLoading ? (
+                  <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+                ) : filtered.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-100 px-5 py-16 text-center">
+                    <Ban size={32} className="text-gray-200 mx-auto mb-3" />
+                    <p className="font-bold text-gray-400 text-sm">No users found</p>
+                    <p className="text-gray-300 text-[13px] mt-1">Try adjusting your search or filters.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filtered.map(u => (
+                      <div key={u.id} className={`bg-white rounded-2xl border p-4 flex items-center gap-4 transition-colors ${u.is_blocked ? 'border-red-100 bg-red-50/30' : 'border-gray-100'}`}>
+                        {/* Avatar */}
+                        <div className={`w-11 h-11 rounded-full overflow-hidden shrink-0 ${u.is_blocked ? 'ring-2 ring-red-200' : ''}`}>
+                          {u.avatar_url
+                            ? <img src={u.avatar_url} alt="" className={`w-full h-full object-cover ${u.is_blocked ? 'opacity-60 grayscale' : ''}`} />
+                            : <div className="w-full h-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 text-sm">{(u.first_name || u.email)?.[0]?.toUpperCase()}</div>}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className={`font-bold text-sm truncate ${u.is_blocked ? 'text-red-800 line-through decoration-red-300' : 'text-gray-900'}`}>
+                              {u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.full_name || u.email}
+                            </p>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
+                              u.role === 'rider' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {u.role === 'rider' ? 'Rider' : 'User'}
+                            </span>
+                            {u.is_blocked && (
+                              <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] font-black uppercase shrink-0">Blocked</span>
+                            )}
+                          </div>
+                          <p className="text-gray-400 text-xs truncate">{u.email}</p>
+                          {u.is_blocked && u.block_reason && (
+                            <p className="text-red-500 text-[11px] font-medium mt-1 truncate" title={u.block_reason}>
+                              Reason: {u.block_reason}
+                            </p>
+                          )}
+                          {u.is_blocked && u.blocked_at && (
+                            <p className="text-gray-400 text-[10px] mt-0.5">
+                              Blocked {new Date(u.blocked_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {u.blocked_by ? ` by ${u.blocked_by}` : ''}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Action */}
+                        <button
+                          onClick={() => { setBlockingTarget(u); setBlockReason(''); }}
+                          className={`px-4 py-2 rounded-xl text-[12px] font-bold transition-colors shrink-0 flex items-center gap-1.5 ${
+                            u.is_blocked
+                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                              : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                          }`}
+                        >
+                          {u.is_blocked ? <><ShieldOff size={13} /> Unblock</> : <><Ban size={13} /> Block</>}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
         </div>
       </div>

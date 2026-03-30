@@ -45,6 +45,11 @@ export interface Profile {
   reviewed_at: string | null;
   admin_role_id: string | null;
   admin_role_ids: string[];
+  // Blocking
+  is_blocked: boolean;
+  block_reason: string | null;
+  blocked_by: string | null;
+  blocked_at: string | null;
   created_at: string;
 }
 
@@ -133,6 +138,53 @@ export async function getRiderProfiles(): Promise<Profile[]> {
     .eq('role', 'rider')
     .order('created_at', { ascending: false });
   return (data as Profile[]) || [];
+}
+
+// ── Blocking ──────────────────────────────────────────────────────────────────
+
+export async function getBlockableProfiles(): Promise<Profile[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('role', ['user', 'rider'])
+    .order('created_at', { ascending: false });
+  return (data as Profile[]) || [];
+}
+
+export async function blockUser(
+  targetUserId: string,
+  reason: string,
+  blockedByName: string,
+): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      is_blocked: true,
+      block_reason: reason,
+      blocked_by: blockedByName,
+      blocked_at: new Date().toISOString(),
+    })
+    .eq('id', targetUserId)
+    .select()
+    .single();
+  if (error) return null;
+  return data as Profile;
+}
+
+export async function unblockUser(targetUserId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      is_blocked: false,
+      block_reason: null,
+      blocked_by: null,
+      blocked_at: null,
+    })
+    .eq('id', targetUserId)
+    .select()
+    .single();
+  if (error) return null;
+  return data as Profile;
 }
 
 export async function uploadImage(
