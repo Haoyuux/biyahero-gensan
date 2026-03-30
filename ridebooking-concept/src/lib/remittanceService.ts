@@ -1,7 +1,7 @@
 // ─── Remittance Service ──────────────────────────────────────────────────────
 // Handles rider remittance (booking fee collection & receipt uploads).
 
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
 
 export interface Remittance {
   id: string;
@@ -116,7 +116,7 @@ export async function createRemittance(
   receiptUrl: string,
   ridesCount: number,
 ): Promise<Remittance | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('remittances')
     .insert({
       rider_id: riderId,
@@ -143,7 +143,7 @@ export async function reviewRemittance(
   adminNotes: string,
   reviewerName: string,
 ): Promise<Remittance | null> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('remittances')
     .update({
       status,

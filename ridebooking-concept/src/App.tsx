@@ -6,7 +6,7 @@ import {
   Home, Briefcase, ThumbsUp, X, Send, Bell, Shield, Users, Activity,
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
-  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff
+  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -3326,6 +3326,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, onImpersonate }: { profile: Pro
     { id: 'analytics' as AdminTab, label: 'Booking Analytics', icon: TrendingUp },
     { id: 'finances' as AdminTab, label: 'Revenue Dashboard', icon: BarChart },
     { id: 'reviews' as AdminTab, label: 'Ride Reviews', icon: Star },
+    { id: 'remittances' as AdminTab, label: 'Remittances', icon: Receipt },
     { id: 'users' as AdminTab, label: 'User Management', icon: Settings },
     { id: 'pricing' as AdminTab, label: 'Pricing Config', icon: DollarSign },
     { id: 'blocking' as AdminTab, label: 'User Blocking', icon: Ban },

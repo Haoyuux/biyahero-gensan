@@ -12,6 +12,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+export const supabaseAdmin = createClient(
+  supabaseUrl,
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
+
 export type UserRole = 'super_admin' | 'admin' | 'rider' | 'user';
 export type RiderStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected';
 
