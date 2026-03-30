@@ -96,11 +96,11 @@ export async function uploadReceipt(
 ): Promise<string | null> {
   const ext = file.name.split('.').pop();
   const path = `remittances/${riderId}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage
+  const { error } = await supabaseAdmin.storage
     .from('documents')
     .upload(path, file, { upsert: true });
   if (error) return null;
-  const { data } = supabase.storage.from('documents').getPublicUrl(path);
+  const { data } = supabaseAdmin.storage.from('documents').getPublicUrl(path);
   return data.publicUrl;
 }
 
