@@ -46,14 +46,18 @@ export async function sendMessage(
   senderRole: 'user' | 'rider',
   senderName: string,
   content: string,
-): Promise<ChatMessage | null> {
+): Promise<{ data: ChatMessage | null; error: any }> {
   const { data, error } = await supabase
     .from('messages')
     .insert({ ride_id: rideId, sender_id: senderId, sender_role: senderRole, sender_name: senderName, content })
     .select()
     .single();
-  if (error) return null;
-  return data as ChatMessage;
+  
+  if (error) {
+    console.error('Chat error:', error);
+    return { data: null, error };
+  }
+  return { data: data as ChatMessage, error: null };
 }
 
 /** Load full message history for a ride (oldest first). */
@@ -74,15 +78,28 @@ export function subscribeToMessages(
   rideId: string,
   onMessage: (msg: ChatMessage) => void,
 ): () => void {
+  // Subscribe to ALL inserts on messages and filter in JS.
+  // This is more reliable than Postgres level filters which often require 
+  // Replica Identity Full to be enabled on the table.
   const channel = supabase
-    .channel(`chat:${rideId}`)
+    .channel(`chat_room_${rideId}`)
     .on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'messages', filter: `ride_id=eq.${rideId}` },
-      (payload) => onMessage(payload.new as ChatMessage),
+      { event: 'INSERT', schema: 'public', table: 'messages' },
+      (payload) => {
+        const newMsg = payload.new as ChatMessage;
+        if (newMsg && newMsg.ride_id === rideId) {
+          onMessage(newMsg);
+        }
+      },
     )
-    .subscribe();
-  return () => { supabase.removeChannel(channel); };
+    .subscribe((status) => {
+      console.log(`Chat subscribe status for ${rideId}:`, status);
+    });
+
+  return () => { 
+    supabase.removeChannel(channel); 
+  };
 }
 
 /**

@@ -5483,13 +5483,18 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const [sendingError, setSendingError] = useState<string | null>(null);
+
   const handleSend = async () => {
     const text = newMessage.trim();
     if (!text) return;
     setNewMessage('');
-    // Optimistic insert
+    setSendingError(null);
+    
+    // Optimistic ID so we can track this specific message
+    const tempId = `opt-${Date.now()}`;
     const optimistic: ChatMessage = {
-      id: `opt-${Date.now()}`,
+      id: tempId,
       ride_id: rideId,
       sender_id: senderId,
       sender_role: senderRole,
@@ -5497,8 +5502,22 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
       content: text,
       created_at: new Date().toISOString(),
     };
+    
     setMessages(prev => [...prev, optimistic]);
-    await sendMessage(rideId, senderId, senderRole, senderName, text);
+
+    const { data: sentMsg, error } = await sendMessage(rideId, senderId, senderRole, senderName, text);
+    
+    if (error) {
+      setSendingError('Message failed to send. Check your connection.');
+      // Remove optimistic or mark it as failed — for now keep it but show warning
+      setTimeout(() => setSendingError(null), 3000);
+      return;
+    }
+
+    if (sentMsg) {
+      // Replace optimistic with real DB message to get correct ID and timestamp
+      setMessages(prev => prev.map(m => m.id === tempId ? sentMsg : m));
+    }
   };
 
   const fmtTime = (iso: string) =>
