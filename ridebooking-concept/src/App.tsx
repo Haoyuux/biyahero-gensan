@@ -6,7 +6,7 @@ import {
   Home, Briefcase, ThumbsUp, X, Send, Bell, Shield, Users, Activity,
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
-  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog
+  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -2187,6 +2187,28 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [hasPendingRemit, setHasPendingRemit] = useState(false);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [viewerTitle, setViewerTitle] = useState<string>('');
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async (url: string, filename: string) => {
+    setDownloading(true);
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      console.error('Download failed', e);
+      window.open(url, '_blank');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     if (!initialProfile.id) return;
@@ -3060,7 +3082,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white rounded-[32px] p-8 max-w-sm w-full relative"
+              className="bg-white rounded-[32px] p-6 md:p-10 max-w-lg w-full relative"
               onClick={e => e.stopPropagation()}
             >
               <button 
@@ -3071,26 +3093,40 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
               </button>
               
               <div className="text-center mb-6">
-                <h3 className="font-black text-xl text-gray-900">{viewerTitle}</h3>
+                <h3 className="font-black text-2xl text-gray-900">{viewerTitle}</h3>
                 <p className="text-sm text-gray-400 font-medium mt-1">
                   {viewerTitle === 'Payment QR Code' ? 'Scan this to remit booking fees' : 'Record of your submission'}
                 </p>
               </div>
               
-              <div className="w-full aspect-square bg-white border border-gray-100 rounded-2xl overflow-hidden mb-6 shadow-inner flex items-center justify-center">
+              <div className="w-full bg-white border border-gray-100 rounded-3xl overflow-hidden mb-8 shadow-inner flex items-center justify-center min-h-[300px]">
                 <img 
                   src={viewerImage} 
                   alt={viewerTitle} 
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-contain"
                 />
               </div>
               
-              <button 
-                onClick={() => setViewerImage(null)}
-                className="w-full py-4 bg-gray-900 text-white font-black rounded-2xl hover:bg-gray-800 transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => handleDownload(viewerImage, `${viewerTitle?.replace(/\s+/g, '_')}_${Date.now()}.png`)}
+                  disabled={downloading}
+                  className="flex-1 py-4 bg-emerald-500 text-white font-black rounded-2xl hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                >
+                  {downloading ? (
+                    <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Download size={20} />
+                  )}
+                  Save Image
+                </button>
+                <button 
+                  onClick={() => setViewerImage(null)}
+                  className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
