@@ -135,6 +135,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (globalSettings?.document_title) {
+      document.title = globalSettings.document_title;
+    } else if (globalSettings?.app_name) {
+      document.title = globalSettings.app_name;
+    }
+  }, [globalSettings]);
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
@@ -2177,6 +2185,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [remitFile, setRemitFile] = useState<File | null>(null);
   const [remitting, setRemitting] = useState(false);
   const [hasPendingRemit, setHasPendingRemit] = useState(false);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [viewerTitle, setViewerTitle] = useState<string>('');
 
   useEffect(() => {
     if (!initialProfile.id) return;
@@ -2918,9 +2928,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                   {settings?.remittance_qr_url && (
                     <div className="mt-5 bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col items-center">
                       <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Scan to Pay Booking Fees</p>
-                      <div className="w-48 h-48 bg-white border border-gray-100 rounded-xl overflow-hidden mb-3 shadow-sm hover:scale-[1.5] transition-transform origin-center cursor-zoom-in relative group">
+                      <div 
+                        onClick={() => { setViewerImage(settings.remittance_qr_url!); setViewerTitle('Payment QR Code'); }}
+                        className="w-48 h-48 bg-white border border-gray-100 rounded-xl overflow-hidden mb-3 shadow-sm hover:scale-[1.05] active:scale-[0.98] transition-all origin-center cursor-zoom-in relative group"
+                      >
                         <img src={settings.remittance_qr_url} alt="Remittance QR" className="w-full h-full object-contain p-2" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 flex items-center justify-center transition-colors">
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/[0.03] flex items-center justify-center transition-colors">
                            <Search className="text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
                         </div>
                       </div>
@@ -3005,8 +3018,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                           </div>
                         </div>
                         {r.receipt_url && (
-                           <div className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden mb-3">
-                             <img src={r.receipt_url} alt="Receipt" className="w-full h-full object-cover" />
+                           <div 
+                             onClick={() => { setViewerImage(r.receipt_url!); setViewerTitle('Receipt Preview'); }}
+                             className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden mb-3 cursor-zoom-in group relative"
+                           >
+                             <img src={r.receipt_url} alt="Receipt" className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
+                             <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/[0.03] transition-colors">
+                               <Eye className="text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
+                             </div>
                            </div>
                         )}
                         {r.admin_notes && (
@@ -3025,6 +3044,57 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           </div>
         )}
       </div>
+
+      {/* Universal Image Viewer Modal */}
+      <AnimatePresence>
+        {viewerImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setViewerImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-white rounded-[32px] p-8 max-w-sm w-full relative"
+              onClick={e => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setViewerImage(null)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+              
+              <div className="text-center mb-6">
+                <h3 className="font-black text-xl text-gray-900">{viewerTitle}</h3>
+                <p className="text-sm text-gray-400 font-medium mt-1">
+                  {viewerTitle === 'Payment QR Code' ? 'Scan this to remit booking fees' : 'Record of your submission'}
+                </p>
+              </div>
+              
+              <div className="w-full aspect-square bg-white border border-gray-100 rounded-2xl overflow-hidden mb-6 shadow-inner flex items-center justify-center">
+                <img 
+                  src={viewerImage} 
+                  alt={viewerTitle} 
+                  className="w-full h-full object-contain p-2"
+                />
+              </div>
+              
+              <button 
+                onClick={() => setViewerImage(null)}
+                className="w-full py-4 bg-gray-900 text-white font-black rounded-2xl hover:bg-gray-800 transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -5232,9 +5302,20 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                       type="text" 
                       value={appSettings?.app_name || ''} 
                       onChange={e => setAppSettings(prev => prev ? {...prev, app_name: e.target.value} : null)}
-                      placeholder="App Name"
+                      placeholder="e.g. Fetch Gensan"
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Web App Title (Browser Tab)</label>
+                    <input 
+                      type="text" 
+                      value={appSettings?.document_title || ''} 
+                      onChange={e => setAppSettings(prev => prev ? {...prev, document_title: e.target.value} : null)}
+                      placeholder="e.g. Fetch — Ride Booking & Delivery"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1.5 ml-1">This text appears in the browser tab. Leave blank to use app name.</p>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">App Logo</label>

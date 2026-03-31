@@ -3,6 +3,7 @@ import { supabase, supabaseAdmin } from './supabase';
 export interface AppSettings {
   id: number;
   app_name: string;
+  document_title: string | null;
   app_logo_url: string | null;
   remittance_qr_url: string | null;
   updated_at: string;
