@@ -198,8 +198,8 @@ export default function App() {
 
 const SplashScreen = ({ settings }: { settings: AppSettings | null }) => (
   <div className="w-full h-[100dvh] bg-[#080808] flex flex-col items-center justify-center font-sans">
-    <div className="w-16 h-16 bg-white/[0.03] rounded-2xl flex items-center justify-center mb-8 overflow-hidden grayscale opacity-50">
-      {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-2" /> : <Car size={26} className="text-white" />}
+    <div className="w-16 h-16 flex items-center justify-center mb-8 overflow-hidden grayscale-0 opacity-100">
+      {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={26} className="text-white" />}
     </div>
     <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
   </div>
@@ -219,8 +219,8 @@ const LoginScreen = ({ settings }: { settings: AppSettings | null }) => {
         className="relative z-10 flex flex-col items-center px-8 w-full max-w-[320px]"
       >
         <div className="mb-14 text-center">
-          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center mb-10 mx-auto overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-2 invert" /> : <Car size={26} className="text-white" />}
+          <div className="w-20 h-20 flex items-center justify-center mb-8 mx-auto overflow-hidden">
+            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={28} className="text-white" />}
           </div>
           <h1 className="text-[3.25rem] font-black text-white tracking-tighter leading-none mb-3">{settings?.app_name || 'Fetch'}</h1>
           <p className="text-gray-500 text-sm font-medium tracking-wide">Your ride, on demand</p>
@@ -1355,8 +1355,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         {/* Desktop nav header — hidden on mobile (floating nav used instead) */}
         <div className="hidden md:flex flex-none border-b border-gray-100 bg-white p-4 justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-950 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-              {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-1 invert" /> : <Shield size={18} className="text-white" />}
+            <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+              {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={18} className="text-gray-950" />}
             </div>
             <div className="min-w-0">
               <h1 className="font-black text-[15px] text-gray-950 leading-tight truncate">{settings?.app_name || 'Fetch'}</h1>
@@ -2464,8 +2464,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
-          <div className="w-8 h-8 md:w-9 md:h-9 bg-gray-950 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-1 invert" /> : <Car size={16} className="text-white" />}
+          <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={18} className="text-gray-950" />}
           </div>
           <div className="min-w-0">
             <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">{settings?.app_name || 'Fetch'} Driver</h1>
@@ -3499,8 +3499,8 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
       {/* Sidebar */}
       <div className="w-full md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0">
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/[0.06]">
-          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain p-1 invert" /> : <Shield size={16} className="text-white" />}
+          <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+            {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={18} className="text-white" />}
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="font-black text-[14px] leading-tight text-white truncate">{settings?.app_name || 'Admin'}</h1>
