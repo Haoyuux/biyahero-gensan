@@ -140,6 +140,16 @@ export default function App() {
     } else if (globalSettings?.app_name) {
       document.title = globalSettings.app_name;
     }
+
+    if (globalSettings?.app_logo_url) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = globalSettings.app_logo_url;
+    }
   }, [globalSettings]);
 
   useEffect(() => {
@@ -198,7 +208,7 @@ export default function App() {
 
 const SplashScreen = ({ settings }: { settings: AppSettings | null }) => (
   <div className="w-full h-[100dvh] bg-[#080808] flex flex-col items-center justify-center font-sans">
-    <div className="w-16 h-16 flex items-center justify-center mb-8 overflow-hidden grayscale-0 opacity-100">
+    <div className="w-16 h-16 md:w-24 md:h-24 flex items-center justify-center mb-8 overflow-hidden grayscale-0 opacity-100">
       {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={26} className="text-white" />}
     </div>
     <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -219,7 +229,7 @@ const LoginScreen = ({ settings }: { settings: AppSettings | null }) => {
         className="relative z-10 flex flex-col items-center px-8 w-full max-w-[320px]"
       >
         <div className="mb-14 text-center">
-          <div className="w-20 h-20 flex items-center justify-center mb-8 mx-auto overflow-hidden">
+          <div className="w-20 h-20 md:w-32 md:h-32 flex items-center justify-center mb-8 mx-auto overflow-hidden">
             {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={28} className="text-white" />}
           </div>
           <h1 className="text-[3.25rem] font-black text-white tracking-tighter leading-none mb-3">{settings?.app_name || 'Fetch'}</h1>
@@ -1355,7 +1365,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         {/* Desktop nav header — hidden on mobile (floating nav used instead) */}
         <div className="hidden md:flex flex-none border-b border-gray-100 bg-white p-4 justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center shrink-0 overflow-hidden">
               {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={18} className="text-gray-950" />}
             </div>
             <div className="min-w-0">
@@ -2464,7 +2474,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
-          <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center shrink-0 overflow-hidden">
             {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={18} className="text-gray-950" />}
           </div>
           <div className="min-w-0">
@@ -3499,7 +3509,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
       {/* Sidebar */}
       <div className="w-full md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0">
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/[0.06]">
-          <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center shrink-0 overflow-hidden">
             {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={18} className="text-white" />}
           </div>
           <div className="flex-1 min-w-0">
