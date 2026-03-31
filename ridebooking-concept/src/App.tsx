@@ -3078,54 +3078,58 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
             onClick={() => setViewerImage(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white rounded-[32px] p-6 md:p-10 max-w-lg w-full relative"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white md:rounded-[40px] md:max-w-lg w-full h-full md:h-auto relative flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
-              <button 
-                onClick={() => setViewerImage(null)}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
-              >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-6">
-                <h3 className="font-black text-2xl text-gray-900">{viewerTitle}</h3>
-                <p className="text-sm text-gray-400 font-medium mt-1">
-                  {viewerTitle === 'Payment QR Code' ? 'Scan this to remit booking fees' : 'Record of your submission'}
-                </p>
-              </div>
-              
-              <div className="w-full bg-white border border-gray-100 rounded-3xl overflow-hidden mb-8 shadow-inner flex items-center justify-center min-h-[300px]">
-                <img 
-                  src={viewerImage} 
-                  alt={viewerTitle} 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => handleDownload(viewerImage, `${viewerTitle?.replace(/\s+/g, '_')}_${Date.now()}.png`)}
-                  disabled={downloading}
-                  className="flex-1 py-4 bg-emerald-500 text-white font-black rounded-2xl hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-                >
-                  {downloading ? (
-                    <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Download size={20} />
-                  )}
-                  Save Image
-                </button>
-                <button 
-                  onClick={() => setViewerImage(null)}
-                  className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
-                >
-                  Close
-                </button>
+              <div className="flex-1 overflow-y-auto px-6 py-10 md:p-10 flex flex-col">
+                <div className="flex justify-end mb-4 md:absolute md:top-6 md:right-6">
+                  <button 
+                    onClick={() => setViewerImage(null)}
+                    className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors shadow-sm"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="text-center mb-10">
+                  <h3 className="font-black text-3xl text-gray-900 tracking-tight">{viewerTitle}</h3>
+                  <p className="text-base text-gray-400 font-medium mt-2">
+                    {viewerTitle === 'Payment QR Code' ? 'Scan this to remit booking fees' : 'Record of your submission'}
+                  </p>
+                </div>
+                
+                <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-[40px] border border-gray-100 overflow-hidden shadow-inner mb-10 p-4">
+                  <img 
+                    src={viewerImage} 
+                    alt={viewerTitle} 
+                    className="max-w-full max-h-full object-contain drop-shadow-2xl"
+                  />
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-6 border-t border-gray-50 md:border-none md:pt-0">
+                  <button 
+                    onClick={() => handleDownload(viewerImage, `${viewerTitle?.replace(/\s+/g, '_')}_${Date.now()}.png`)}
+                    disabled={downloading}
+                    className="flex-[2] py-4 md:py-5 bg-emerald-500 text-white font-black text-base md:text-lg rounded-2xl md:rounded-3xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 active:scale-[0.96]"
+                  >
+                    {downloading ? (
+                      <div className="w-5 h-5 border-3 border-white/50 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Download size={20} />
+                    )}
+                    Save Image
+                  </button>
+                  <button 
+                    onClick={() => setViewerImage(null)}
+                    className="flex-1 py-4 md:py-5 bg-gray-100 text-gray-600 font-bold text-base md:text-lg rounded-2xl md:rounded-3xl hover:bg-gray-200 transition-all active:scale-[0.96]"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
