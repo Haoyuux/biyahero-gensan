@@ -1679,6 +1679,9 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             setActiveRider(pendingRider);
             setPendingRider(null);
             setStep('matched');
+            if (currentRideId) {
+              supabase.channel('rides').send({ type: 'broadcast', event: 'USER_CONFIRMED_RIDER', payload: { rideId: currentRideId } });
+            }
             pushAppNotification('Rider on the way 🛵', 'Your rider is heading to you now.');
           }}
           onCancel={() => {
@@ -2360,6 +2363,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   const [requestAccepted, setRequestAccepted] = useState(false);
+  const [waitingForUserConfirm, setWaitingForUserConfirm] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
@@ -2717,9 +2721,21 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         if (current?.rideId === rideId) {
           setHasRequest(false);
           setRequestAccepted(false);
+          setWaitingForUserConfirm(false);
+          setShowActiveRide(false);
           setAppNotifications(prev => [{ id: genId(), title: 'Ride cancelled', body: 'The passenger cancelled their booking.', time: Date.now(), read: false }, ...prev]);
           alert('The passenger cancelled the ride.');
           return null;
+        }
+        return current;
+      });
+    });
+
+    channel.on('broadcast', { event: 'USER_CONFIRMED_RIDER' }, (payload) => {
+      setCurrentRequest((current: any) => {
+        if (current?.rideId === payload.payload.rideId) {
+          setWaitingForUserConfirm(false);
+          setShowActiveRide(true);
         }
         return current;
       });
@@ -2837,8 +2853,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           </div>
         </div>
         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-          <div className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black tracking-wide ${isOnline && !requestAccepted ? 'bg-emerald-50 text-emerald-700' : requestAccepted ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-500'}`}>
-            {requestAccepted ? 'ON TRIP' : isOnline ? 'ONLINE' : 'OFFLINE'}
+          <div className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black tracking-wide ${waitingForUserConfirm ? 'bg-amber-100 text-amber-700' : isOnline && !requestAccepted ? 'bg-emerald-50 text-emerald-700' : requestAccepted ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-500'}`}>
+            {waitingForUserConfirm ? 'PENDING' : requestAccepted ? 'ON TRIP' : isOnline ? 'ONLINE' : 'OFFLINE'}
           </div>
           <button onClick={() => setShowChatHistory(true)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors">
             <MessageSquare size={15} className="text-gray-600" />
@@ -2893,20 +2909,24 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
               key="rider-ongoing"
               initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             >
-              <div className="bg-gray-950 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <div className={`${waitingForUserConfirm ? 'bg-amber-500' : 'bg-gray-950'} text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20`}>
+                <div className={`w-2 h-2 rounded-full ${waitingForUserConfirm ? 'bg-white animate-pulse' : 'bg-emerald-400 animate-pulse'} shrink-0`} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[13px] leading-tight">Ongoing trip</p>
-                  <p className="text-gray-400 text-[11px] font-medium truncate mt-0.5">
+                  <p className="font-bold text-[13px] leading-tight">
+                    {waitingForUserConfirm ? 'Waiting for passenger...' : 'Ongoing trip'}
+                  </p>
+                  <p className="text-white/70 text-[11px] font-medium truncate mt-0.5">
                     {currentRequest.user?.first_name || 'Passenger'} · {currentRequest.pickup?.label}
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowActiveRide(true)}
-                  className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
-                >
-                  View
-                </button>
+                {!waitingForUserConfirm && (
+                  <button
+                    onClick={() => setShowActiveRide(true)}
+                    className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    View
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -3266,8 +3286,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                   onClick={() => {
                     usedRideIdsRef.current.add(currentRequest.rideId);
                     setRequestAccepted(true);
+                    setWaitingForUserConfirm(true);
                     setHasRequest(false);
-                    setShowActiveRide(true);
                     supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_ACCEPTED', payload: { rideId: currentRequest.rideId, rider: currentProfile } });
                     // Mark as accepted in DB so other riders don't pick it up
                     supabase.from('rides').update({ status: 'accepted', rider_id: currentProfile.id }).eq('id', currentRequest.rideId).eq('status', 'pending');
