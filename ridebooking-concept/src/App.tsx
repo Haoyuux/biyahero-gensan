@@ -30,6 +30,16 @@ interface FavoritePlace {
 }
 const FAVORITES_KEY = 'fetch_favorites';
 
+/** Haversine distance in km between two lat/lng pairs. */
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 // Safe unique-ID that works in both HTTPS and plain HTTP dev environments.
 // genId() is only available in secure contexts (HTTPS / localhost).
 const genId = () =>
@@ -1033,10 +1043,28 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   // Keep completion ref in sync every render (avoids stale closures in channel useEffect)
   completionDataRef.current = { pickup, dropoff, fareBreakdown, selectedRide, activeRider };
 
+  // Stores the current REQUEST_RIDE payload so the re-broadcast interval can access it
+  const pendingRequestRef = React.useRef<any>(null);
+
   const { connectionState, reconnectTick } = useConnectionStatus();
   const wasOfflineRef = React.useRef(false);
 
   useEffect(() => { requestNotificationPermission(); }, []);
+
+  // While searching, re-broadcast REQUEST_RIDE every 4 s so riders who come online
+  // mid-search receive the request (they miss the one-shot initial broadcast).
+  useEffect(() => {
+    if (step !== 'searching') {
+      pendingRequestRef.current = null;
+      return;
+    }
+    const interval = setInterval(() => {
+      const payload = pendingRequestRef.current;
+      if (!payload) return;
+      supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [step]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -1475,7 +1503,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             {step === 'select' && (
               <SelectPanel key="select" setStep={setStep} selectedRide={selectedRide}
                 setSelectedRide={setSelectedRide} routeInfo={routeInfo} pricingConfig={pricingConfig}
-                onBook={(rideId: string, breakdown: FareBreakdown) => {
+                onBook={async (rideId: string, breakdown: FareBreakdown) => {
                   if (currentRideId) {
                     showNotification('You have an ongoing ride. Finish it before booking another.');
                     return;
@@ -1483,15 +1511,42 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   setStep('searching');
                   setCurrentRideId(rideId);
                   setFareBreakdown(breakdown);
+
+                  // Fetch online approved riders and sort by distance to pickup
+                  const pickupLL = pickupCoords || deviceLocation;
+                  let priorityRiderIds: string[] = [];
+                  if (pickupLL) {
+                    const { data: onlineRiders } = await supabase
+                      .from('profiles')
+                      .select('id, last_lat, last_lng')
+                      .eq('role', 'rider')
+                      .eq('rider_status', 'approved')
+                      .eq('is_online', true);
+                    if (onlineRiders?.length) {
+                      priorityRiderIds = (onlineRiders as any[])
+                        .map(r => ({
+                          id: r.id as string,
+                          dist: (r.last_lat != null && r.last_lng != null)
+                            ? haversineKm(pickupLL[0], pickupLL[1], r.last_lat, r.last_lng)
+                            : Infinity,
+                        }))
+                        .sort((a, b) => a.dist - b.dist)
+                        .map(r => r.id);
+                    }
+                  }
+
                   const requestPayload = {
                     rideId,
                     user: currentProfile,
-                    pickup: { label: pickup, coords: pickupCoords || deviceLocation },
+                    pickup: { label: pickup, coords: pickupLL },
                     dropoff: { label: dropoff, coords: destinationCoords },
                     fare: breakdown.totalFare,
                     fareBreakdown: breakdown,
+                    priorityRiderIds,
                   };
-                  // Persist pending ride so riders coming online later can see it
+                  // Store payload so the re-broadcast interval can keep sending it
+                  pendingRequestRef.current = requestPayload;
+                  // Persist pending ride so riders coming online later can see it via DB
                   supabase.from('rides').insert({
                     id: rideId,
                     user_id: currentProfile.id,
@@ -1505,7 +1560,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     ride_type: selectedRide,
                     request_data: requestPayload,
                   });
-                  // Also broadcast for riders already online
+                  // Initial broadcast for riders already online
                   supabase.channel('rides').send({
                     type: 'broadcast',
                     event: 'REQUEST_RIDE',
@@ -2201,6 +2256,9 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
   const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit'>('home');
+  const [riderCurrentLoc, setRiderCurrentLoc] = useState<[number, number] | null>(null);
+  // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
+  const pendingTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Check location permission on mount
   useEffect(() => {
@@ -2366,11 +2424,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: true });
     const watchId = navigator.geolocation.watchPosition(
       pos => {
+        const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setRiderCurrentLoc(loc);
         supabase.rpc('set_rider_online', {
           target_user_id: riderId,
           is_online_val: true,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
+          lat: loc[0],
+          lng: loc[1],
         });
       },
       (err) => {
@@ -2397,48 +2457,90 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       setCurrentRequest(null);
       return;
     }
+    const PRIORITY_DELAY_MS = 15_000; // 15 s per priority rank
+    const riderId = currentProfile.id;
+    const timers = pendingTimersRef.current;
+
+    // Schedule a request to appear in the queue after a priority-based delay.
+    // Closest rider (index 0) gets delay = 0; every subsequent rank adds 15 s.
+    const scheduleRequest = (req: any) => {
+      if (timers.has(req.rideId)) return; // already scheduled
+      const priority: string[] = req.priorityRiderIds ?? [];
+      const pos = priority.indexOf(riderId);
+      const delay = pos >= 0 ? pos * PRIORITY_DELAY_MS : priority.length * PRIORITY_DELAY_MS;
+
+      const enqueue = () => {
+        timers.delete(req.rideId);
+        setIncomingRequests(prev => {
+          if (prev.some((r: any) => r.rideId === req.rideId)) return prev;
+          return [...prev, req];
+        });
+        const pName = `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || 'Passenger';
+        setAppNotifications(prev => [{ id: genId(), title: 'New ride request 🛵', body: `${pName} is requesting a ride.`, time: Date.now(), read: false }, ...prev]);
+        if (delay === 0) pushNotification('New ride request 🛵', `${pName} is requesting a ride.`);
+      };
+
+      if (delay === 0) { enqueue(); }
+      else { timers.set(req.rideId, setTimeout(enqueue, delay)); }
+    };
+
     const channel = supabase.channel('rides');
+
     channel.on('broadcast', { event: 'REQUEST_RIDE' }, (payload) => {
-       setIncomingRequests(prev => {
-         // Avoid duplicates (rider may already have fetched this from DB)
-         if (prev.some((r: any) => r.rideId === payload.payload.rideId)) return prev;
-         return [...prev, payload.payload];
-       });
-       const pName = `${payload.payload.user?.first_name || ''} ${payload.payload.user?.last_name || ''}`.trim() || 'Passenger';
-       setAppNotifications(prev => [{ id: genId(), title: 'New ride request 🛵', body: `${pName} is requesting a ride.`, time: Date.now(), read: false }, ...prev]);
-       pushNotification('New ride request 🛵', `${pName} is requesting a ride.`);
+      scheduleRequest(payload.payload);
     });
+
     channel.on('broadcast', { event: 'CANCEL_RIDE' }, (payload) => {
-       setIncomingRequests(prev => prev.filter(req => req.rideId !== payload.payload.rideId));
-       setCurrentRequest((current: any) => {
-          if (current?.rideId === payload.payload.rideId) {
-             setHasRequest(false);
-             setRequestAccepted(false);
-             setAppNotifications(prev => [{ id: genId(), title: 'Ride cancelled', body: 'The passenger cancelled their booking.', time: Date.now(), read: false }, ...prev]);
-             alert('The passenger cancelled the ride.');
-             return null;
-          }
-          return current;
-       });
+      const { rideId } = payload.payload;
+      // Cancel pending timer if not yet shown
+      const t = timers.get(rideId);
+      if (t) { clearTimeout(t); timers.delete(rideId); }
+      setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
+      setCurrentRequest((current: any) => {
+        if (current?.rideId === rideId) {
+          setHasRequest(false);
+          setRequestAccepted(false);
+          setAppNotifications(prev => [{ id: genId(), title: 'Ride cancelled', body: 'The passenger cancelled their booking.', time: Date.now(), read: false }, ...prev]);
+          alert('The passenger cancelled the ride.');
+          return null;
+        }
+        return current;
+      });
     });
-    channel.subscribe(async () => {
-      // Once subscribed, fetch any pending rides that were booked before we came online
+
+    // Remove rides accepted by ANOTHER rider from this rider's queue
+    channel.on('broadcast', { event: 'RIDE_ACCEPTED' }, (payload) => {
+      const { rideId } = payload.payload;
+      const t = timers.get(rideId);
+      if (t) { clearTimeout(t); timers.delete(rideId); }
+      setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
+      setCurrentRequest((current: any) => {
+        if (current?.rideId === rideId && !requestAccepted) {
+          setHasRequest(false);
+          return null;
+        }
+        return current;
+      });
+    });
+
+    channel.subscribe(async (status) => {
+      if (status !== 'SUBSCRIBED') return;
+      // Fetch rides booked before this rider came online
       const { data: pending } = await supabase
         .from('rides')
         .select('request_data')
         .eq('status', 'pending')
         .order('id', { ascending: true });
-      if (pending && pending.length > 0) {
-        const requests = pending.map((r: any) => r.request_data).filter(Boolean);
-        if (requests.length > 0) {
-          setIncomingRequests(prev => {
-            const existingIds = new Set(prev.map((r: any) => r.rideId));
-            return [...prev, ...requests.filter((r: any) => !existingIds.has(r.rideId))];
-          });
-        }
+      if (pending?.length) {
+        pending.map((r: any) => r.request_data).filter(Boolean).forEach(scheduleRequest);
       }
     });
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      supabase.removeChannel(channel);
+      timers.forEach(t => clearTimeout(t));
+      timers.clear();
+    };
   }, [isOnline, riderReconnectTick]);
 
   useEffect(() => {
@@ -2875,7 +2977,17 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-black text-xl text-gray-950">₱{currentRequest?.fare}</p>
-                  <p className="text-[11px] text-gray-400">3.2 km away</p>
+                  <p className="text-[11px] text-gray-400">
+                    {(() => {
+                      const loc = riderCurrentLoc;
+                      const coords = currentRequest?.pickup?.coords;
+                      if (loc && coords) {
+                        const d = haversineKm(loc[0], loc[1], coords[0], coords[1]);
+                        return `${d < 1 ? (d * 1000).toFixed(0) + ' m' : d.toFixed(1) + ' km'} away`;
+                      }
+                      return 'Calculating…';
+                    })()}
+                  </p>
                 </div>
               </div>
               <div className="space-y-2 mb-4 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
@@ -3221,6 +3333,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   const [financeData, setFinanceData] = useState<{ grossTotal: number; grossThisWeek: number; grossLastWeek: number; recentRides: any[] } | null>(null);
   const [liveRiderLocations, setLiveRiderLocations] = useState<Record<string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }>>({});
   const [onlineNoGps, setOnlineNoGps] = useState<Record<string, { riderName: string; riderAvatar?: string }>>({});
+  const [selectedLiveRiderId, setSelectedLiveRiderId] = useState<string | null>(null);
   
   const [allRemits, setAllRemits] = useState<Remittance[]>([]);
   const [remitsLoading, setRemitsLoading] = useState(false);
@@ -3577,7 +3690,34 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
         <div className="max-w-6xl mx-auto">
 
           {/* Live Operations */}
-          {activeTab === 'live' && (
+          {activeTab === 'live' && (() => {
+            const totalOnline = Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length;
+            const selectedRiderProfile = selectedLiveRiderId ? riders.find(r => r.id === selectedLiveRiderId) ?? null : null;
+            const selectedRiderLoc = selectedLiveRiderId ? liveRiderLocations[selectedLiveRiderId] ?? null : null;
+            const selectedRiderNoGps = selectedLiveRiderId ? onlineNoGps[selectedLiveRiderId] ?? null : null;
+
+            const riderRow = (id: string, name: string, avatar: string | null | undefined, status: string, sublabel: string) => (
+              <button key={id}
+                onClick={() => setSelectedLiveRiderId(prev => prev === id ? null : id)}
+                className={`w-full px-5 py-3 flex items-center gap-3 text-left transition-colors ${selectedLiveRiderId === id ? 'bg-gray-50 border-l-2 border-gray-900' : 'hover:bg-gray-50/60 border-l-2 border-transparent'}`}
+              >
+                <div className={`w-9 h-9 rounded-full overflow-hidden shrink-0 border-2 ${status === 'on_trip' ? 'border-amber-400' : 'border-emerald-400'}`}>
+                  {avatar
+                    ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                    : <div className={`w-full h-full flex items-center justify-center font-bold text-xs ${status === 'on_trip' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{name[0]}</div>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-gray-900 truncate">{name}</p>
+                  <p className="text-[11px] text-gray-400 truncate">{sublabel}</p>
+                </div>
+                <span className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${status === 'on_trip' ? 'text-amber-500' : 'text-emerald-600'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${status === 'on_trip' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                  {status === 'on_trip' ? 'On Trip' : 'Online'}
+                </span>
+              </button>
+            );
+
+            return (
             <>
               <div className="mb-8">
                 <h2 className="text-2xl font-black tracking-tight text-gray-950">Live Operations</h2>
@@ -3595,7 +3735,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                   [
                     { label: 'Registered Passengers', value: liveStats.passengers.toLocaleString(), delta: 'Total users' },
                     { label: 'Approved Riders', value: liveStats.approvedRiders.toLocaleString(), delta: 'Active on platform' },
-                    { label: 'Pending Applications', value: liveStats.pending.toLocaleString(), delta: 'Awaiting review' },
+                    { label: 'Online Now', value: totalOnline.toLocaleString(), delta: `${Object.keys(liveRiderLocations).length} on map` },
                   ].map(({ label, value, delta }) => (
                     <div key={label} className="bg-white p-5 rounded-2xl border border-gray-100">
                       <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">{label}</p>
@@ -3605,107 +3745,209 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                   ))
                 )}
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-bold text-sm text-gray-900">Live Rider Map</h3>
-                    <p className="text-[11px] text-gray-400 mt-0.5">
-                      {Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length} online rider{(Object.keys(liveRiderLocations).length + Object.keys(onlineNoGps).length) !== 1 ? 's' : ''} · {Object.keys(liveRiderLocations).length} on map
-                    </p>
+
+              <div className="flex gap-4 items-start">
+                {/* Map + rider list */}
+                <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-sm text-gray-900">Live Rider Map</h3>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {totalOnline} online rider{totalOnline !== 1 ? 's' : ''} · {Object.keys(liveRiderLocations).length} on map
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setLiveRefreshTick(t => t + 1)} className="text-[11px] text-gray-400 hover:text-gray-600 underline">Refresh</button>
+                      <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> LIVE
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setLiveRefreshTick(t => t + 1)} className="text-[11px] text-gray-400 hover:text-gray-600 underline">Refresh</button>
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> LIVE
-                    </span>
+                  <div className="h-[420px] w-full">
+                    <MapContainer center={[6.1164, 125.1716]} zoom={13} zoomControl={true} className="w-full h-full">
+                      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                      {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([id, loc]) => {
+                        const initial = (loc.riderName || 'R')[0].toUpperCase();
+                        const isSelected = selectedLiveRiderId === id;
+                        const borderColor = isSelected ? '#6366f1' : loc.status === 'on_trip' ? '#f59e0b' : '#10b981';
+                        const icon = L.divIcon({
+                          html: loc.riderAvatar
+                            ? `<div style="width:${isSelected?48:40}px;height:${isSelected?48:40}px;border-radius:50%;overflow:hidden;border:3px solid ${borderColor};box-shadow:0 2px 16px rgba(0,0,0,0.5);transition:all .2s"><img src="${loc.riderAvatar}" style="width:100%;height:100%;object-fit:cover"/></div>`
+                            : `<div style="width:${isSelected?48:40}px;height:${isSelected?48:40}px;border-radius:50%;background:${borderColor};border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:${isSelected?17:15}px;box-shadow:0 2px 16px rgba(0,0,0,0.5)">${initial}</div>`,
+                          className: '',
+                          iconSize: [isSelected?48:40, isSelected?48:40],
+                          iconAnchor: [isSelected?24:20, isSelected?24:20],
+                        });
+                        return (
+                          <Marker key={id} position={[loc.lat, loc.lng]} icon={icon}
+                            eventHandlers={{ click: () => setSelectedLiveRiderId(prev => prev === id ? null : id) }}>
+                            <Popup offset={[0, -16]}>
+                              <div className="flex flex-col gap-2 py-0.5 min-w-[140px]">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full shrink-0 ${loc.status === 'on_trip' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                                  <span className="font-bold text-[13px] text-gray-900">{loc.riderName || 'Rider'}</span>
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${loc.status === 'on_trip' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {loc.status === 'on_trip' ? 'On Trip' : 'Online'}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => setSelectedLiveRiderId(id)}
+                                  className="w-full text-[11px] font-bold text-indigo-600 hover:text-indigo-700 text-left"
+                                >
+                                  View details →
+                                </button>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        );
+                      })}
+                    </MapContainer>
                   </div>
+                  {/* Rider list */}
+                  {(Object.keys(liveRiderLocations).length > 0 || Object.keys(onlineNoGps).length > 0) ? (
+                    <div className="border-t border-gray-100 divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                      {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([id, loc]) =>
+                        riderRow(id, loc.riderName || 'Rider', loc.riderAvatar, loc.status || 'online', `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`)
+                      )}
+                      {(Object.entries(onlineNoGps) as [string, { riderName: string; riderAvatar?: string }][]).map(([id, r]) =>
+                        riderRow(id, r.riderName, r.riderAvatar, 'online', 'Waiting for GPS…')
+                      )}
+                    </div>
+                  ) : (
+                    <div className="px-5 py-6 text-center text-[12px] text-gray-400">
+                      No riders are online. Positions appear here when riders go online.
+                    </div>
+                  )}
                 </div>
-                <div className="h-[580px] w-full">
-                  <MapContainer center={[6.1164, 125.1716]} zoom={13} zoomControl={true} className="w-full h-full">
-                    <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                    {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([key, loc]) => {
-                      const initial = (loc.riderName || 'R')[0].toUpperCase();
-                      const borderColor = loc.status === 'on_trip' ? '#f59e0b' : '#10b981';
-                      const icon = L.divIcon({
-                        html: loc.riderAvatar
-                          ? `<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;border:3px solid ${borderColor};box-shadow:0 2px 12px rgba(0,0,0,0.4)"><img src="${loc.riderAvatar}" style="width:100%;height:100%;object-fit:cover"/></div>`
-                          : `<div style="width:40px;height:40px;border-radius:50%;background:${borderColor};border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;box-shadow:0 2px 12px rgba(0,0,0,0.4)">${initial}</div>`,
-                        className: '',
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20],
-                      });
-                      return (
-                        <Marker key={key} position={[loc.lat, loc.lng]} icon={icon}>
-                          <Popup offset={[0, -16]}>
-                            <div className="flex items-center gap-2 py-0.5">
-                              <div className={`w-2 h-2 rounded-full shrink-0 ${loc.status === 'on_trip' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                              <span className="font-bold text-[13px] text-gray-900 whitespace-nowrap">{loc.riderName || 'Rider'}</span>
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${loc.status === 'on_trip' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                {loc.status === 'on_trip' ? 'On Trip' : 'Online'}
+
+                {/* Rider detail panel — slides in when a rider is selected */}
+                {selectedLiveRiderId && (
+                  <div className="w-80 shrink-0 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    {/* Header */}
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                      <h3 className="font-bold text-sm text-gray-900">Rider Details</h3>
+                      <button onClick={() => setSelectedLiveRiderId(null)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {selectedRiderProfile ? (
+                      <div className="p-5 space-y-5">
+                        {/* Profile header */}
+                        <div className="flex items-center gap-3">
+                          <div className={`w-14 h-14 rounded-full overflow-hidden border-3 shrink-0 ${selectedRiderLoc?.status === 'on_trip' ? 'border-amber-400' : 'border-emerald-400'}`} style={{ border: `3px solid ${selectedRiderLoc?.status === 'on_trip' ? '#f59e0b' : '#10b981'}` }}>
+                            {selectedRiderProfile.avatar_url
+                              ? <img src={selectedRiderProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                              : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-500 bg-gray-100">
+                                  {(selectedRiderProfile.first_name || selectedRiderProfile.full_name || 'R')[0]}
+                                </div>}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-black text-base text-gray-950 truncate">
+                              {selectedRiderProfile.first_name && selectedRiderProfile.last_name
+                                ? `${selectedRiderProfile.first_name} ${selectedRiderProfile.last_name}`
+                                : selectedRiderProfile.full_name || 'Rider'}
+                            </p>
+                            <p className="text-[11px] text-gray-400 truncate">{selectedRiderProfile.email}</p>
+                            <span className={`inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${selectedRiderLoc?.status === 'on_trip' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${selectedRiderLoc?.status === 'on_trip' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                              {selectedRiderLoc?.status === 'on_trip' ? 'On Trip' : selectedRiderNoGps ? 'Online · No GPS' : 'Online'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Contact */}
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Contact</p>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-[13px]">
+                              <Phone size={13} className="text-gray-400 shrink-0" />
+                              <span className="text-gray-700">{selectedRiderProfile.phone || '—'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[13px]">
+                              <MapPin size={13} className="text-gray-400 shrink-0" />
+                              <span className="text-gray-700">
+                                {selectedRiderLoc ? `${selectedRiderLoc.lat.toFixed(5)}, ${selectedRiderLoc.lng.toFixed(5)}` : 'No GPS data'}
                               </span>
                             </div>
-                          </Popup>
-                        </Marker>
-                      );
-                    })}
-                  </MapContainer>
-                </div>
-                {/* Riders with GPS */}
-                {Object.keys(liveRiderLocations).length > 0 && (
-                  <div className="border-t border-gray-100 divide-y divide-gray-50">
-                    {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([key, loc]) => (
-                      <div key={key} className="px-5 py-3 flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full overflow-hidden shrink-0 border-2 ${loc.status === 'on_trip' ? 'border-amber-400' : 'border-emerald-400'}`}>
-                          {loc.riderAvatar
-                            ? <img src={loc.riderAvatar} alt="" className="w-full h-full object-cover" />
-                            : <div className={`w-full h-full flex items-center justify-center font-bold text-xs ${loc.status === 'on_trip' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{(loc.riderName || 'R')[0]}</div>}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900 truncate">{loc.riderName || 'Rider'}</p>
-                          <p className="text-[11px] text-gray-400">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</p>
+
+                        {/* Vehicle */}
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Vehicle</p>
+                          <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+                            {[
+                              { label: 'Type', value: selectedRiderProfile.vehicle_type },
+                              { label: 'Make / Model', value: [selectedRiderProfile.vehicle_make, selectedRiderProfile.vehicle_model].filter(Boolean).join(' ') },
+                              { label: 'Plate', value: selectedRiderProfile.vehicle_plate },
+                              { label: 'Color', value: selectedRiderProfile.vehicle_color },
+                            ].map(({ label, value }) => (
+                              <div key={label} className="flex justify-between text-[12px]">
+                                <span className="text-gray-400 font-medium">{label}</span>
+                                <span className="text-gray-900 font-semibold">{value || '—'}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        {loc.status === 'on_trip' ? (
-                          <span className="flex items-center gap-1 text-[11px] font-bold text-amber-500">
-                            <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" /> On Trip
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Online
-                          </span>
-                        )}
+
+                        {/* Account */}
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Account</p>
+                          <div className="space-y-1.5">
+                            {[
+                              { label: 'Rider status', value: selectedRiderProfile.rider_status },
+                              { label: 'Joined', value: new Date(selectedRiderProfile.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) },
+                            ].map(({ label, value }) => (
+                              <div key={label} className="flex justify-between text-[12px]">
+                                <span className="text-gray-400 font-medium">{label}</span>
+                                <span className="text-gray-900 font-semibold capitalize">{value || '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-                {/* Riders online but GPS not yet received */}
-                {Object.keys(onlineNoGps).length > 0 && (
-                  <div className="border-t border-gray-100 divide-y divide-gray-50">
-                    {(Object.entries(onlineNoGps) as [string, { riderName: string; riderAvatar?: string }][]).map(([key, r]) => (
-                      <div key={key} className="px-5 py-3 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border-2 border-emerald-400">
-                          {r.riderAvatar
-                            ? <img src={r.riderAvatar} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center font-bold text-xs bg-emerald-100 text-emerald-700">{r.riderName[0]}</div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900 truncate">{r.riderName}</p>
-                          <p className="text-[11px] text-gray-400">Waiting for GPS…</p>
-                        </div>
-                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Online
-                        </span>
+                    ) : (
+                      /* Rider not yet in riders[] — show what we have from live data */
+                      <div className="p-5 space-y-4">
+                        {(selectedRiderLoc || selectedRiderNoGps) && (() => {
+                          const loc = selectedRiderLoc;
+                          const noGps = selectedRiderNoGps;
+                          const name = loc?.riderName || noGps?.riderName || 'Rider';
+                          const avatar = loc?.riderAvatar || noGps?.riderAvatar;
+                          return (
+                            <>
+                              <div className="flex items-center gap-3">
+                                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-emerald-400 shrink-0">
+                                  {avatar
+                                    ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                                    : <div className="w-full h-full flex items-center justify-center text-lg font-black bg-gray-100 text-gray-500">{name[0]}</div>}
+                                </div>
+                                <div>
+                                  <p className="font-black text-base text-gray-950">{name}</p>
+                                  <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                    <div className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500" /> Online
+                                  </span>
+                                </div>
+                              </div>
+                              {loc && (
+                                <div className="flex items-center gap-2 text-[12px] text-gray-600">
+                                  <MapPin size={13} className="text-gray-400" />
+                                  {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                                </div>
+                              )}
+                              <p className="text-[11px] text-gray-400">Full profile not yet loaded — click Refresh to load.</p>
+                            </>
+                          );
+                        })()}
                       </div>
-                    ))}
-                  </div>
-                )}
-                {Object.keys(liveRiderLocations).length === 0 && Object.keys(onlineNoGps).length === 0 && (
-                  <div className="px-5 py-4 text-center text-[12px] text-gray-400">
-                    No riders are online. Rider positions appear here when they go online.
+                    )}
                   </div>
                 )}
               </div>
             </>
-          )}
+            );
+          })()}
 
           {/* Driver Management */}
           {activeTab === 'drivers' && (() => {
