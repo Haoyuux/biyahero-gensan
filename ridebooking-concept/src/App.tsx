@@ -94,7 +94,17 @@ const RIDE_OPTIONS = [
 
 type MapFocus = { coords: [number, number] | 'route'; key: number } | null;
 
-function MapBounds({ mapFocus, routeCoords, step }: { mapFocus: MapFocus; routeCoords: [number, number][] | null; step?: string }) {
+function MapAutoSize() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
+function MapBounds({ mapFocus, routeCoords }: { mapFocus: MapFocus; routeCoords: [number, number][] | null }) {
   const map = useMap();
   const userInteracted = useRef(false);
 
@@ -103,12 +113,6 @@ function MapBounds({ mapFocus, routeCoords, step }: { mapFocus: MapFocus; routeC
     dragstart: () => { userInteracted.current = true; },
     zoomstart: () => { userInteracted.current = true; },
   });
-
-  // Re-measure when panel height changes (step changes → sidebar height changes → map area changes)
-  useEffect(() => {
-    const id = setTimeout(() => map.invalidateSize(), 320);
-    return () => clearTimeout(id);
-  }, [step, map]);
 
   useEffect(() => {
     if (!mapFocus) return;
@@ -1312,7 +1316,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   }
 
   return (
-    <div className="w-full h-[100dvh] overflow-hidden flex flex-col md:flex-row font-sans text-gray-900">
+    <div className="w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900">
       <ConnectionBanner state={connectionState} />
       <NotificationToast message={notification} />
 
@@ -1362,10 +1366,11 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         </button>
       </div>
 
-      {/* ── Sidebar — below map on mobile (flex-none), left panel on desktop ── */}
+      {/* ── Sidebar — overlays map from bottom on mobile, left panel on desktop ── */}
       <div className="
-        flex flex-col flex-none order-2
-        md:order-1 md:w-[420px] md:shrink-0
+        absolute bottom-0 inset-x-0 z-10 pointer-events-none
+        md:relative md:bottom-auto md:inset-auto md:pointer-events-auto
+        md:order-1 md:w-[420px] md:shrink-0 md:flex md:flex-col
         md:bg-white md:shadow-[4px_0_24px_rgba(0,0,0,0.1)] md:z-20 md:overflow-hidden
       ">
         {/* Desktop nav header — hidden on mobile (floating nav used instead) */}
@@ -1524,8 +1529,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         </div>
       </div>
 
-      {/* Map — flex-1 above panels on mobile, fills right on desktop */}
-      <div className="flex-1 relative min-h-[38vh] md:min-h-0 order-1 md:order-2">
+      {/* Map — full screen on mobile (behind panels), fills right on desktop */}
+      <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
         <MapContainer center={startLoc} zoom={15} zoomControl={false} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -1567,7 +1572,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           {riderLocation && step === 'matched' && (
             <Marker position={riderLocation} icon={riderIcon} />
           )}
-          <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} step={step} />
+          <MapAutoSize />
+          <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
         </MapContainer>
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -6078,76 +6084,83 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="overflow-hidden"
           >
-      <div className="p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-6 md:pb-8 flex flex-col max-h-[75vh] md:max-h-none overflow-y-auto">
-      <h3 className="text-[1.5rem] font-black tracking-tight mb-5">Choose a ride</h3>
-      <div className="flex-1 overflow-y-auto space-y-2.5 mb-5 pb-1">
-        {dynamicRides.map((ride) => (
-          <div key={ride.id} onClick={() => setSelectedRide(ride.id)}
-            className={`flex items-center p-4 rounded-2xl border transition-all cursor-pointer ${selectedRide === ride.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}>
-            <div className={`w-13 h-13 w-[52px] h-[52px] rounded-xl flex items-center justify-center shrink-0 ${selectedRide === ride.id ? 'bg-gray-950 text-white' : 'bg-white text-gray-500 shadow-sm border border-gray-100'}`}>
-              <ride.icon size={24} />
-            </div>
-            <div className="ml-3.5 flex-1">
-              <div className="flex justify-between items-center mb-0.5">
-                <span className="font-bold text-[15px]">{ride.name}</span>
-                <span className="font-black text-[16px]">₱{ride.breakdown.totalFare}</span>
-              </div>
-              <div className="flex items-center text-xs text-gray-400 font-medium gap-1">
-                <Clock size={11} /> {ride.time} away
-                <span className="text-gray-200 mx-0.5">·</span>
-                <User size={11} /> {ride.capacity}
-              </div>
-            </div>
-            {selectedRide === ride.id && (
-              <div className="ml-3 w-4 h-4 rounded-full bg-gray-950 flex items-center justify-center shrink-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-white" />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Fare breakdown for selected tier */}
-      {selectedBreakdown && (
-        <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
-          <div className="space-y-2 text-[13px]">
-            {[
-              { label: 'Base Fare',                    value: selectedBreakdown.baseFare },
-              { label: `Distance (${(distanceM/1000).toFixed(1)} km)`, value: selectedBreakdown.distanceFee },
-              { label: `Time (${durationMin} min)`,    value: selectedBreakdown.timeFee },
-              { label: 'Booking Fee',                  value: selectedBreakdown.bookingFee },
-            ].map(row => (
-              <div key={row.label} className="flex justify-between text-gray-500">
-                <span>{row.label}</span>
-                <span>₱{row.value}</span>
+      <div className="flex flex-col max-h-[72vh] md:max-h-none pt-5 px-5 md:px-6 md:pt-6">
+        {/* Scrollable content */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <h3 className="text-[1.5rem] font-black tracking-tight mb-5">Choose a ride</h3>
+          <div className="space-y-2.5 mb-5 pb-1">
+            {dynamicRides.map((ride) => (
+              <div key={ride.id} onClick={() => setSelectedRide(ride.id)}
+                className={`flex items-center p-4 rounded-2xl border transition-all cursor-pointer ${selectedRide === ride.id ? 'border-gray-900 bg-gray-50' : 'border-gray-100 bg-gray-50 hover:border-gray-200'}`}>
+                <div className={`w-[52px] h-[52px] rounded-xl flex items-center justify-center shrink-0 ${selectedRide === ride.id ? 'bg-gray-950 text-white' : 'bg-white text-gray-500 shadow-sm border border-gray-100'}`}>
+                  <ride.icon size={24} />
+                </div>
+                <div className="ml-3.5 flex-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <span className="font-bold text-[15px]">{ride.name}</span>
+                    <span className="font-black text-[16px]">₱{ride.breakdown.totalFare}</span>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-400 font-medium gap-1">
+                    <Clock size={11} /> {ride.time} away
+                    <span className="text-gray-200 mx-0.5">·</span>
+                    <User size={11} /> {ride.capacity}
+                  </div>
+                </div>
+                {selectedRide === ride.id && (
+                  <div className="ml-3 w-4 h-4 rounded-full bg-gray-950 flex items-center justify-center shrink-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  </div>
+                )}
               </div>
             ))}
-            <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
-              <span>Total</span>
-              <span>₱{selectedBreakdown.totalFare}</span>
+          </div>
+
+          {/* Fare breakdown for selected tier */}
+          {selectedBreakdown && (
+            <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
+              <div className="space-y-2 text-[13px]">
+                {[
+                  { label: 'Base Fare',                    value: selectedBreakdown.baseFare },
+                  { label: `Distance (${(distanceM/1000).toFixed(1)} km)`, value: selectedBreakdown.distanceFee },
+                  { label: `Time (${durationMin} min)`,    value: selectedBreakdown.timeFee },
+                  { label: 'Booking Fee',                  value: selectedBreakdown.bookingFee },
+                ].map(row => (
+                  <div key={row.label} className="flex justify-between text-gray-500">
+                    <span>{row.label}</span>
+                    <span>₱{row.value}</span>
+                  </div>
+                ))}
+                <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                  <span>Total</span>
+                  <span>₱{selectedBreakdown.totalFare}</span>
+                </div>
+              </div>
             </div>
+          )}
+
+          <div className="flex items-center justify-between px-4 py-3.5 bg-gray-50 rounded-2xl border border-gray-100 mb-1">
+            <div className="flex items-center gap-2.5">
+              <CreditCard size={15} className="text-gray-400" />
+              <span className="font-semibold text-sm">GCash</span>
+            </div>
+            <MoreHorizontal size={17} className="text-gray-300" />
           </div>
         </div>
-      )}
 
-      <div className="flex items-center justify-between px-4 py-3.5 bg-gray-50 rounded-2xl mb-5 border border-gray-100">
-        <div className="flex items-center gap-2.5">
-          <CreditCard size={15} className="text-gray-400" />
-          <span className="font-semibold text-sm">GCash</span>
+        {/* Book button — always visible, never scrolled away */}
+        <div className="shrink-0 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-8">
+          <button
+            onClick={() => {
+              const bd = dynamicRides.find(r => r.id === selectedRide)?.breakdown;
+              if (onBook) onBook(Date.now().toString(), bd);
+              else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
+            }}
+            className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20"
+          >
+            Book {dynamicRides.find(r => r.id === selectedRide)?.name}
+          </button>
         </div>
-        <MoreHorizontal size={17} className="text-gray-300" />
-      </div>
-      <button
-        onClick={() => {
-          const bd = dynamicRides.find(r => r.id === selectedRide)?.breakdown;
-          if (onBook) onBook(Date.now().toString(), bd);
-          else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
-        }}
-        className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20"
-      >
-        Book {dynamicRides.find(r => r.id === selectedRide)?.name}
-      </button>
       </div>
           </motion.div>
         )}
