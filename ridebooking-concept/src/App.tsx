@@ -1502,7 +1502,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   });
                 }} />
             )}
-            {step === 'searching' && <SearchingPanel key="search" />}
+            {step === 'searching' && <SearchingPanel key="search" onCancel={() => handleCancelBooking(true)} />}
             {step === 'matched' && (
               <MatchedPanel key="matched" onCancel={() => handleCancelBooking(true)} activeRider={activeRider}
                 selectedRide={selectedRide} routeInfo={routeInfo} showNotification={showNotification}
@@ -6116,7 +6116,7 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
   );
 };
 
-const SearchingPanel = () => (
+const SearchingPanel = ({ onCancel }: { onCancel?: () => void }) => (
   <motion.div
     initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
@@ -6146,6 +6146,14 @@ const SearchingPanel = () => (
         <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" style={{ animationDelay: `${i * 0.3}s` }} />
       ))}
     </div>
+    {onCancel && (
+      <button
+        onClick={onCancel}
+        className="mt-8 px-6 py-2.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-500 hover:border-gray-400 hover:text-gray-800 transition-all active:scale-95"
+      >
+        Cancel
+      </button>
+    )}
   </motion.div>
 );
 
