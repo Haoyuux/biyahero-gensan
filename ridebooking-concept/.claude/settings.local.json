@@ -4,7 +4,10 @@
       "Bash(curl:*)",
       "Bash(npm install:*)",
       "Bash(npm run:*)",
-      "Bash(SERVICE_ROLE=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueGhkc3hzbGJrZ2d0am5heG9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY0NzE3OSwiZXhwIjoyMDkwMjIzMTc5fQ.RVcPg_BL2cdhNLXQSVy0zUPzNb6DirzsMSidZY65e-c\")"
+      "Bash(SERVICE_ROLE=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueGhkc3hzbGJrZ2d0am5heG9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY0NzE3OSwiZXhwIjoyMDkwMjIzMTc5fQ.RVcPg_BL2cdhNLXQSVy0zUPzNb6DirzsMSidZY65e-c\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
