@@ -94,7 +94,7 @@ const RIDE_OPTIONS = [
 
 type MapFocus = { coords: [number, number] | 'route'; key: number } | null;
 
-function MapBounds({ mapFocus, routeCoords }: { mapFocus: MapFocus; routeCoords: [number, number][] | null }) {
+function MapBounds({ mapFocus, routeCoords, step }: { mapFocus: MapFocus; routeCoords: [number, number][] | null; step?: string }) {
   const map = useMap();
   const userInteracted = useRef(false);
 
@@ -103,6 +103,12 @@ function MapBounds({ mapFocus, routeCoords }: { mapFocus: MapFocus; routeCoords:
     dragstart: () => { userInteracted.current = true; },
     zoomstart: () => { userInteracted.current = true; },
   });
+
+  // Re-measure when panel height changes (step changes → sidebar height changes → map area changes)
+  useEffect(() => {
+    const id = setTimeout(() => map.invalidateSize(), 320);
+    return () => clearTimeout(id);
+  }, [step, map]);
 
   useEffect(() => {
     if (!mapFocus) return;
@@ -1519,7 +1525,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       </div>
 
       {/* Map — flex-1 above panels on mobile, fills right on desktop */}
-      <div className="flex-1 relative min-h-0 order-1 md:order-2">
+      <div className="flex-1 relative min-h-[38vh] md:min-h-0 order-1 md:order-2">
         <MapContainer center={startLoc} zoom={15} zoomControl={false} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -1561,7 +1567,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           {riderLocation && step === 'matched' && (
             <Marker position={riderLocation} icon={riderIcon} />
           )}
-          <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
+          <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} step={step} />
         </MapContainer>
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -5476,16 +5482,29 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [subStatus, setSubStatus] = useState<string>('CONNECTING');
+  const [sendingError, setSendingError] = useState<string | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchMessages(rideId).then(msgs => { setMessages(msgs); setLoading(false); });
-    const unsub = subscribeToMessages(rideId, (msg) => {
-      // Only add messages from the other party via realtime — own messages are added optimistically
-      if (msg.sender_id !== senderId) {
-        setMessages(prev => [...prev, msg]);
-      }
+    setLoading(true);
+    setFetchError(null);
+    fetchMessages(rideId).then(({ messages: msgs, error }) => {
+      if (error) setFetchError('Could not load messages. Check your connection.');
+      setMessages(msgs);
+      setLoading(false);
     });
+    const unsub = subscribeToMessages(
+      rideId,
+      (msg) => {
+        // Only add messages from the other party via realtime — own messages are added optimistically
+        if (msg.sender_id !== senderId) {
+          setMessages(prev => [...prev, msg]);
+        }
+      },
+      (status) => setSubStatus(status),
+    );
     return unsub;
   }, [rideId, senderId]);
 
@@ -5493,15 +5512,12 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const [sendingError, setSendingError] = useState<string | null>(null);
-
   const handleSend = async () => {
     const text = newMessage.trim();
     if (!text) return;
     setNewMessage('');
     setSendingError(null);
-    
-    // Optimistic ID so we can track this specific message
+
     const tempId = `opt-${Date.now()}`;
     const optimistic: ChatMessage = {
       id: tempId,
@@ -5512,26 +5528,27 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
       content: text,
       created_at: new Date().toISOString(),
     };
-    
+
     setMessages(prev => [...prev, optimistic]);
 
     const { data: sentMsg, error } = await sendMessage(rideId, senderId, senderRole, senderName, text);
-    
+
     if (error) {
-      setSendingError('Message failed to send. Check your connection.');
-      // Remove optimistic or mark it as failed — for now keep it but show warning
-      setTimeout(() => setSendingError(null), 3000);
+      setSendingError('Failed to send. Check your connection.');
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setTimeout(() => setSendingError(null), 4000);
       return;
     }
 
     if (sentMsg) {
-      // Replace optimistic with real DB message to get correct ID and timestamp
       setMessages(prev => prev.map(m => m.id === tempId ? sentMsg : m));
     }
   };
 
   const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const isDisconnected = subStatus === 'CHANNEL_ERROR' || subStatus === 'TIMED_OUT' || subStatus === 'CLOSED';
 
   return (
     <motion.div
@@ -5549,13 +5566,29 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
             ? <img src={otherAvatar} alt="" className="w-full h-full object-cover" />
             : <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-lg">{otherName[0]}</div>}
         </div>
-        <div className="ml-3">
+        <div className="ml-3 flex-1 min-w-0">
           <h4 className="font-bold leading-tight">{otherName}</h4>
           <p className="text-xs text-emerald-200 font-medium">
             {senderRole === 'user' ? 'Rider' : 'Passenger'}
           </p>
         </div>
+        {isDisconnected && (
+          <div className="flex items-center gap-1.5 bg-red-500/20 px-2.5 py-1 rounded-full shrink-0">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-300" />
+            <span className="text-[10px] font-bold text-red-200">Offline</span>
+          </div>
+        )}
+        {subStatus === 'CONNECTING' && (
+          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
+        )}
       </div>
+
+      {/* Connection / fetch error banner */}
+      {(isDisconnected || fetchError) && (
+        <div className="bg-amber-50 border-b border-amber-100 px-4 py-2.5 flex items-center gap-2 shrink-0">
+          <span className="text-amber-600 text-xs font-semibold">{fetchError ?? 'Realtime disconnected — new messages may not appear.'}</span>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50 flex flex-col">
@@ -5564,7 +5597,7 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
             <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-        {!loading && messages.length === 0 && (
+        {!loading && messages.length === 0 && !fetchError && (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
             <MessageSquare size={40} className="mb-3 opacity-30" />
             <p className="text-sm font-medium">No messages yet</p>
@@ -5584,6 +5617,13 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
         })}
         <div ref={bottomRef} />
       </div>
+
+      {/* Send error */}
+      {sendingError && (
+        <div className="px-4 py-2 bg-red-50 border-t border-red-100 shrink-0">
+          <p className="text-xs text-red-600 font-semibold text-center">{sendingError}</p>
+        </div>
+      )}
 
       {/* Input */}
       <div className="p-4 bg-white border-t border-gray-100 flex gap-3 shrink-0">
@@ -6116,7 +6156,7 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
   );
 };
 
-const SearchingPanel = ({ onCancel }: { onCancel?: () => void }) => (
+const SearchingPanel = ({ onCancel }: { onCancel?: () => void; key?: string }) => (
   <motion.div
     initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
@@ -6254,7 +6294,7 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="overflow-hidden"
           >
-            <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] md:pb-8 md:pt-6">
+            <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] md:pb-8 md:pt-6 overflow-y-auto max-h-[52vh] md:max-h-none">
               {/* ETA header (desktop only — already shown in handle on mobile) */}
               <div className="hidden md:flex items-start justify-between mb-6">
                 <div>

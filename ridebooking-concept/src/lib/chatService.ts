@@ -61,13 +61,17 @@ export async function sendMessage(
 }
 
 /** Load full message history for a ride (oldest first). */
-export async function fetchMessages(rideId: string): Promise<ChatMessage[]> {
-  const { data } = await supabase
+export async function fetchMessages(rideId: string): Promise<{ messages: ChatMessage[]; error: string | null }> {
+  const { data, error } = await supabase
     .from('messages')
     .select('*')
     .eq('ride_id', rideId)
     .order('created_at', { ascending: true });
-  return (data as ChatMessage[]) ?? [];
+  if (error) {
+    console.error('fetchMessages error:', error);
+    return { messages: [], error: error.message };
+  }
+  return { messages: (data as ChatMessage[]) ?? [], error: null };
 }
 
 /**
@@ -77,9 +81,10 @@ export async function fetchMessages(rideId: string): Promise<ChatMessage[]> {
 export function subscribeToMessages(
   rideId: string,
   onMessage: (msg: ChatMessage) => void,
+  onStatus?: (status: string) => void,
 ): () => void {
   // Subscribe to ALL inserts on messages and filter in JS.
-  // This is more reliable than Postgres level filters which often require 
+  // This is more reliable than Postgres level filters which often require
   // Replica Identity Full to be enabled on the table.
   const channel = supabase
     .channel(`chat_room_${rideId}`)
@@ -95,10 +100,11 @@ export function subscribeToMessages(
     )
     .subscribe((status) => {
       console.log(`Chat subscribe status for ${rideId}:`, status);
+      onStatus?.(status);
     });
 
-  return () => { 
-    supabase.removeChannel(channel); 
+  return () => {
+    supabase.removeChannel(channel);
   };
 }
 
