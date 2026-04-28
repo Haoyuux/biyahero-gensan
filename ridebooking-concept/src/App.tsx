@@ -1028,6 +1028,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
   const [currentRideId, setCurrentRideId] = useState<string | null>(null);
   const [activeRider, setActiveRider] = useState<any>(null);
+  const [pendingRider, setPendingRider] = useState<any>(null);
   const [pricingConfig] = useState<PricingConfig>(() => loadPricingConfig());
   const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -1177,6 +1178,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     }
     localStorage.removeItem(USER_RIDE_KEY);
     setStep('home');
+    setPendingRider(null);
     pickupGpsNeedsResolve.current = true;
     setPickup('Current Location');
     setPickupCoords(null);
@@ -1249,11 +1251,10 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     
     channel.on('broadcast', { event: 'RIDE_ACCEPTED' }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
-        setActiveRider(payload.payload.rider);
-        setStep('matched');
-        showNotification('Rider accepted your booking!');
-        pushNotification('Rider on the way 🛵', 'Your rider accepted the booking and is heading to you.');
-        pushAppNotification('Rider on the way 🛵', 'Your rider accepted the booking and is heading to you.');
+        setPendingRider(payload.payload.rider);
+        showNotification('A rider accepted! Review details to confirm.');
+        pushNotification('Rider found! 🛵', 'Review driver details and confirm your booking.');
+        pushAppNotification('Rider found! 🛵', 'Tap to review and confirm your driver.');
       }
     });
 
@@ -1654,7 +1655,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   });
                 }} />
             )}
-            {step === 'searching' && <SearchingPanel key="search" onCancel={() => handleCancelBooking(true)} />}
+            {step === 'searching' && <SearchingPanel key="search" onCancel={pendingRider ? undefined : () => handleCancelBooking(true)} />}
             {step === 'matched' && (
               <MatchedPanel key="matched" onCancel={() => handleCancelBooking(true)} activeRider={activeRider}
                 selectedRide={selectedRide} routeInfo={routeInfo} showNotification={showNotification}
@@ -1669,6 +1670,27 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           </AnimatePresence>
         </div>
       </div>
+
+      {pendingRider && (
+        <RiderConfirmModal
+          rider={pendingRider}
+          rideId={currentRideId}
+          onAccept={() => {
+            setActiveRider(pendingRider);
+            setPendingRider(null);
+            setStep('matched');
+            pushAppNotification('Rider on the way 🛵', 'Your rider is heading to you now.');
+          }}
+          onCancel={() => {
+            if (currentRideId) {
+              supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
+              supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
+            }
+            setPendingRider(null);
+            handleCancelBooking();
+          }}
+        />
+      )}
 
       {/* Map — full screen on mobile (behind panels), fills right on desktop */}
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
@@ -7669,6 +7691,125 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
         )}
       </AnimatePresence>
     </motion.div>
+  );
+};
+
+const RiderConfirmModal = ({ rider, rideId, onAccept, onCancel }: { rider: any; rideId: string | null; onAccept: () => void; onCancel: () => void }) => {
+  const [riderRating, setRiderRating] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!rider?.id) return;
+    supabase
+      .from('rides')
+      .select('rating')
+      .eq('rider_id', rider.id)
+      .not('rating', 'is', null)
+      .then(({ data }) => {
+        if (data?.length) {
+          const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+          setRiderRating(Math.round(avg * 10) / 10);
+        }
+      });
+  }, [rider?.id]);
+
+  const age = rider?.birthday
+    ? Math.floor((Date.now() - new Date(rider.birthday).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
+
+  const vehicleName = [rider?.vehicle_make, rider?.vehicle_model].filter(Boolean).join(' ');
+  const vehicleType = rider?.vehicle_type
+    ? rider.vehicle_type.charAt(0).toUpperCase() + rider.vehicle_type.slice(1)
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 80, opacity: 0 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+        className="relative w-full max-w-sm bg-white rounded-t-[28px] md:rounded-2xl shadow-2xl px-6 pt-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:pb-6 pointer-events-auto"
+      >
+        <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-5 md:hidden" />
+
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Driver Found</p>
+
+        {/* Avatar + name */}
+        <div className="flex items-center gap-4 mb-5">
+          <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden shrink-0 border-2 border-gray-200">
+            {rider?.avatar_url
+              ? <img src={rider.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center font-black text-2xl text-gray-500">{(rider?.first_name || rider?.full_name || 'R')[0].toUpperCase()}</div>
+            }
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-black text-[17px] text-gray-950 leading-tight truncate">
+              {rider?.first_name} {rider?.last_name || ''}
+            </h3>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {age && (
+                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{age} yrs</span>
+              )}
+              {rider?.sex && (
+                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full capitalize">{rider.sex}</span>
+              )}
+              {riderRating !== null && riderRating >= 4 && (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                  <Star size={10} className="fill-amber-400 text-amber-400" />{riderRating.toFixed(1)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Vehicle info */}
+        {(vehicleName || vehicleType || rider?.vehicle_plate) && (
+          <div className="bg-gray-50 rounded-2xl p-4 mb-5 border border-gray-100 space-y-2.5">
+            {vehicleType && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Type</span>
+                <span className="text-[13px] font-semibold text-gray-800">{vehicleType}</span>
+              </div>
+            )}
+            {vehicleName && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Vehicle</span>
+                <span className="text-[13px] font-semibold text-gray-800">{vehicleName}</span>
+              </div>
+            )}
+            {rider?.vehicle_color && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Color</span>
+                <span className="text-[13px] font-semibold text-gray-800 capitalize">{rider.vehicle_color}</span>
+              </div>
+            )}
+            {rider?.vehicle_plate && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Plate</span>
+                <span className="text-[13px] font-bold text-gray-950 font-mono tracking-wider">{rider.vehicle_plate}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2.5">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onAccept}
+            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+          >
+            Accept Rider
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 
