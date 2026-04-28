@@ -12,12 +12,16 @@
 //   author_name  text not null,
 //   author_avatar text,
 //   published    boolean not null default true,
+//   is_archived  boolean not null default false,
 //   created_at   timestamptz default now() not null,
 //   updated_at   timestamptz default now() not null
 // );
 // alter table news_posts enable row level security;
-// create policy "anyone can read published" on news_posts for select using (published = true);
+// create policy "anyone can read published" on news_posts for select using (published = true and is_archived = false);
 // create policy "authenticated read all" on news_posts for select using (auth.role() = 'authenticated');
+//
+// If the table already exists, run:
+// alter table news_posts add column if not exists is_archived boolean not null default false;
 
 import { supabase, supabaseAdmin } from './supabase';
 
@@ -34,16 +38,20 @@ export interface NewsPost {
   author_name: string;
   author_avatar: string | null;
   published: boolean;
+  is_archived: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export async function fetchNewsPosts(includeUnpublished = false): Promise<NewsPost[]> {
+/** Fetch posts for public feed — only published, non-archived. */
+export async function fetchNewsPosts(includeAll = false): Promise<NewsPost[]> {
   let query = supabase
     .from('news_posts')
     .select('*')
     .order('created_at', { ascending: false });
-  if (!includeUnpublished) query = query.eq('published', true);
+  if (!includeAll) {
+    query = query.eq('published', true).eq('is_archived', false);
+  }
   const { data } = await query;
   return (data as NewsPost[]) ?? [];
 }
@@ -60,7 +68,7 @@ export async function createNewsPost(
 ): Promise<NewsPost | null> {
   const { data, error } = await supabaseAdmin
     .from('news_posts')
-    .insert({ title, content, category, image_url: imageUrl, author_id: authorId, author_name: authorName, author_avatar: authorAvatar, published })
+    .insert({ title, content, category, image_url: imageUrl, author_id: authorId, author_name: authorName, author_avatar: authorAvatar, published, is_archived: false })
     .select()
     .single();
   if (error) { console.error('createNewsPost:', error); return null; }
@@ -69,7 +77,7 @@ export async function createNewsPost(
 
 export async function updateNewsPost(
   id: string,
-  updates: Partial<Pick<NewsPost, 'title' | 'content' | 'category' | 'image_url' | 'published'>>,
+  updates: Partial<Pick<NewsPost, 'title' | 'content' | 'category' | 'image_url' | 'published' | 'is_archived'>>,
 ): Promise<boolean> {
   const { error } = await supabaseAdmin
     .from('news_posts')

@@ -7,7 +7,7 @@ import {
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
   FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download,
-  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag
+  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag, Archive, ArchiveRestore
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -4069,6 +4069,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingPost, setEditingPost] = useState<NewsPost | null>(null);
   const [saving, setSaving] = useState(false);
@@ -4091,6 +4092,13 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
     fetchNewsPosts(true).then(data => { setPosts(data); setLoading(false); });
   }, []);
 
+  const filtered = posts.filter(p => {
+    if (filter === 'archived') return p.is_archived;
+    if (filter === 'published') return p.published && !p.is_archived;
+    if (filter === 'draft') return !p.published && !p.is_archived;
+    return !p.is_archived; // 'all' hides archived
+  });
+
   const handleImageUpload = async (file: File) => {
     setImageUploading(true);
     const url = await uploadNewsImage(file);
@@ -4104,7 +4112,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
     const authorName = currentProfile.full_name || `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || 'Admin';
     if (editingPost) {
       const ok = await updateNewsPost(editingPost.id, { title: form.title, content: form.content, category: form.category, image_url: form.image_url, published: form.published });
-      if (ok) setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...form } : p));
+      if (ok) setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, title: form.title, content: form.content, category: form.category, image_url: form.image_url, published: form.published } : p));
     } else {
       const post = await createNewsPost(form.title, form.content, form.category, form.image_url, currentProfile.id, authorName, currentProfile.avatar_url, form.published);
       if (post) setPosts(prev => [post, ...prev]);
@@ -4114,9 +4122,9 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this post?')) return;
-    await deleteNewsPost(id);
-    setPosts(prev => prev.filter(p => p.id !== id));
+    if (!confirm('Permanently delete this post? This cannot be undone.')) return;
+    const ok = await deleteNewsPost(id);
+    if (ok) setPosts(prev => prev.filter(p => p.id !== id));
   };
 
   const handleTogglePublish = async (post: NewsPost) => {
@@ -4124,9 +4132,21 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
     if (ok) setPosts(prev => prev.map(p => p.id === post.id ? { ...p, published: !p.published } : p));
   };
 
+  const handleToggleArchive = async (post: NewsPost) => {
+    const ok = await updateNewsPost(post.id, { is_archived: !post.is_archived, published: post.is_archived ? post.published : false });
+    if (ok) setPosts(prev => prev.map(p => p.id === post.id ? { ...p, is_archived: !p.is_archived, published: p.is_archived ? p.published : false } : p));
+  };
+
+  const FILTER_TABS = [
+    { key: 'all', label: 'All', count: posts.filter(p => !p.is_archived).length },
+    { key: 'published', label: 'Published', count: posts.filter(p => p.published && !p.is_archived).length },
+    { key: 'draft', label: 'Draft', count: posts.filter(p => !p.published && !p.is_archived).length },
+    { key: 'archived', label: 'Archived', count: posts.filter(p => p.is_archived).length },
+  ] as const;
+
   return (
     <div>
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-6 flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-gray-950">News Feed</h2>
           <p className="text-gray-400 text-sm mt-1">Post announcements, updates, and promotions</p>
@@ -4134,6 +4154,17 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
         <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors">
           <Plus size={15} /> New Post
         </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+        {FILTER_TABS.map(t => (
+          <button key={t.key} onClick={() => setFilter(t.key)}
+            className={`flex-1 py-2 px-3 text-[12px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === t.key ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+            {t.label}
+            {t.count > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${filter === t.key ? 'bg-gray-100 text-gray-600' : 'bg-gray-200 text-gray-400'}`}>{t.count}</span>}
+          </button>
+        ))}
       </div>
 
       {/* Create / Edit form */}
@@ -4145,33 +4176,28 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
           </div>
 
           {/* Header image */}
-          <div className="relative">
-            {form.image_url ? (
-              <div className="relative">
-                <img src={form.image_url} alt="" className="w-full h-48 object-cover" />
-                <button onClick={() => setForm(f => ({ ...f, image_url: null }))}
-                  className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center transition-colors">
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center h-36 bg-gray-50 border-b border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors gap-2">
-                {imageUploading
-                  ? <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  : <>
-                      <ImagePlus size={22} className="text-gray-300" />
-                      <span className="text-[12px] font-semibold text-gray-400">Upload header image</span>
-                    </>}
-                <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
-              </label>
-            )}
-          </div>
+          {form.image_url ? (
+            <div className="relative">
+              <img src={form.image_url} alt="" className="w-full h-48 object-cover" />
+              <button onClick={() => setForm(f => ({ ...f, image_url: null }))}
+                className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <label className="flex flex-col items-center justify-center h-36 bg-gray-50 border-b border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors gap-2">
+              {imageUploading
+                ? <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                : <><ImagePlus size={22} className="text-gray-300" /><span className="text-[12px] font-semibold text-gray-400">Upload header image</span></>}
+              <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
+            </label>
+          )}
 
           <div className="p-5 space-y-4">
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <input
                 type="text" placeholder="Post title *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="flex-1 min-w-[200px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
               />
               <div className="flex items-center gap-1.5 px-3 border border-gray-200 rounded-xl">
                 <Tag size={13} className="text-gray-400 shrink-0" />
@@ -4183,10 +4209,9 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
             </div>
             <textarea
               placeholder="Write your post content… *" value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-              rows={5}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+              rows={5} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
             />
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <div onClick={() => setForm(f => ({ ...f, published: !f.published }))}
                   className={`w-9 h-5 rounded-full relative transition-colors ${form.published ? 'bg-gray-950' : 'bg-gray-200'}`}>
@@ -4208,38 +4233,50 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
-      ) : posts.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-16 text-center">
           <Newspaper size={32} className="text-gray-300 mb-3" />
-          <p className="text-gray-500 font-semibold text-sm">No posts yet</p>
-          <p className="text-gray-400 text-[12px] mt-1">Click New Post to create your first announcement</p>
+          <p className="text-gray-500 font-semibold text-sm">{filter === 'archived' ? 'No archived posts' : 'No posts'}</p>
+          <p className="text-gray-400 text-[12px] mt-1">{filter === 'all' || filter === 'published' ? 'Click New Post to get started' : ''}</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {posts.map(post => (
-            <div key={post.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              {post.image_url && <img src={post.image_url} alt="" className="w-full h-40 object-cover" />}
+          {filtered.map(post => (
+            <div key={post.id} className={`bg-white rounded-2xl border overflow-hidden transition-opacity ${post.is_archived ? 'border-gray-100 opacity-60' : 'border-gray-100'}`}>
+              {post.image_url && <img src={post.image_url} alt="" className={`w-full h-40 object-cover ${post.is_archived ? 'grayscale' : ''}`} />}
               <div className="px-5 py-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${CATEGORY_COLORS[post.category] ?? 'bg-gray-100 text-gray-600'}`}>{post.category}</span>
-                      {!post.published && <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-wide">Draft</span>}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${post.is_archived ? 'bg-gray-100 text-gray-400' : (CATEGORY_COLORS[post.category] ?? 'bg-gray-100 text-gray-600')}`}>{post.category}</span>
+                      {post.is_archived && <span className="px-2 py-0.5 bg-orange-100 text-orange-500 rounded-full text-[10px] font-black uppercase tracking-wide">Archived</span>}
+                      {!post.published && !post.is_archived && <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-wide">Draft</span>}
                       <span className="text-[11px] text-gray-400">{new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                     <p className="font-bold text-gray-900 text-sm leading-snug">{post.title}</p>
                     <p className="text-[12px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">{post.content}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => handleTogglePublish(post)}
-                      title={post.published ? 'Unpublish' : 'Publish'}
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${post.published ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-300 hover:bg-gray-100'}`}>
-                      <Eye size={14} />
+                    {!post.is_archived && (
+                      <button onClick={() => handleTogglePublish(post)}
+                        title={post.published ? 'Unpublish' : 'Publish'}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${post.published ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-300 hover:bg-gray-100'}`}>
+                        <Eye size={14} />
+                      </button>
+                    )}
+                    {!post.is_archived && (
+                      <button onClick={() => openEdit(post)} title="Edit"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+                        <Edit3 size={14} />
+                      </button>
+                    )}
+                    <button onClick={() => handleToggleArchive(post)}
+                      title={post.is_archived ? 'Unarchive' : 'Archive'}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${post.is_archived ? 'text-orange-400 hover:bg-orange-50' : 'text-gray-300 hover:bg-orange-50 hover:text-orange-400'}`}>
+                      {post.is_archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                     </button>
-                    <button onClick={() => openEdit(post)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-                      <Edit3 size={14} />
-                    </button>
-                    <button onClick={() => handleDelete(post.id)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
+                    <button onClick={() => handleDelete(post.id)} title="Delete permanently"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
                   </div>
