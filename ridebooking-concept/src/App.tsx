@@ -1038,6 +1038,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
   const [showNews, setShowNews] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
@@ -1078,6 +1079,21 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const pushAppNotification = (title: string, body: string) => {
     setAppNotifications(prev => [{ id: genId(), title, body, time: Date.now(), read: false }, ...prev]);
   };
+
+  // Subscribe to new published news posts
+  useEffect(() => {
+    const channel = supabase.channel('news_user')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_posts' }, payload => {
+        const post = payload.new as { title: string; content: string; published: boolean; is_archived: boolean };
+        if (post.published && !post.is_archived) {
+          const snippet = post.content.length > 80 ? post.content.slice(0, 80) + '…' : post.content;
+          pushAppNotification(`📢 ${post.title}`, snippet);
+          pushNotification(`📢 ${post.title}`, snippet);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const saveFavorite = (place: FavoritePlace) => {
     setFavorites(prev => {
@@ -1356,12 +1372,79 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       <ConnectionBanner state={connectionState} />
       <NotificationToast message={notification} />
 
+      {/* ── Burger drawer — mobile only ── */}
+      <AnimatePresence>
+        {showMenu && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/40 md:hidden" onClick={() => setShowMenu(false)} />
+            <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white shadow-2xl flex flex-col md:hidden">
+              {/* Profile header */}
+              <div className="px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-5 border-b border-gray-100 flex items-center gap-3">
+                <button onClick={() => { setShowMenu(false); setShowProfile(true); }}
+                  className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 shrink-0">
+                  {currentProfile.avatar_url
+                    ? <img src={currentProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><User size={20} className="text-gray-500" /></div>}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-gray-950 text-sm truncate">{currentProfile.full_name || currentProfile.first_name || 'User'}</p>
+                  <p className="text-[11px] text-gray-400 truncate">{currentProfile.email}</p>
+                </div>
+                <button onClick={() => setShowMenu(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400">
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Menu items */}
+              <div className="flex-1 overflow-y-auto py-3">
+                {[
+                  { icon: Newspaper, label: 'News & Updates', action: () => { setShowMenu(false); setShowNews(true); } },
+                  { icon: Bell, label: 'Notifications', badge: appNotifications.filter(n => !n.read).length, action: () => { setShowMenu(false); setShowNotifications(true); setAppNotifications(prev => prev.map(n => ({ ...n, read: true }))); } },
+                  { icon: MessageSquare, label: 'Messages', action: () => { setShowMenu(false); setShowChatHistory(true); } },
+                  { icon: Clock, label: 'Trip History', action: () => { setShowMenu(false); setShowRideHistory(true); } },
+                  { icon: User, label: 'Profile', action: () => { setShowMenu(false); setShowProfile(true); } },
+                ].map(item => (
+                  <button key={item.label} onClick={item.action}
+                    className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left">
+                    <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 relative">
+                      <item.icon size={17} className="text-gray-600" />
+                      {item.badge && item.badge > 0 ? (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-black flex items-center justify-center">
+                          {item.badge > 9 ? '9+' : item.badge}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Sign out */}
+              <div className="px-5 py-4 border-t border-gray-100">
+                <button onClick={() => { setShowMenu(false); signOut(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-colors text-red-500 font-bold text-sm">
+                  <LogOut size={16} /> Sign out
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Floating nav — mobile only, overlays the map ── */}
       <div className="absolute top-0 inset-x-0 z-30 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center pointer-events-none md:hidden">
         <div className="flex items-center gap-2">
           {step === 'home' ? (
-            <button className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
+            <button onClick={() => setShowMenu(true)} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto relative">
               <Menu size={22} />
+              {appNotifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-black flex items-center justify-center leading-none">
+                  {appNotifications.filter(n => !n.read).length > 9 ? '9+' : appNotifications.filter(n => !n.read).length}
+                </span>
+              )}
             </button>
           ) : step === 'matched' ? (
             <button onClick={() => setStep('home')} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
@@ -1372,31 +1455,6 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
               <ChevronLeft size={22} />
             </button>
           )}
-          <button onClick={() => setShowChatHistory(true)} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto relative">
-            <MessageSquare size={20} />
-          </button>
-          {step === 'home' && (
-            <button onClick={() => setShowRideHistory(true)} className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto">
-              <Clock size={20} />
-            </button>
-          )}
-          <button
-            onClick={() => { setShowNotifications(true); setAppNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
-            className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto relative"
-          >
-            <Bell size={20} />
-            {appNotifications.filter(n => !n.read).length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] font-black flex items-center justify-center leading-none">
-                {appNotifications.filter(n => !n.read).length > 9 ? '9+' : appNotifications.filter(n => !n.read).length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setShowNews(true)}
-            className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto"
-          >
-            <Newspaper size={20} />
-          </button>
         </div>
         <button
           onClick={() => setShowProfile(true)}
@@ -1430,6 +1488,9 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <button onClick={() => setShowNews(true)} className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl">
+              <Newspaper size={16} className="text-gray-600" />
+            </button>
             <button onClick={() => setShowChatHistory(true)} className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl relative">
               <MessageSquare size={16} className="text-gray-600" />
             </button>
@@ -2396,6 +2457,25 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       setRemitLoading(false);
     })();
   }, [riderTab, initialProfile.id, remitDate, remitting]);
+
+  const pushAppNotification = (title: string, body: string) => {
+    setAppNotifications(prev => [{ id: `notif-${Date.now()}-${Math.random().toString(36).slice(2)}`, title, body, time: Date.now(), read: false }, ...prev]);
+  };
+
+  // Subscribe to new published news posts
+  useEffect(() => {
+    const channel = supabase.channel('news_rider')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_posts' }, payload => {
+        const post = payload.new as { title: string; content: string; published: boolean; is_archived: boolean };
+        if (post.published && !post.is_archived) {
+          const snippet = post.content.length > 80 ? post.content.slice(0, 80) + '…' : post.content;
+          pushAppNotification(`📢 ${post.title}`, snippet);
+          pushNotification(`📢 ${post.title}`, snippet);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   // ── My Team (team leader check — any rider can lead a team) ──────────────
   useEffect(() => {
@@ -4290,12 +4370,6 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  {post.author_avatar
-                    ? <img src={post.author_avatar} alt="" className="w-5 h-5 rounded-full" />
-                    : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-black text-gray-500">{post.author_name?.[0]}</div>}
-                  <span className="text-[11px] text-gray-400">{post.author_name}</span>
-                </div>
               </div>
             </div>
           ))}
@@ -4343,12 +4417,6 @@ const NewsFeedViewer = ({ onClose, embedded = false }: { onClose: () => void; em
                   {isOpen ? 'Show less' : 'Read more'}
                 </button>
               )}
-              <div className="mt-3 flex items-center gap-2 pt-3 border-t border-gray-50">
-                {post.author_avatar
-                  ? <img src={post.author_avatar} alt="" className="w-5 h-5 rounded-full" />
-                  : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-black text-gray-500">{post.author_name?.[0]}</div>}
-                <span className="text-[11px] text-gray-400">{post.author_name}</span>
-              </div>
             </div>
           </div>
         );
