@@ -152,6 +152,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [impersonating, setImpersonating] = useState<Profile | null>(null);
   const [globalSettings, setGlobalSettings] = useState<AppSettings | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  const mapLoadShownRef = React.useRef(false);
 
   useEffect(() => {
     getAppSettings().then(setGlobalSettings);
@@ -194,6 +196,18 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Show map loading screen once on first login for user/rider roles
+  React.useEffect(() => {
+    if (!profile || mapLoadShownRef.current) return;
+    const role = profile.role;
+    if (role === 'user' || role === 'rider' || role === 'team_leader') {
+      mapLoadShownRef.current = true;
+      setMapLoading(true);
+      const t = setTimeout(() => setMapLoading(false), 2800);
+      return () => clearTimeout(t);
+    }
+  }, [profile?.id]);
+
   if (authLoading || (session && !profile)) return <SplashScreen settings={globalSettings} />;
   if (!session || !profile) return <LoginScreen settings={globalSettings} />;
   if (!profile.onboarded) return <OnboardingScreen profile={profile} settings={globalSettings} onComplete={setProfile} />;
@@ -201,6 +215,8 @@ export default function App() {
     return <BlockedScreen profile={profile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
     return <ProfileSetupScreen profile={profile} onComplete={setProfile} />;
+
+  if (mapLoading) return <MapLoadingScreen settings={globalSettings} />;
 
   if (impersonating) {
     const exitBanner = (
@@ -226,6 +242,30 @@ export default function App() {
   if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} onImpersonate={setImpersonating} />;
   return <UserApp profile={profile} settings={globalSettings} />;
 }
+
+// ─── Map Loading Screen ───────────────────────────────────────────────────────
+
+const MapLoadingScreen = ({ settings }: { settings: AppSettings | null }) => (
+  <div className="w-full h-[100dvh] bg-gray-950 flex flex-col items-center justify-center font-sans gap-8">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-16 h-16 flex items-center justify-center mb-1 overflow-hidden">
+        {settings?.app_logo_url
+          ? <img src={settings.app_logo_url} className="w-full h-full object-contain" />
+          : <Navigation size={30} className="text-white" />}
+      </div>
+      <h2 className="text-white font-black text-xl tracking-tight">Loading Map</h2>
+      <p className="text-white/40 text-sm">Preparing your navigation…</p>
+    </div>
+    <div className="w-56 h-1 bg-white/10 rounded-full overflow-hidden">
+      <motion.div
+        initial={{ width: '0%' }}
+        animate={{ width: '100%' }}
+        transition={{ duration: 2.5, ease: 'easeInOut' }}
+        className="h-full bg-white rounded-full"
+      />
+    </div>
+  </div>
+);
 
 // ─── Splash Screen ────────────────────────────────────────────────────────────
 
@@ -2362,7 +2402,6 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [riderNotification, setRiderNotification] = useState<string | null>(null);
   const showRiderNotification = (msg: string) => { setRiderNotification(msg); setTimeout(() => setRiderNotification(null), 3500); };
   const [isOnline, setIsOnline] = useState(false);
-  const [mapInitializing, setMapInitializing] = useState(false);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   const [requestAccepted, setRequestAccepted] = useState(false);
@@ -2599,12 +2638,6 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   useEffect(() => {
     if (currentProfile.rider_status !== 'approved') setIsOnline(false);
   }, [currentProfile.rider_status]);
-
-  useEffect(() => {
-    if (!mapInitializing) return;
-    const t = setTimeout(() => setMapInitializing(false), 2500);
-    return () => clearTimeout(t);
-  }, [mapInitializing]);
 
   // Write online status + GPS to profiles.
   // Throttled: only writes when rider moves >50 m or 30 s have elapsed since last write.
@@ -2862,33 +2895,6 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       <ConnectionBanner state={riderConnectionState} />
       <NotificationToast message={riderNotification} />
 
-      {/* Map initializing overlay */}
-      <AnimatePresence>
-        {mapInitializing && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="fixed inset-0 z-[9999] bg-gray-950 flex flex-col items-center justify-center gap-6"
-          >
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-2">
-                <Navigation size={26} className="text-white" />
-              </div>
-              <h2 className="text-white font-black text-xl tracking-tight">Loading Map</h2>
-              <p className="text-white/50 text-sm">Preparing your navigation…</p>
-            </div>
-            <div className="w-64 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: '0%' }}
-                animate={{ width: '100%' }}
-                transition={{ duration: 2.3, ease: 'easeInOut' }}
-                className="h-full bg-white rounded-full"
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
@@ -3228,9 +3234,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
             <button
               onClick={() => {
                 if (!isOnline && (riderLocationDenied || hasPendingRemit)) return;
-                const goingOnline = !isOnline;
-                setIsOnline(goingOnline);
-                if (goingOnline) { setMapInitializing(true); }
+                setIsOnline(prev => !prev);
               }}
               className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
                 isOnline ? 'bg-white text-gray-950 hover:bg-gray-100'
@@ -3266,9 +3270,9 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           </div>
         )}
 
-        {/* Incoming Request — only shown when NOT already on a trip and map ready */}
+        {/* Incoming Request — only shown when NOT already on a trip */}
         <AnimatePresence>
-          {hasRequest && !requestAccepted && !mapInitializing && (
+          {hasRequest && !requestAccepted && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
