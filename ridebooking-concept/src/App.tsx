@@ -2418,16 +2418,22 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   useEffect(() => {
     const riderId = currentProfile.id;
     const now = () => new Date().toISOString();
+    const dbUpdate = (fields: Record<string, unknown>) => {
+      supabase.from('profiles').update(fields).eq('id', riderId).then(({ error }) => {
+        if (error) console.error('[presence] update error:', error.code, error.message, '| riderId:', riderId);
+        else console.log('[presence] updated:', fields);
+      });
+    };
     if (!isOnline) {
-      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId);
+      dbUpdate({ is_online: false, last_lat: null, last_lng: null });
       return;
     }
-    supabase.from('profiles').update({ is_online: true, last_seen_at: now() }).eq('id', riderId);
+    dbUpdate({ is_online: true, last_seen_at: now() });
     const watchId = navigator.geolocation.watchPosition(
       pos => {
         const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setRiderCurrentLoc(loc);
-        supabase.from('profiles').update({ is_online: true, last_seen_at: now(), last_lat: loc[0], last_lng: loc[1] }).eq('id', riderId);
+        dbUpdate({ is_online: true, last_seen_at: now(), last_lat: loc[0], last_lng: loc[1] });
       },
       (err) => {
         console.error('Geolocation error:', err.message);
@@ -2441,7 +2447,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     );
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId);
+      dbUpdate({ is_online: false, last_lat: null, last_lng: null });
     };
   }, [isOnline, currentProfile.id]);
 
