@@ -2362,6 +2362,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [riderNotification, setRiderNotification] = useState<string | null>(null);
   const showRiderNotification = (msg: string) => { setRiderNotification(msg); setTimeout(() => setRiderNotification(null), 3500); };
   const [isOnline, setIsOnline] = useState(false);
+  const [mapInitializing, setMapInitializing] = useState(false);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   const [requestAccepted, setRequestAccepted] = useState(false);
@@ -2598,6 +2599,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   useEffect(() => {
     if (currentProfile.rider_status !== 'approved') setIsOnline(false);
   }, [currentProfile.rider_status]);
+
+  useEffect(() => {
+    if (!mapInitializing) return;
+    const t = setTimeout(() => setMapInitializing(false), 2500);
+    return () => clearTimeout(t);
+  }, [mapInitializing]);
 
   // Write online status + GPS to profiles.
   // Throttled: only writes when rider moves >50 m or 30 s have elapsed since last write.
@@ -2854,6 +2861,34 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     <div className="w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900">
       <ConnectionBanner state={riderConnectionState} />
       <NotificationToast message={riderNotification} />
+
+      {/* Map initializing overlay */}
+      <AnimatePresence>
+        {mapInitializing && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="fixed inset-0 z-[9999] bg-gray-950 flex flex-col items-center justify-center gap-6"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-2">
+                <Navigation size={26} className="text-white" />
+              </div>
+              <h2 className="text-white font-black text-xl tracking-tight">Loading Map</h2>
+              <p className="text-white/50 text-sm">Preparing your navigation…</p>
+            </div>
+            <div className="w-64 h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: '0%' }}
+                animate={{ width: '100%' }}
+                transition={{ duration: 2.3, ease: 'easeInOut' }}
+                className="h-full bg-white rounded-full"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
@@ -3193,7 +3228,9 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
             <button
               onClick={() => {
                 if (!isOnline && (riderLocationDenied || hasPendingRemit)) return;
-                setIsOnline(prev => !prev);
+                const goingOnline = !isOnline;
+                setIsOnline(goingOnline);
+                if (goingOnline) { setMapInitializing(true); }
               }}
               className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
                 isOnline ? 'bg-white text-gray-950 hover:bg-gray-100'
@@ -3229,9 +3266,9 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           </div>
         )}
 
-        {/* Incoming Request — only shown when NOT already on a trip */}
+        {/* Incoming Request — only shown when NOT already on a trip and map ready */}
         <AnimatePresence>
-          {hasRequest && !requestAccepted && (
+          {hasRequest && !requestAccepted && !mapInitializing && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
