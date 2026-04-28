@@ -56,6 +56,11 @@ export interface Profile {
   reviewed_at: string | null;
   admin_role_id: string | null;
   admin_role_ids: string[];
+  // Presence (online status + GPS)
+  is_online: boolean;
+  last_lat: number | null;
+  last_lng: number | null;
+  last_seen_at: string | null;
   // Blocking
   is_blocked: boolean;
   block_reason: string | null;
