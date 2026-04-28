@@ -1,0 +1,76 @@
+import { supabase } from './supabase';
+import type { Profile } from './supabase';
+
+export interface Team {
+  id: string;
+  name: string;
+  capacity: number;
+  leader_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  leader?: Pick<Profile, 'id' | 'full_name' | 'first_name' | 'last_name' | 'avatar_url'> | null;
+  members?: TeamMember[];
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  rider_id: string;
+  joined_at: string;
+  rider?: Pick<Profile, 'id' | 'full_name' | 'first_name' | 'last_name' | 'avatar_url'>;
+}
+
+const TEAM_SELECT = 'id, name, capacity, leader_id, created_by, created_at, leader:profiles!teams_leader_id_fkey(id, full_name, first_name, last_name, avatar_url)';
+const MEMBER_SELECT = 'id, team_id, rider_id, joined_at, rider:profiles!team_members_rider_id_fkey(id, full_name, first_name, last_name, avatar_url)';
+
+export async function fetchTeams(): Promise<Team[]> {
+  const { data } = await supabase.from('teams').select(TEAM_SELECT).order('created_at', { ascending: false });
+  return (data as unknown as Team[]) ?? [];
+}
+
+export async function fetchTeamWithMembers(teamId: string): Promise<Team | null> {
+  const { data } = await supabase
+    .from('teams')
+    .select(`${TEAM_SELECT}, members:team_members(${MEMBER_SELECT})`)
+    .eq('id', teamId)
+    .single();
+  return (data as unknown as Team) ?? null;
+}
+
+export async function fetchMyTeam(leaderId: string): Promise<Team | null> {
+  const { data } = await supabase
+    .from('teams')
+    .select(`${TEAM_SELECT}, members:team_members(${MEMBER_SELECT})`)
+    .eq('leader_id', leaderId)
+    .maybeSingle();
+  return (data as unknown as Team) ?? null;
+}
+
+export async function createTeam(name: string, capacity: number, createdBy: string): Promise<Team | null> {
+  const { data, error } = await supabase
+    .from('teams').insert({ name, capacity, created_by: createdBy }).select(TEAM_SELECT).single();
+  if (error) { console.error('createTeam:', error); return null; }
+  return data as unknown as Team;
+}
+
+export async function updateTeam(id: string, updates: Partial<Pick<Team, 'name' | 'capacity' | 'leader_id'>>): Promise<boolean> {
+  const { error } = await supabase.from('teams').update(updates).eq('id', id);
+  if (error) console.error('updateTeam:', error);
+  return !error;
+}
+
+export async function deleteTeam(id: string): Promise<boolean> {
+  const { error } = await supabase.from('teams').delete().eq('id', id);
+  return !error;
+}
+
+export async function addTeamMember(teamId: string, riderId: string): Promise<boolean> {
+  const { error } = await supabase.from('team_members').insert({ team_id: teamId, rider_id: riderId });
+  if (error) console.error('addTeamMember:', error);
+  return !error;
+}
+
+export async function removeTeamMember(teamId: string, riderId: string): Promise<boolean> {
+  const { error } = await supabase.from('team_members').delete().eq('team_id', teamId).eq('rider_id', riderId);
+  return !error;
+}

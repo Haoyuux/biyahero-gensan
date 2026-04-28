@@ -6,7 +6,8 @@ import {
   Home, Briefcase, ThumbsUp, X, Send, Bell, Shield, Users, Activity,
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
-  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download
+  FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download,
+  Users2, UserPlus, Trash2, Crown
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -17,6 +18,7 @@ import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, type Remittance } from '@/src/lib/remittanceService';
 import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
+import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY  = 'fetch_user_ride';
@@ -218,7 +220,7 @@ export default function App() {
     );
   }
 
-  if (profile.role === 'rider') return <RiderDashboard profile={profile} settings={globalSettings} />;
+  if (profile.role === 'rider' || profile.role === 'team_leader') return <RiderDashboard profile={profile} settings={globalSettings} />;
   if (profile.role === 'admin') return <AdminDashboard profile={profile} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} />;
   if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} onImpersonate={setImpersonating} />;
   return <UserApp profile={profile} settings={globalSettings} />;
@@ -2255,7 +2257,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
-  const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit'>('home');
+  const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit' | 'team'>('home');
+  const [myTeam, setMyTeam] = useState<Team | null>(null);
+  const [myTeamLoading, setMyTeamLoading] = useState(false);
+  const [allRidersForTeam, setAllRidersForTeam] = useState<Profile[]>([]);
+  const [teamMemberSearch, setTeamMemberSearch] = useState('');
+  const [addingMember, setAddingMember] = useState(false);
   const [riderCurrentLoc, setRiderCurrentLoc] = useState<[number, number] | null>(null);
   // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
   const pendingTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -2370,6 +2377,20 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       setRemitLoading(false);
     })();
   }, [riderTab, initialProfile.id, remitDate, remitting]);
+
+  // ── My Team (team leader) ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (riderTab !== 'team' || initialProfile.role !== 'team_leader') return;
+    setMyTeamLoading(true);
+    Promise.all([
+      fetchMyTeam(initialProfile.id),
+      getRiderProfiles(),
+    ]).then(([team, allRiders]) => {
+      setMyTeam(team);
+      setAllRidersForTeam(allRiders.filter(r => r.rider_status === 'approved'));
+      setMyTeamLoading(false);
+    });
+  }, [riderTab, initialProfile.id, initialProfile.role]);
 
   // ── Active-ride persistence ────────────────────────────────────────────────
   const [rideRestored, setRideRestored] = React.useState(false);
@@ -2698,13 +2719,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
       {/* Tab Bar */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 flex gap-1">
-        {(['home', 'history', 'remit'] as const).map(tab => (
+        {((['home', 'history', 'remit', ...(currentProfile.role === 'team_leader' ? ['team'] : [])] as const) as Array<'home'|'history'|'remit'|'team'>).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
             className={`py-3 px-4 text-[13px] font-bold border-b-2 transition-colors capitalize ${riderTab === tab ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
-            {tab === 'home' ? 'Dashboard' : tab === 'history' ? 'Trip History' : 'Remittance'}
+            {tab === 'home' ? 'Dashboard' : tab === 'history' ? 'Trip History' : tab === 'remit' ? 'Remittance' : 'My Team'}
           </button>
         ))}
       </div>
@@ -3267,6 +3288,125 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         )}
       </div>
 
+      {/* ── My Team Tab (team leaders only) ── */}
+      {riderTab === 'team' && currentProfile.role === 'team_leader' && (
+        <div className="space-y-4">
+          <h3 className="font-black text-lg text-gray-950">My Team</h3>
+          {myTeamLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : !myTeam ? (
+            <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-12 text-center">
+              <Users2 size={32} className="text-gray-300 mb-3" />
+              <p className="text-gray-500 font-semibold text-sm">No team assigned yet</p>
+              <p className="text-gray-400 text-[12px] mt-1">Ask an admin to assign you as team leader</p>
+            </div>
+          ) : (
+            <>
+              {/* Team info card */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl bg-gray-950 flex items-center justify-center">
+                    <Users2 size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="font-black text-gray-900">{myTeam.name}</p>
+                    <p className="text-[12px] text-gray-400">{(myTeam.members ?? []).length} / {myTeam.capacity} members</p>
+                  </div>
+                </div>
+                {/* Capacity bar */}
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gray-950 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, ((myTeam.members ?? []).length / myTeam.capacity) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Members */}
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+                  <p className="font-bold text-sm text-gray-900">Members</p>
+                  {(myTeam.members ?? []).length < myTeam.capacity && (
+                    <button
+                      onClick={() => { setAddingMember(true); setTeamMemberSearch(''); }}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <UserPlus size={12} /> Add
+                    </button>
+                  )}
+                </div>
+
+                {addingMember && (
+                  <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/60">
+                    <input
+                      type="text" placeholder="Search riders…" value={teamMemberSearch}
+                      onChange={e => setTeamMemberSearch(e.target.value)} autoFocus
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white mb-2"
+                    />
+                    <div className="max-h-36 overflow-y-auto space-y-1">
+                      {allRidersForTeam
+                        .filter(r => !(myTeam.members ?? []).some(m => m.rider_id === r.id))
+                        .filter(r => !teamMemberSearch || (r.full_name || '').toLowerCase().includes(teamMemberSearch.toLowerCase()))
+                        .map(r => (
+                          <button key={r.id}
+                            onClick={async () => {
+                              const ok = await addTeamMember(myTeam.id, r.id);
+                              if (ok) {
+                                const updated = await fetchMyTeam(currentProfile.id);
+                                setMyTeam(updated);
+                              }
+                              setAddingMember(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white text-left transition-colors"
+                          >
+                            {r.avatar_url
+                              ? <img src={r.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+                              : <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400">{r.full_name?.[0] || '?'}</div>}
+                            <span className="text-sm font-medium text-gray-700">{r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()}</span>
+                          </button>
+                        ))}
+                    </div>
+                    <button onClick={() => setAddingMember(false)} className="mt-1 text-[11px] text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                )}
+
+                {(myTeam.members ?? []).length === 0 ? (
+                  <div className="px-5 py-8 text-center text-[12px] text-gray-400">No members yet. Add riders to your team.</div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {(myTeam.members ?? []).map(m => {
+                      const name = m.rider?.full_name || `${m.rider?.first_name || ''} ${m.rider?.last_name || ''}`.trim() || 'Unnamed';
+                      return (
+                        <div key={m.id} className="flex items-center gap-3 px-5 py-3.5">
+                          {m.rider?.avatar_url
+                            ? <img src={m.rider.avatar_url} alt="" className="w-9 h-9 rounded-full" />
+                            : <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">{name[0]}</div>}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
+                            <p className="text-[10px] text-gray-400">Joined {new Date(m.joined_at).toLocaleDateString()}</p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              await removeTeamMember(myTeam.id, m.rider_id);
+                              setMyTeam(prev => prev ? { ...prev, members: (prev.members ?? []).filter(x => x.rider_id !== m.rider_id) } : prev);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Universal Image Viewer Modal */}
       <AnimatePresence>
         {viewerImage && (
@@ -3345,12 +3485,325 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
 // ─── Admin / Super Admin Dashboard ───────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'settings';
+// ─── Team Management Panel ────────────────────────────────────────────────────
+
+const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) => {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [riders, setRiders] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [teamDetail, setTeamDetail] = useState<Team | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCapacity, setNewCapacity] = useState(10);
+  const [saving, setSaving] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [addMemberTeamId, setAddMemberTeamId] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    const [t, r] = await Promise.all([
+      fetchTeams(),
+      getRiderProfiles(),
+    ]);
+    setTeams(t);
+    setRiders(r.filter(r => r.rider_status === 'approved'));
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openTeam = async (id: string) => {
+    if (expandedId === id) { setExpandedId(null); setTeamDetail(null); return; }
+    setExpandedId(id);
+    setDetailLoading(true);
+    const d = await fetchTeamWithMembers(id);
+    setTeamDetail(d);
+    setDetailLoading(false);
+  };
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setSaving(true);
+    const t = await createTeam(newName.trim(), newCapacity, currentProfile.id);
+    if (t) { setTeams(prev => [t, ...prev]); setCreating(false); setNewName(''); setNewCapacity(10); }
+    setSaving(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTeam) return;
+    setSaving(true);
+    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity });
+    if (ok) setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity } : t));
+    setEditingTeam(null);
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this team? Members will be removed.')) return;
+    await deleteTeam(id);
+    setTeams(prev => prev.filter(t => t.id !== id));
+    if (expandedId === id) { setExpandedId(null); setTeamDetail(null); }
+  };
+
+  const handleAssignLeader = async (teamId: string, riderId: string) => {
+    await updateTeam(teamId, { leader_id: riderId || null });
+    const leader = riders.find(r => r.id === riderId) ?? null;
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, leader_id: riderId || null, leader: leader as any } : t));
+    if (teamDetail?.id === teamId) setTeamDetail(prev => prev ? { ...prev, leader_id: riderId || null, leader: leader as any } : prev);
+  };
+
+  const handleAddMember = async (teamId: string, riderId: string) => {
+    const ok = await addTeamMember(teamId, riderId);
+    if (!ok) return;
+    const detail = await fetchTeamWithMembers(teamId);
+    setTeamDetail(detail);
+    setAddMemberTeamId(null);
+    setMemberSearch('');
+  };
+
+  const handleRemoveMember = async (teamId: string, riderId: string) => {
+    await removeTeamMember(teamId, riderId);
+    setTeamDetail(prev => prev ? { ...prev, members: (prev.members ?? []).filter(m => m.rider_id !== riderId) } : prev);
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-gray-950">Team Management</h2>
+          <p className="text-gray-400 text-sm mt-1">Create and manage rider teams</p>
+        </div>
+        <button
+          onClick={() => setCreating(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
+        >
+          <Plus size={15} /> New Team
+        </button>
+      </div>
+
+      {/* Create form */}
+      {creating && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
+          <h3 className="font-bold text-sm text-gray-900 mb-4">Create New Team</h3>
+          <div className="flex gap-3 flex-wrap">
+            <input
+              type="text" placeholder="Team name" value={newName} onChange={e => setNewName(e.target.value)}
+              className="flex-1 min-w-[180px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[12px] font-semibold text-gray-500">Capacity</label>
+              <input
+                type="number" min={1} max={100} value={newCapacity} onChange={e => setNewCapacity(Number(e.target.value))}
+                className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setCreating(false); setNewName(''); }} className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleCreate} disabled={saving || !newName.trim()} className="px-4 py-2 bg-gray-950 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40 transition-colors">
+                {saving ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {teams.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-16 text-center">
+          <Users2 size={32} className="text-gray-300 mb-3" />
+          <p className="text-gray-500 font-semibold text-sm">No teams yet</p>
+          <p className="text-gray-400 text-[12px] mt-1">Click New Team to get started</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {teams.map(team => {
+            const isExpanded = expandedId === team.id;
+            const memberCount = teamDetail?.id === team.id ? (teamDetail.members ?? []).length : '—';
+            const leaderName = team.leader ? (team.leader.full_name || `${team.leader.first_name || ''} ${team.leader.last_name || ''}`.trim() || 'Unnamed') : null;
+
+            return (
+              <div key={team.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                {/* Team row */}
+                <div className="px-5 py-4 flex items-center gap-4">
+                  <button onClick={() => openTeam(team.id)} className="flex-1 flex items-center gap-4 text-left">
+                    <div className="w-10 h-10 rounded-xl bg-gray-950 flex items-center justify-center shrink-0">
+                      <Users2 size={18} className="text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm">{team.name}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {leaderName
+                          ? <span className="flex items-center gap-1"><Crown size={10} className="text-amber-500" />{leaderName}</span>
+                          : <span className="text-gray-300">No leader assigned</span>}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[11px] font-bold text-gray-900">{memberCount} / {team.capacity}</p>
+                      <p className="text-[10px] text-gray-400">members</p>
+                    </div>
+                    <div className={`w-5 h-5 flex items-center justify-center text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                      <ChevronLeft size={14} className="-rotate-90" />
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => setEditingTeam(editingTeam?.id === team.id ? null : { ...team })} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+                      <Edit3 size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(team.id)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Inline edit */}
+                {editingTeam?.id === team.id && (
+                  <div className="px-5 pb-4 flex gap-3 flex-wrap border-t border-gray-50 pt-4">
+                    <input
+                      type="text" value={editingTeam.name} onChange={e => setEditingTeam({ ...editingTeam, name: e.target.value })}
+                      className="flex-1 min-w-[160px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    />
+                    <div className="flex items-center gap-2">
+                      <label className="text-[12px] font-semibold text-gray-500">Capacity</label>
+                      <input type="number" min={1} max={100} value={editingTeam.capacity} onChange={e => setEditingTeam({ ...editingTeam, capacity: Number(e.target.value) })}
+                        className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingTeam(null)} className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>
+                      <button onClick={handleSaveEdit} disabled={saving} className="px-3 py-2 bg-gray-950 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40">Save</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 px-5 py-5 space-y-5">
+                    {detailLoading ? (
+                      <div className="flex justify-center py-4">
+                        <div className="w-5 h-5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Assign leader */}
+                        <div>
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Team Leader</p>
+                          <div className="flex items-center gap-3">
+                            {team.leader?.avatar_url
+                              ? <img src={team.leader.avatar_url} alt="" className="w-8 h-8 rounded-full border-2 border-amber-400" />
+                              : <div className="w-8 h-8 rounded-full bg-amber-100 border-2 border-amber-400 flex items-center justify-center text-xs font-black text-amber-700">{leaderName?.[0] || '?'}</div>}
+                            <select
+                              value={team.leader_id ?? ''}
+                              onChange={e => handleAssignLeader(team.id, e.target.value)}
+                              className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                            >
+                              <option value="">— No leader —</option>
+                              {riders.map(r => (
+                                <option key={r.id} value={r.id}>{r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Members */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                              Members ({(teamDetail?.members ?? []).length}/{team.capacity})
+                            </p>
+                            {(teamDetail?.members ?? []).length < team.capacity && (
+                              <button
+                                onClick={() => { setAddMemberTeamId(team.id); setMemberSearch(''); }}
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                <UserPlus size={12} /> Add Member
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Add member search */}
+                          {addMemberTeamId === team.id && (
+                            <div className="mb-3 p-3 bg-gray-50 rounded-xl">
+                              <input
+                                type="text" placeholder="Search riders to add…" value={memberSearch}
+                                onChange={e => setMemberSearch(e.target.value)}
+                                autoFocus
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white mb-2"
+                              />
+                              <div className="max-h-40 overflow-y-auto space-y-1">
+                                {riders
+                                  .filter(r => !(teamDetail?.members ?? []).some(m => m.rider_id === r.id))
+                                  .filter(r => !memberSearch || (r.full_name || '').toLowerCase().includes(memberSearch.toLowerCase()))
+                                  .map(r => (
+                                    <button key={r.id} onClick={() => handleAddMember(team.id, r.id)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white text-left transition-colors"
+                                    >
+                                      {r.avatar_url
+                                        ? <img src={r.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+                                        : <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-black text-gray-500">{r.full_name?.[0] || '?'}</div>}
+                                      <span className="text-sm font-medium text-gray-700">{r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()}</span>
+                                    </button>
+                                  ))}
+                              </div>
+                              <button onClick={() => setAddMemberTeamId(null)} className="mt-2 text-[11px] text-gray-400 hover:text-gray-600">Cancel</button>
+                            </div>
+                          )}
+
+                          {(teamDetail?.members ?? []).length === 0 ? (
+                            <p className="text-[12px] text-gray-400 text-center py-4">No members yet</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {(teamDetail?.members ?? []).map(m => {
+                                const name = m.rider?.full_name || `${m.rider?.first_name || ''} ${m.rider?.last_name || ''}`.trim() || 'Unnamed';
+                                return (
+                                  <div key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                                    {m.rider?.avatar_url
+                                      ? <img src={m.rider.avatar_url} alt="" className="w-8 h-8 rounded-full" />
+                                      : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-black text-gray-400">{name[0]}</div>}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
+                                      <p className="text-[10px] text-gray-400">Joined {new Date(m.joined_at).toLocaleDateString()}</p>
+                                    </div>
+                                    <button onClick={() => handleRemoveMember(team.id, m.rider_id)}
+                                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Admin Dashboard ───────────────────────────────────────────────────────────
+
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'teams' | 'settings';
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'live', label: 'Live Operations' },
   { id: 'drivers', label: 'Driver Management' },
   { id: 'riders', label: 'Rider Verification' },
+  { id: 'teams', label: 'Team Management' },
   { id: 'analytics', label: 'Booking Analytics' },
   { id: 'finances', label: 'Revenue Dashboard' },
   { id: 'reviews', label: 'Ride Reviews' },
@@ -3672,6 +4125,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
     { id: 'live' as AdminTab, label: 'Live Operations', icon: Activity },
     { id: 'drivers' as AdminTab, label: 'Driver Management', icon: Users },
     { id: 'riders' as AdminTab, label: 'Rider Verification', icon: FileText },
+    { id: 'teams' as AdminTab, label: 'Team Management', icon: Users2 },
     { id: 'analytics' as AdminTab, label: 'Booking Analytics', icon: TrendingUp },
     { id: 'finances' as AdminTab, label: 'Revenue Dashboard', icon: BarChart },
     { id: 'reviews' as AdminTab, label: 'Ride Reviews', icon: Star },
@@ -4504,6 +4958,11 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
             </>
           )}
 
+          {/* Team Management */}
+          {activeTab === 'teams' && (
+            <TeamManagementPanel currentProfile={profile} />
+          )}
+
           {/* Ride Reviews */}
           {activeTab === 'reviews' && (
             <>
@@ -4755,6 +5214,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                               <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
                                 u.role === 'super_admin' ? 'bg-purple-50 text-purple-700' :
                                 u.role === 'admin' ? 'bg-blue-50 text-blue-700' :
+                                u.role === 'team_leader' ? 'bg-amber-50 text-amber-700' :
                                 u.role === 'rider' ? 'bg-emerald-50 text-emerald-700' :
                                 'bg-gray-100 text-gray-600'
                               }`}>{u.role}</span>
@@ -4773,6 +5233,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                 >
                                   <option value="user">user</option>
                                   <option value="rider">rider</option>
+                                  <option value="team_leader">team_leader</option>
                                   <option value="admin">admin</option>
                                   <option value="super_admin">super_admin</option>
                                 </select>

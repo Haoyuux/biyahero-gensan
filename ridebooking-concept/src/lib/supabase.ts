@@ -23,7 +23,7 @@ export const supabaseAdmin = createClient(
   }
 );
 
-export type UserRole = 'super_admin' | 'admin' | 'rider' | 'user';
+export type UserRole = 'super_admin' | 'admin' | 'team_leader' | 'rider' | 'user';
 export type RiderStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected';
 
 export interface Profile {
