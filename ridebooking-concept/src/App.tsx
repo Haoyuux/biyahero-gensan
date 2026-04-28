@@ -4411,6 +4411,14 @@ const NewsFeedViewer = ({ onClose, embedded = false }: { onClose: () => void; em
                 <span className="text-[11px] text-gray-400">{new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </div>
               <p className="font-black text-gray-950 text-[15px] leading-snug mb-2">{post.title}</p>
+              {post.author_name && (
+                <div className="flex items-center gap-2 mb-2">
+                  {post.author_avatar
+                    ? <img src={post.author_avatar} alt={post.author_name} className="w-5 h-5 rounded-full object-cover" />
+                    : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center"><User size={10} className="text-gray-500" /></div>}
+                  <span className="text-[11px] text-gray-500 font-semibold">{post.author_name}</span>
+                </div>
+              )}
               <p className={`text-[13px] text-gray-600 leading-relaxed ${isOpen ? '' : 'line-clamp-3'}`}>{post.content}</p>
               {post.content.length > 200 && (
                 <button onClick={() => setExpanded(isOpen ? null : post.id)} className="text-[12px] font-bold text-gray-950 mt-1.5 hover:underline">
@@ -4920,7 +4928,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                       </span>
                     </div>
                   </div>
-                  <div className="h-[420px] w-full">
+                  <div className="h-[680px] w-full">
                     <MapContainer center={[6.1164, 125.1716]} zoom={13} zoomControl={true} className="w-full h-full">
                       <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
                       {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([id, loc]) => {
