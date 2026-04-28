@@ -2414,24 +2414,20 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     if (currentProfile.rider_status !== 'approved') setIsOnline(false);
   }, [currentProfile.rider_status]);
 
-  // Write location to DB in real-time using device GPS
+  // Write online status + GPS location directly to profiles (avoids RPC overload ambiguity)
   useEffect(() => {
     const riderId = currentProfile.id;
+    const now = () => new Date().toISOString();
     if (!isOnline) {
-      supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: false });
+      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId);
       return;
     }
-    supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: true });
+    supabase.from('profiles').update({ is_online: true, last_seen_at: now() }).eq('id', riderId);
     const watchId = navigator.geolocation.watchPosition(
       pos => {
         const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setRiderCurrentLoc(loc);
-        supabase.rpc('set_rider_online', {
-          target_user_id: riderId,
-          is_online_val: true,
-          lat: loc[0],
-          lng: loc[1],
-        });
+        supabase.from('profiles').update({ is_online: true, last_seen_at: now(), last_lat: loc[0], last_lng: loc[1] }).eq('id', riderId);
       },
       (err) => {
         console.error('Geolocation error:', err.message);
@@ -2445,7 +2441,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     );
     return () => {
       navigator.geolocation.clearWatch(watchId);
-      supabase.rpc('set_rider_online', { target_user_id: riderId, is_online_val: false });
+      supabase.from('profiles').update({ is_online: false, last_lat: null, last_lng: null }).eq('id', riderId);
     };
   }, [isOnline, currentProfile.id]);
 
