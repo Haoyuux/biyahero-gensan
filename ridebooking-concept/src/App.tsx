@@ -16,7 +16,7 @@ import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadI
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
-import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, type Remittance } from '@/src/lib/remittanceService';
+import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, getTeamRemittances, type Remittance } from '@/src/lib/remittanceService';
 import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
 import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
 
@@ -2263,6 +2263,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [allRidersForTeam, setAllRidersForTeam] = useState<Profile[]>([]);
   const [teamMemberSearch, setTeamMemberSearch] = useState('');
   const [addingMember, setAddingMember] = useState(false);
+  const [teamSubTab, setTeamSubTab] = useState<'members' | 'remittances'>('members');
+  const [teamRemittances, setTeamRemittances] = useState<Remittance[]>([]);
+  const [teamRemitDate, setTeamRemitDate] = useState(new Date().toISOString().split('T')[0]);
+  const [teamRemitLoading, setTeamRemitLoading] = useState(false);
+  const [viewingRemittance, setViewingRemittance] = useState<Remittance | null>(null);
   const [riderCurrentLoc, setRiderCurrentLoc] = useState<[number, number] | null>(null);
   // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
   const pendingTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -2391,6 +2396,17 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       setMyTeamLoading(false);
     });
   }, [riderTab, initialProfile.id, initialProfile.role]);
+
+  useEffect(() => {
+    if (riderTab !== 'team' || teamSubTab !== 'remittances' || !myTeam) return;
+    const riderIds = (myTeam.members ?? []).map(m => m.rider_id);
+    if (!riderIds.length) return;
+    setTeamRemitLoading(true);
+    getTeamRemittances(riderIds, teamRemitDate).then(data => {
+      setTeamRemittances(data);
+      setTeamRemitLoading(false);
+    });
+  }, [riderTab, teamSubTab, myTeam, teamRemitDate]);
 
   // ── Active-ride persistence ────────────────────────────────────────────────
   const [rideRestored, setRideRestored] = React.useState(false);
@@ -3291,7 +3307,6 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       {/* ── My Team Tab (team leaders only) ── */}
       {riderTab === 'team' && currentProfile.role === 'team_leader' && (
         <div className="space-y-4">
-          <h3 className="font-black text-lg text-gray-950">My Team</h3>
           {myTeamLoading ? (
             <div className="flex justify-center py-10">
               <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
@@ -3306,106 +3321,241 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
             <>
               {/* Team info card */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-11 h-11 rounded-xl bg-gray-950 flex items-center justify-center">
-                    <Users2 size={20} className="text-white" />
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-11 h-11 rounded-xl bg-gray-950 flex items-center justify-center shrink-0">
+                    <Crown size={18} className="text-amber-400" />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-black text-gray-900">{myTeam.name}</p>
                     <p className="text-[12px] text-gray-400">{(myTeam.members ?? []).length} / {myTeam.capacity} members</p>
                   </div>
                 </div>
-                {/* Capacity bar */}
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gray-950 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, ((myTeam.members ?? []).length / myTeam.capacity) * 100)}%` }}
-                  />
+                  <div className="h-full bg-gray-950 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, ((myTeam.members ?? []).length / myTeam.capacity) * 100)}%` }} />
                 </div>
               </div>
 
-              {/* Members */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-                  <p className="font-bold text-sm text-gray-900">Members</p>
-                  {(myTeam.members ?? []).length < myTeam.capacity && (
-                    <button
-                      onClick={() => { setAddingMember(true); setTeamMemberSearch(''); }}
-                      className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <UserPlus size={12} /> Add
-                    </button>
-                  )}
-                </div>
+              {/* Sub-tabs */}
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {(['members', 'remittances'] as const).map(t => (
+                  <button key={t} onClick={() => setTeamSubTab(t)}
+                    className={`flex-1 py-2 text-[13px] font-bold rounded-lg transition-colors capitalize ${teamSubTab === t ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                    {t === 'members' ? 'Members' : 'Remittances'}
+                  </button>
+                ))}
+              </div>
 
-                {addingMember && (
-                  <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/60">
-                    <input
-                      type="text" placeholder="Search riders…" value={teamMemberSearch}
-                      onChange={e => setTeamMemberSearch(e.target.value)} autoFocus
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white mb-2"
-                    />
-                    <div className="max-h-36 overflow-y-auto space-y-1">
-                      {allRidersForTeam
-                        .filter(r => !(myTeam.members ?? []).some(m => m.rider_id === r.id))
-                        .filter(r => !teamMemberSearch || (r.full_name || '').toLowerCase().includes(teamMemberSearch.toLowerCase()))
-                        .map(r => (
-                          <button key={r.id}
-                            onClick={async () => {
-                              const ok = await addTeamMember(myTeam.id, r.id);
-                              if (ok) {
-                                const updated = await fetchMyTeam(currentProfile.id);
-                                setMyTeam(updated);
-                              }
-                              setAddingMember(false);
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white text-left transition-colors"
-                          >
-                            {r.avatar_url
-                              ? <img src={r.avatar_url} alt="" className="w-6 h-6 rounded-full" />
-                              : <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400">{r.full_name?.[0] || '?'}</div>}
-                            <span className="text-sm font-medium text-gray-700">{r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()}</span>
-                          </button>
-                        ))}
-                    </div>
-                    <button onClick={() => setAddingMember(false)} className="mt-1 text-[11px] text-gray-400 hover:text-gray-600">Cancel</button>
+              {/* ── Members sub-tab ── */}
+              {teamSubTab === 'members' && (
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+                    <p className="font-bold text-sm text-gray-900">Team Members</p>
+                    {(myTeam.members ?? []).length < myTeam.capacity && (
+                      <button onClick={() => { setAddingMember(true); setTeamMemberSearch(''); }}
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors">
+                        <UserPlus size={12} /> Add Member
+                      </button>
+                    )}
                   </div>
-                )}
 
-                {(myTeam.members ?? []).length === 0 ? (
-                  <div className="px-5 py-8 text-center text-[12px] text-gray-400">No members yet. Add riders to your team.</div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {(myTeam.members ?? []).map(m => {
-                      const name = m.rider?.full_name || `${m.rider?.first_name || ''} ${m.rider?.last_name || ''}`.trim() || 'Unnamed';
-                      return (
-                        <div key={m.id} className="flex items-center gap-3 px-5 py-3.5">
-                          {m.rider?.avatar_url
-                            ? <img src={m.rider.avatar_url} alt="" className="w-9 h-9 rounded-full" />
-                            : <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">{name[0]}</div>}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-                            <p className="text-[10px] text-gray-400">Joined {new Date(m.joined_at).toLocaleDateString()}</p>
-                          </div>
-                          <button
-                            onClick={async () => {
+                  {addingMember && (
+                    <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/60">
+                      <input type="text" placeholder="Search riders…" value={teamMemberSearch}
+                        onChange={e => setTeamMemberSearch(e.target.value)} autoFocus
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white mb-2" />
+                      <div className="max-h-36 overflow-y-auto space-y-1">
+                        {allRidersForTeam
+                          .filter(r => !(myTeam.members ?? []).some(m => m.rider_id === r.id))
+                          .filter(r => !teamMemberSearch || (r.full_name || '').toLowerCase().includes(teamMemberSearch.toLowerCase()))
+                          .map(r => (
+                            <button key={r.id} onClick={async () => {
+                              const ok = await addTeamMember(myTeam.id, r.id);
+                              if (ok) { const updated = await fetchMyTeam(currentProfile.id); setMyTeam(updated); }
+                              setAddingMember(false);
+                            }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white text-left transition-colors">
+                              {r.avatar_url ? <img src={r.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+                                : <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400">{r.full_name?.[0] || '?'}</div>}
+                              <span className="text-sm font-medium text-gray-700">{r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()}</span>
+                            </button>
+                          ))}
+                      </div>
+                      <button onClick={() => setAddingMember(false)} className="mt-1 text-[11px] text-gray-400 hover:text-gray-600">Cancel</button>
+                    </div>
+                  )}
+
+                  {(myTeam.members ?? []).length === 0 ? (
+                    <div className="px-5 py-8 text-center text-[12px] text-gray-400">No members yet. Add riders to your team.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-50">
+                      {(myTeam.members ?? []).map(m => {
+                        const name = m.rider?.full_name || `${m.rider?.first_name || ''} ${m.rider?.last_name || ''}`.trim() || 'Unnamed';
+                        return (
+                          <div key={m.id} className="flex items-center gap-3 px-5 py-3.5">
+                            {m.rider?.avatar_url ? <img src={m.rider.avatar_url} alt="" className="w-9 h-9 rounded-full" />
+                              : <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">{name[0]}</div>}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
+                              <p className="text-[10px] text-gray-400">Joined {new Date(m.joined_at).toLocaleDateString()}</p>
+                            </div>
+                            <button onClick={async () => {
                               await removeTeamMember(myTeam.id, m.rider_id);
                               setMyTeam(prev => prev ? { ...prev, members: (prev.members ?? []).filter(x => x.rider_id !== m.rider_id) } : prev);
-                            }}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                      );
-                    })}
+                            }} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
+                              <X size={13} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Remittances sub-tab ── */}
+              {teamSubTab === 'remittances' && (
+                <div className="space-y-3">
+                  {/* Date filter */}
+                  <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-gray-900">Filter by Date</p>
+                    <input type="date" value={teamRemitDate} onChange={e => setTeamRemitDate(e.target.value)}
+                      className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white" />
                   </div>
-                )}
-              </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-50">
+                      <p className="font-bold text-sm text-gray-900">
+                        Remittances
+                        <span className="ml-2 text-[11px] text-gray-400 font-medium">
+                          {new Date(teamRemitDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </p>
+                    </div>
+
+                    {teamRemitLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="w-5 h-5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : teamRemittances.length === 0 ? (
+                      <div className="px-5 py-10 text-center">
+                        <Receipt size={28} className="text-gray-200 mx-auto mb-2" />
+                        <p className="text-[12px] text-gray-400">No remittances for this date</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {teamRemittances.map(r => {
+                          const statusColor = r.status === 'approved' ? 'bg-emerald-100 text-emerald-700'
+                            : r.status === 'rejected' ? 'bg-red-100 text-red-600'
+                            : 'bg-amber-100 text-amber-700';
+                          return (
+                            <div key={r.id} className="px-5 py-4 flex items-center gap-3">
+                              {r.rider_avatar ? <img src={r.rider_avatar} alt="" className="w-9 h-9 rounded-full shrink-0" />
+                                : <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400 shrink-0">{(r.rider_name || '?')[0]}</div>}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{r.rider_name || 'Unknown'}</p>
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className="text-[10px] text-gray-400">{r.rides_count} ride{r.rides_count !== 1 ? 's' : ''}</span>
+                                  <span className="text-[10px] text-gray-300">·</span>
+                                  <span className="text-[10px] text-gray-400">₱{r.amount_remitted.toFixed(2)} remitted</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor}`}>{r.status}</span>
+                                <button onClick={() => setViewingRemittance(r)}
+                                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors">
+                                  View
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
       )}
+
+      {/* ── Remittance Detail Modal (team leader) ── */}
+      <AnimatePresence>
+        {viewingRemittance && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setViewingRemittance(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div>
+                  <p className="font-black text-gray-900 text-base">Remittance Details</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {new Date(viewingRemittance.remittance_date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+                <button onClick={() => setViewingRemittance(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* Rider */}
+                <div className="flex items-center gap-3">
+                  {viewingRemittance.rider_avatar ? <img src={viewingRemittance.rider_avatar} alt="" className="w-11 h-11 rounded-full" />
+                    : <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center font-black text-gray-400">{(viewingRemittance.rider_name || '?')[0]}</div>}
+                  <div>
+                    <p className="font-bold text-gray-900">{viewingRemittance.rider_name || 'Unknown Rider'}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${viewingRemittance.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : viewingRemittance.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
+                      {viewingRemittance.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Breakdown */}
+                <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
+                  {[
+                    { label: 'Rides Completed', value: `${viewingRemittance.rides_count}` },
+                    { label: 'Total Earnings', value: `₱${viewingRemittance.total_earnings.toFixed(2)}` },
+                    { label: 'Booking Fee Due', value: `₱${viewingRemittance.total_booking_fee.toFixed(2)}` },
+                    { label: 'Amount Remitted', value: `₱${viewingRemittance.amount_remitted.toFixed(2)}`, bold: true },
+                  ].map(({ label, value, bold }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-[13px] text-gray-500">{label}</span>
+                      <span className={`text-[13px] ${bold ? 'font-black text-gray-900' : 'font-semibold text-gray-700'}`}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Receipt */}
+                {viewingRemittance.receipt_url ? (
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Receipt</p>
+                    <img src={viewingRemittance.receipt_url} alt="Receipt"
+                      className="w-full rounded-xl border border-gray-100 object-contain max-h-56 cursor-pointer"
+                      onClick={() => window.open(viewingRemittance.receipt_url!, '_blank')} />
+                    <p className="text-[10px] text-gray-400 mt-1 text-center">Tap to open full size</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl py-5 text-center text-[12px] text-gray-400">No receipt uploaded</div>
+                )}
+
+                {/* Admin notes */}
+                {viewingRemittance.admin_notes && (
+                  <div className="bg-amber-50 rounded-xl p-4">
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Admin Note</p>
+                    <p className="text-[13px] text-amber-800">{viewingRemittance.admin_notes}</p>
+                    {viewingRemittance.reviewed_by && <p className="text-[10px] text-amber-500 mt-1">By {viewingRemittance.reviewed_by}</p>}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Universal Image Viewer Modal */}
       <AnimatePresence>

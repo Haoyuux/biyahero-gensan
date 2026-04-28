@@ -158,6 +158,22 @@ export async function reviewRemittance(
   return data as Remittance;
 }
 
+/** Fetch remittances for a list of rider IDs (team leader view). */
+export async function getTeamRemittances(
+  riderIds: string[],
+  dateFilter?: string,
+): Promise<Remittance[]> {
+  if (!riderIds.length) return [];
+  let query = supabase
+    .from('remittances')
+    .select('*')
+    .in('rider_id', riderIds)
+    .order('remittance_date', { ascending: false });
+  if (dateFilter) query = query.eq('remittance_date', dateFilter);
+  const { data } = await query;
+  return (data as Remittance[]) || [];
+}
+
 /** Check if rider has any pending (unreviewed) remittance. */
 export async function hasPendingRemittance(riderId: string): Promise<boolean> {
   const { count } = await supabase
