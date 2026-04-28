@@ -5504,10 +5504,9 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
     const unsub = subscribeToMessages(
       rideId,
       (msg) => {
-        // Only add messages from the other party via realtime — own messages are added optimistically
-        if (msg.sender_id !== senderId) {
-          setMessages(prev => [...prev, msg]);
-        }
+        // Skip own messages (added optimistically). Dedupe anything already in list.
+        if (msg.sender_id === senderId) return;
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
       },
       (status) => setSubStatus(status),
     );
@@ -6254,11 +6253,14 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
 
   if (isChatOpen) {
     const riderName = activeRider
-      ? `${activeRider.first_name || ''} ${activeRider.last_name || ''}`.trim()
+      ? (`${activeRider.first_name || ''} ${activeRider.last_name || ''}`.trim()
+          || activeRider.full_name
+          || 'Rider')
       : 'Rider';
+    if (!rideId) return null;
     return (
       <RealtimeChat
-        rideId={rideId ?? 'unknown'}
+        rideId={rideId}
         senderId={userId}
         senderRole="user"
         senderName={userName}
@@ -6339,8 +6341,9 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
                   <p className="text-[11px] font-semibold text-gray-500 mt-0.5 truncate">{activeRider?.vehicle_make} {activeRider?.vehicle_model} · {activeRider?.vehicle_plate}</p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => setIsChatOpen(true)}
-                    className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
+                  <button onClick={() => rideId && setIsChatOpen(true)}
+                    disabled={!rideId}
+                    className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-40">
                     <MessageSquare size={16} />
                   </button>
                   <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
