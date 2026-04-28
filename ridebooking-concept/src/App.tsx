@@ -3978,6 +3978,8 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
+  const [adminTeams, setAdminTeams] = useState<Team[]>([]);
+  const [teamAssigning, setTeamAssigning] = useState<string | null>(null);
   const [riders, setRiders] = useState<Profile[]>([]);
   const [ridersLoading, setRidersLoading] = useState(false);
   const [selectedRider, setSelectedRider] = useState<Profile | null>(null);
@@ -4057,6 +4059,9 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
         setAllUsers((data as Profile[]) || []);
         setUsersLoading(false);
       });
+    }
+    if (activeTab === 'users' && isSuperAdmin) {
+      fetchTeams().then(setAdminTeams);
     }
     if (activeTab === 'riders' || activeTab === 'drivers') {
       setRidersLoading(true);
@@ -5353,6 +5358,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Team Leader</th>
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">View As</th>
                           </tr>
@@ -5397,6 +5403,51 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                   <option value="super_admin">super_admin</option>
                                 </select>
                               )}
+                            </td>
+                            <td className="px-5 py-4">
+                              {(u.role === 'rider' || u.role === 'team_leader') ? (() => {
+                                const ledTeam = adminTeams.find(t => t.leader_id === u.id);
+                                return teamAssigning === u.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <select autoFocus
+                                      defaultValue=""
+                                      onChange={async e => {
+                                        const teamId = e.target.value;
+                                        if (!teamId) { setTeamAssigning(null); return; }
+                                        // Remove previous leader of that team if any
+                                        const targetTeam = adminTeams.find(t => t.id === teamId);
+                                        if (targetTeam?.leader_id && targetTeam.leader_id !== u.id) {
+                                          await updateTeam(teamId, { leader_id: u.id });
+                                        } else {
+                                          await updateTeam(teamId, { leader_id: u.id });
+                                        }
+                                        setAdminTeams(await fetchTeams());
+                                        setTeamAssigning(null);
+                                      }}
+                                      className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                                    >
+                                      <option value="">— pick team —</option>
+                                      {adminTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                    </select>
+                                    <button onClick={() => setTeamAssigning(null)} className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
+                                  </div>
+                                ) : ledTeam ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
+                                      <Crown size={10} /> {ledTeam.name}
+                                    </span>
+                                    <button onClick={async () => {
+                                      await updateTeam(ledTeam.id, { leader_id: null });
+                                      setAdminTeams(await fetchTeams());
+                                    }} className="text-gray-300 hover:text-red-400 transition-colors"><X size={12} /></button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setTeamAssigning(u.id)}
+                                    className="flex items-center gap-1 text-[11px] font-bold text-gray-500 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors">
+                                    <Crown size={10} /> Assign Team
+                                  </button>
+                                );
+                              })() : <span className="text-gray-300 text-[12px]">—</span>}
                             </td>
                             <td className="px-5 py-4">
                               {u.role === 'admin' ? (
