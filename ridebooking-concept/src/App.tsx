@@ -2414,14 +2414,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     if (currentProfile.rider_status !== 'approved') setIsOnline(false);
   }, [currentProfile.rider_status]);
 
-  // Write online status + GPS location directly to profiles (avoids RPC overload ambiguity)
+  // Write online status + GPS to profiles.
+  // Throttled: only writes when rider moves >50 m or 30 s have elapsed since last write.
   useEffect(() => {
     const riderId = currentProfile.id;
     const now = () => new Date().toISOString();
     const dbUpdate = (fields: Record<string, unknown>) => {
       supabase.from('profiles').update(fields).eq('id', riderId).then(({ error }) => {
         if (error) console.error('[presence] update error:', error.code, error.message, '| riderId:', riderId);
-        else console.log('[presence] updated:', fields);
       });
     };
     if (!isOnline) {
@@ -2429,11 +2429,25 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       return;
     }
     dbUpdate({ is_online: true, last_seen_at: now() });
+
+    let lastWrittenLat: number | null = null;
+    let lastWrittenLng: number | null = null;
+    let lastWriteTime = 0;
+    const THROTTLE_MS = 30_000;   // max one DB write per 30 s
+    const MOVE_THRESHOLD_M = 50;  // skip write if moved less than 50 m
+
     const watchId = navigator.geolocation.watchPosition(
       pos => {
         const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setRiderCurrentLoc(loc);
-        dbUpdate({ is_online: true, last_seen_at: now(), last_lat: loc[0], last_lng: loc[1] });
+        const elapsed = Date.now() - lastWriteTime;
+        const moved = (lastWrittenLat != null && lastWrittenLng != null)
+          ? haversineKm(lastWrittenLat, lastWrittenLng, loc[0], loc[1]) * 1000
+          : Infinity;
+        if (elapsed >= THROTTLE_MS || moved >= MOVE_THRESHOLD_M) {
+          lastWrittenLat = loc[0]; lastWrittenLng = loc[1]; lastWriteTime = Date.now();
+          dbUpdate({ is_online: true, last_seen_at: now(), last_lat: loc[0], last_lng: loc[1] });
+        }
       },
       (err) => {
         console.error('Geolocation error:', err.message);
@@ -2441,7 +2455,6 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           setRiderLocationDenied(true);
           setIsOnline(false);
         }
-        // TIMEOUT or POSITION_UNAVAILABLE — don't force offline, just keep waiting
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
     );
@@ -2449,6 +2462,30 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       navigator.geolocation.clearWatch(watchId);
       dbUpdate({ is_online: false, last_lat: null, last_lng: null });
     };
+  }, [isOnline, currentProfile.id]);
+
+  // Auto-offline when the browser tab/window is closed.
+  // Uses fetch keepalive so the request completes even after the page unloads.
+  useEffect(() => {
+    if (!isOnline) return;
+    const riderId = currentProfile.id;
+    const handleUnload = () => {
+      fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${riderId}`,
+        {
+          method: 'PATCH',
+          keepalive: true,
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY as string}`,
+          },
+          body: JSON.stringify({ is_online: false, last_lat: null, last_lng: null }),
+        },
+      );
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
   }, [isOnline, currentProfile.id]);
 
   useEffect(() => {
