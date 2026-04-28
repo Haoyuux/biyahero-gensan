@@ -3221,6 +3221,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
                   <span className="text-[13px] text-gray-600 truncate">{currentRequest?.dropoff?.label}</span>
                 </div>
+                {currentRequest?.pickup?.coords && currentRequest?.dropoff?.coords && (() => {
+                  const d = haversineKm(currentRequest.pickup.coords[0], currentRequest.pickup.coords[1], currentRequest.dropoff.coords[0], currentRequest.dropoff.coords[1]);
+                  return (
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
+                      <span className="text-[11px] font-semibold text-gray-400">{d < 1 ? (d * 1000).toFixed(0) + ' m' : d.toFixed(1) + ' km'} trip</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex gap-2.5">
                 <button
