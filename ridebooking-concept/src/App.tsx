@@ -5539,9 +5539,10 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
     const { data: sentMsg, error } = await sendMessage(rideId, senderId, senderRole, senderName, text);
 
     if (error) {
-      setSendingError('Failed to send. Check your connection.');
+      const detail = error?.message || error?.code || JSON.stringify(error);
+      setSendingError(`Failed to send: ${detail}`);
       setMessages(prev => prev.filter(m => m.id !== tempId));
-      setTimeout(() => setSendingError(null), 4000);
+      setTimeout(() => setSendingError(null), 8000);
       return;
     }
 

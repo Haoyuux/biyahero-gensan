@@ -47,17 +47,28 @@ export async function sendMessage(
   senderName: string,
   content: string,
 ): Promise<{ data: ChatMessage | null; error: any }> {
-  const { data, error } = await supabase
+  // Use insert-only (no .select().single()) to avoid PGRST116 when the
+  // row is inserted successfully but the post-insert SELECT returns 0 rows
+  // due to RLS SELECT policy edge cases. We reconstruct the message locally.
+  const { error } = await supabase
     .from('messages')
-    .insert({ ride_id: rideId, sender_id: senderId, sender_role: senderRole, sender_name: senderName, content })
-    .select()
-    .single();
-  
+    .insert({ ride_id: rideId, sender_id: senderId, sender_role: senderRole, sender_name: senderName, content });
+
   if (error) {
-    console.error('Chat error:', error);
+    console.error('Chat send error:', error.code, error.message, error.details);
     return { data: null, error };
   }
-  return { data: data as ChatMessage, error: null };
+
+  const msg: ChatMessage = {
+    id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    ride_id: rideId,
+    sender_id: senderId,
+    sender_role: senderRole,
+    sender_name: senderName,
+    content,
+    created_at: new Date().toISOString(),
+  };
+  return { data: msg, error: null };
 }
 
 /** Load full message history for a ride (oldest first). */
