@@ -1042,6 +1042,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
+  const pickupGpsNeedsResolve = useRef(true);
   // Ref keeps latest ride data accessible in stale closures inside channel useEffect
   const completionDataRef = React.useRef({ pickup: '', dropoff: '', fareBreakdown: null as FareBreakdown | null, selectedRide: 'eco', activeRider: null as any });
 
@@ -1176,6 +1177,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     }
     localStorage.removeItem(USER_RIDE_KEY);
     setStep('home');
+    pickupGpsNeedsResolve.current = true;
     setPickup('Current Location');
     setPickupCoords(null);
     setDropoff('');
@@ -1229,6 +1231,15 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       initialFocusDone.current = true;
     }
   }, []);
+
+  // Resolve GPS coords to a real place name on first fix
+  useEffect(() => {
+    if (!deviceLocation || !pickupGpsNeedsResolve.current) return;
+    pickupGpsNeedsResolve.current = false;
+    reverseGeocode(deviceLocation[0], deviceLocation[1]).then(name => {
+      setPickup(prev => prev === 'Current Location' ? name : prev);
+    });
+  }, [deviceLocation]);
 
   const startLoc = pickupCoords || deviceLocation;
   const endLoc = destinationCoords;
@@ -1569,7 +1580,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   setStep(s);
                 }} pickup={pickup} setPickup={setPickup}
                   setPickupCoords={setPickupCoords} dropoff={dropoff} setDropoff={setDropoff}
-                  setDestinationCoords={setDestinationCoords}
+                  setDestinationCoords={setDestinationCoords} deviceLocation={deviceLocation}
                   favorites={favorites} onSaveFavorite={saveFavorite} onRemoveFavorite={removeFavorite}
                   onPickupFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })}
                   onDropoffFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })} />
@@ -7275,7 +7286,7 @@ const ChatHistoryScreen = ({ userId, userName, role = 'user', onBack }: { userId
 
 // ─── Panel Components ─────────────────────────────────────────────────────────
 
-const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, favorites = [], onSaveFavorite, onRemoveFavorite, onPickupFocus, onDropoffFocus }: any) => {
+const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, deviceLocation, favorites = [], onSaveFavorite, onRemoveFavorite, onPickupFocus, onDropoffFocus }: any) => {
   const [activeField, setActiveField] = useState<'pickup' | 'dropoff'>('dropoff');
   const [query, setQuery] = useState(dropoff);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -7444,7 +7455,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                 <>
                   {activeField === 'pickup' && (
                     <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                      onClick={() => { setPickup('Current Location'); setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); /* mapFocus will be current deviceLocation — no explicit coords needed */ }}>
+                      onClick={async () => { setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); if (deviceLocation) { const name = await reverseGeocode(deviceLocation[0], deviceLocation[1]); setPickup(name); } else { setPickup('Current Location'); } }}>
                       <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Navigation size={16} className="text-gray-600" /></div>
                       <div>
                         <p className="font-semibold text-sm text-gray-900">Current Location</p>
