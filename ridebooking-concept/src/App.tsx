@@ -18,7 +18,7 @@ import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, getTeamRemittances, type Remittance } from '@/src/lib/remittanceService';
 import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
-import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
+import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, fetchRiderMembership, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY  = 'fetch_user_ride';
@@ -2264,6 +2264,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [teamMemberSearch, setTeamMemberSearch] = useState('');
   const [addingMember, setAddingMember] = useState(false);
   const [isTeamLeader, setIsTeamLeader] = useState(false);
+  const [riderTeam, setRiderTeam] = useState<Team | null>(null);
   const [teamSubTab, setTeamSubTab] = useState<'members' | 'remittances'>('members');
   const [teamRemittances, setTeamRemittances] = useState<Remittance[]>([]);
   const [teamRemitDate, setTeamRemitDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2386,10 +2387,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
   // ── My Team (team leader check — any rider can lead a team) ──────────────
   useEffect(() => {
-    // Check on mount if this rider leads a team
-    fetchMyTeam(initialProfile.id).then(team => {
+    Promise.all([
+      fetchMyTeam(initialProfile.id),
+      fetchRiderMembership(initialProfile.id),
+    ]).then(([team, membership]) => {
       setIsTeamLeader(!!team);
       if (team) setMyTeam(team);
+      setRiderTeam(membership);
     });
   }, [initialProfile.id]);
 
@@ -3044,6 +3048,29 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           </motion.div>
         ) : null}
 
+        {/* Team membership card */}
+        {riderTeam && (
+          <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gray-950 flex items-center justify-center shrink-0">
+              <Users2 size={18} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900 text-sm">{riderTeam.name}</p>
+              {(riderTeam.schedule_days ?? []).length > 0 ? (
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) =>
+                    (riderTeam.schedule_days ?? []).includes(i)
+                      ? <span key={i} className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-black rounded">{d}</span>
+                      : <span key={i} className="px-1.5 py-0.5 bg-gray-100 text-gray-300 text-[9px] font-black rounded">{d}</span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[11px] text-gray-400 mt-0.5">No schedule set</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Incoming Request — only shown when NOT already on a trip */}
         <AnimatePresence>
           {hasRequest && !requestAccepted && (
@@ -3339,10 +3366,24 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                     <p className="text-[12px] text-gray-400">{(myTeam.members ?? []).length} / {myTeam.capacity} members</p>
                   </div>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
                   <div className="h-full bg-gray-950 rounded-full transition-all"
                     style={{ width: `${Math.min(100, ((myTeam.members ?? []).length / myTeam.capacity) * 100)}%` }} />
                 </div>
+                {(myTeam.schedule_days ?? []).length > 0 ? (
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Schedule</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) =>
+                        (myTeam.schedule_days ?? []).includes(i)
+                          ? <span key={i} className="px-2 py-0.5 bg-gray-900 text-white text-[10px] font-black rounded-md">{d}</span>
+                          : <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-300 text-[10px] font-black rounded-md">{d}</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-gray-300">No schedule set</p>
+                )}
               </div>
 
               {/* Sub-tabs */}

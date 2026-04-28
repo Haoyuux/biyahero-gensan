@@ -65,6 +65,22 @@ export async function deleteTeam(id: string): Promise<boolean> {
   return !error;
 }
 
+/** Fetch the team a rider belongs to as a member (not as leader). */
+export async function fetchRiderMembership(riderId: string): Promise<Team | null> {
+  const { data } = await supabase
+    .from('team_members')
+    .select('team_id')
+    .eq('rider_id', riderId)
+    .maybeSingle();
+  if (!data?.team_id) return null;
+  const { data: team } = await supabase
+    .from('teams')
+    .select(TEAM_SELECT)
+    .eq('id', data.team_id)
+    .maybeSingle();
+  return (team as unknown as Team) ?? null;
+}
+
 export async function addTeamMember(teamId: string, riderId: string): Promise<boolean> {
   const { error } = await supabase.from('team_members').insert({ team_id: teamId, rider_id: riderId });
   if (error) console.error('addTeamMember:', error);
