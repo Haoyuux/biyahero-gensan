@@ -2359,6 +2359,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
+  const [riderNotification, setRiderNotification] = useState<string | null>(null);
+  const showRiderNotification = (msg: string) => { setRiderNotification(msg); setTimeout(() => setRiderNotification(null), 3500); };
   const [isOnline, setIsOnline] = useState(false);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
@@ -2724,7 +2726,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           setWaitingForUserConfirm(false);
           setShowActiveRide(false);
           setAppNotifications(prev => [{ id: genId(), title: 'Ride cancelled', body: 'The passenger cancelled their booking.', time: Date.now(), read: false }, ...prev]);
-          alert('The passenger cancelled the ride.');
+          showRiderNotification('Passenger cancelled the ride.');
           return null;
         }
         return current;
@@ -2841,6 +2843,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900">
       <ConnectionBanner state={riderConnectionState} />
+      <NotificationToast message={riderNotification} />
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
@@ -3420,11 +3423,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                               );
                               setRemitFile(null);
                             } else {
-                              alert("Failed to upload receipt.");
+                              showRiderNotification('Failed to upload receipt. Try again.');
                             }
                           } catch (e) {
                             console.error(e);
-                            alert("An error occurred during remittance.");
+                            showRiderNotification('An error occurred during remittance.');
                           } finally {
                             setRemitting(false);
                           }
