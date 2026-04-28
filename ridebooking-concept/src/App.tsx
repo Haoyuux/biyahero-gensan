@@ -7,7 +7,7 @@ import {
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
   FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download,
-  Users2, UserPlus, Trash2, Crown
+  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -19,6 +19,7 @@ import { requestNotificationPermission, pushNotification } from '@/src/lib/notif
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, getTeamRemittances, type Remittance } from '@/src/lib/remittanceService';
 import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
 import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, fetchRiderMembership, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
+import { fetchNewsPosts, createNewsPost, updateNewsPost, deleteNewsPost, uploadNewsImage, NEWS_CATEGORIES, type NewsPost } from '@/src/lib/newsService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY  = 'fetch_user_ride';
@@ -1036,6 +1037,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   });
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
+  const [showNews, setShowNews] = useState(false);
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
@@ -1336,6 +1338,10 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     );
   }
 
+  if (showNews) {
+    return <NewsFeedViewer onClose={() => setShowNews(false)} />;
+  }
+
   if (showRideHistory) {
     return (
       <RideHistoryScreen
@@ -1384,6 +1390,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                 {appNotifications.filter(n => !n.read).length > 9 ? '9+' : appNotifications.filter(n => !n.read).length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setShowNews(true)}
+            className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors pointer-events-auto"
+          >
+            <Newspaper size={20} />
           </button>
         </div>
         <button
@@ -2257,7 +2269,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
-  const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit' | 'team'>('home');
+  const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit' | 'team' | 'news'>('home');
   const [myTeam, setMyTeam] = useState<Team | null>(null);
   const [myTeamLoading, setMyTeamLoading] = useState(false);
   const [allRidersForTeam, setAllRidersForTeam] = useState<Profile[]>([]);
@@ -2748,13 +2760,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
       {/* Tab Bar */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 flex gap-1">
-        {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : [])] as const) as Array<'home'|'history'|'remit'|'team'>).map(tab => (
+        {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
             className={`py-3 px-4 text-[13px] font-bold border-b-2 transition-colors capitalize ${riderTab === tab ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
-            {tab === 'home' ? 'Dashboard' : tab === 'history' ? 'Trip History' : tab === 'remit' ? 'Remittance' : 'My Team'}
+            {tab === 'home' ? 'Dashboard' : tab === 'history' ? 'Trip History' : tab === 'remit' ? 'Remittance' : tab === 'team' ? 'My Team' : 'News'}
           </button>
         ))}
       </div>
@@ -3607,6 +3619,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         )}
       </AnimatePresence>
 
+      {/* ── News Tab ── */}
+      {riderTab === 'news' && (
+        <NewsFeedViewer onClose={() => setRiderTab('home')} embedded />
+      )}
+
       {/* Universal Image Viewer Modal */}
       <AnimatePresence>
         {viewerImage && (
@@ -4039,15 +4056,290 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   );
 };
 
+// ─── News Feed Panel (Admin) ──────────────────────────────────────────────────
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Announcement: 'bg-blue-100 text-blue-700',
+  Update:       'bg-emerald-100 text-emerald-700',
+  Promo:        'bg-amber-100 text-amber-700',
+  Event:        'bg-purple-100 text-purple-700',
+  Important:    'bg-red-100 text-red-700',
+};
+
+const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
+  const [posts, setPosts] = useState<NewsPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingPost, setEditingPost] = useState<NewsPost | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+
+  const [form, setForm] = useState({
+    title: '', content: '', category: 'Announcement', image_url: null as string | null, published: true,
+  });
+
+  const resetForm = () => setForm({ title: '', content: '', category: 'Announcement', image_url: null, published: true });
+
+  const openCreate = () => { resetForm(); setEditingPost(null); setShowForm(true); };
+  const openEdit = (p: NewsPost) => {
+    setForm({ title: p.title, content: p.content, category: p.category, image_url: p.image_url, published: p.published });
+    setEditingPost(p);
+    setShowForm(true);
+  };
+
+  useEffect(() => {
+    fetchNewsPosts(true).then(data => { setPosts(data); setLoading(false); });
+  }, []);
+
+  const handleImageUpload = async (file: File) => {
+    setImageUploading(true);
+    const url = await uploadNewsImage(file);
+    if (url) setForm(f => ({ ...f, image_url: url }));
+    setImageUploading(false);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim() || !form.content.trim()) return;
+    setSaving(true);
+    const authorName = currentProfile.full_name || `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || 'Admin';
+    if (editingPost) {
+      const ok = await updateNewsPost(editingPost.id, { title: form.title, content: form.content, category: form.category, image_url: form.image_url, published: form.published });
+      if (ok) setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...form } : p));
+    } else {
+      const post = await createNewsPost(form.title, form.content, form.category, form.image_url, currentProfile.id, authorName, currentProfile.avatar_url, form.published);
+      if (post) setPosts(prev => [post, ...prev]);
+    }
+    setShowForm(false);
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this post?')) return;
+    await deleteNewsPost(id);
+    setPosts(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleTogglePublish = async (post: NewsPost) => {
+    const ok = await updateNewsPost(post.id, { published: !post.published });
+    if (ok) setPosts(prev => prev.map(p => p.id === post.id ? { ...p, published: !p.published } : p));
+  };
+
+  return (
+    <div>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-gray-950">News Feed</h2>
+          <p className="text-gray-400 text-sm mt-1">Post announcements, updates, and promotions</p>
+        </div>
+        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors">
+          <Plus size={15} /> New Post
+        </button>
+      </div>
+
+      {/* Create / Edit form */}
+      {showForm && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <p className="font-bold text-gray-900 text-sm">{editingPost ? 'Edit Post' : 'New Post'}</p>
+            <button onClick={() => setShowForm(false)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400"><X size={14} /></button>
+          </div>
+
+          {/* Header image */}
+          <div className="relative">
+            {form.image_url ? (
+              <div className="relative">
+                <img src={form.image_url} alt="" className="w-full h-48 object-cover" />
+                <button onClick={() => setForm(f => ({ ...f, image_url: null }))}
+                  className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center h-36 bg-gray-50 border-b border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors gap-2">
+                {imageUploading
+                  ? <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  : <>
+                      <ImagePlus size={22} className="text-gray-300" />
+                      <span className="text-[12px] font-semibold text-gray-400">Upload header image</span>
+                    </>}
+                <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+
+          <div className="p-5 space-y-4">
+            <div className="flex gap-3">
+              <input
+                type="text" placeholder="Post title *" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <div className="flex items-center gap-1.5 px-3 border border-gray-200 rounded-xl">
+                <Tag size={13} className="text-gray-400 shrink-0" />
+                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                  className="text-sm bg-transparent focus:outline-none text-gray-700 font-medium pr-1 py-2">
+                  {NEWS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <textarea
+              placeholder="Write your post content… *" value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+              rows={5}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+            />
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div onClick={() => setForm(f => ({ ...f, published: !f.published }))}
+                  className={`w-9 h-5 rounded-full relative transition-colors ${form.published ? 'bg-gray-950' : 'bg-gray-200'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.published ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </div>
+                <span className="text-sm font-medium text-gray-600">{form.published ? 'Published' : 'Draft'}</span>
+              </label>
+              <div className="flex gap-2">
+                <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>
+                <button onClick={handleSave} disabled={saving || !form.title.trim() || !form.content.trim()}
+                  className="px-4 py-2 bg-gray-950 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40 transition-colors">
+                  {saving ? 'Saving…' : editingPost ? 'Update' : 'Publish'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+      ) : posts.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-16 text-center">
+          <Newspaper size={32} className="text-gray-300 mb-3" />
+          <p className="text-gray-500 font-semibold text-sm">No posts yet</p>
+          <p className="text-gray-400 text-[12px] mt-1">Click New Post to create your first announcement</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {posts.map(post => (
+            <div key={post.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              {post.image_url && <img src={post.image_url} alt="" className="w-full h-40 object-cover" />}
+              <div className="px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${CATEGORY_COLORS[post.category] ?? 'bg-gray-100 text-gray-600'}`}>{post.category}</span>
+                      {!post.published && <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-wide">Draft</span>}
+                      <span className="text-[11px] text-gray-400">{new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                    <p className="font-bold text-gray-900 text-sm leading-snug">{post.title}</p>
+                    <p className="text-[12px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">{post.content}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => handleTogglePublish(post)}
+                      title={post.published ? 'Unpublish' : 'Publish'}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${post.published ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-300 hover:bg-gray-100'}`}>
+                      <Eye size={14} />
+                    </button>
+                    <button onClick={() => openEdit(post)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
+                      <Edit3 size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(post.id)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  {post.author_avatar
+                    ? <img src={post.author_avatar} alt="" className="w-5 h-5 rounded-full" />
+                    : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-black text-gray-500">{post.author_name?.[0]}</div>}
+                  <span className="text-[11px] text-gray-400">{post.author_name}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── News Feed Viewer (shared user + rider) ───────────────────────────────────
+
+const NewsFeedViewer = ({ onClose, embedded = false }: { onClose: () => void; embedded?: boolean }) => {
+  const [posts, setPosts] = useState<NewsPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchNewsPosts(false).then(data => { setPosts(data); setLoading(false); });
+  }, []);
+
+  const postList = loading ? (
+    <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+  ) : posts.length === 0 ? (
+    <div className="flex flex-col items-center justify-center py-20 text-center px-8">
+      <Newspaper size={40} className="text-gray-200 mb-4" />
+      <p className="font-semibold text-gray-500 text-sm">No posts yet</p>
+      <p className="text-[12px] text-gray-400 mt-1">Check back later for news and announcements</p>
+    </div>
+  ) : (
+    <div className={`space-y-4 ${embedded ? '' : 'p-4'}`}>
+      {posts.map(post => {
+        const isOpen = expanded === post.id;
+        return (
+          <div key={post.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+            {post.image_url && <img src={post.image_url} alt={post.title} className="w-full h-44 object-cover" />}
+            <div className="px-4 py-4">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${CATEGORY_COLORS[post.category] ?? 'bg-gray-100 text-gray-600'}`}>{post.category}</span>
+                <span className="text-[11px] text-gray-400">{new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              </div>
+              <p className="font-black text-gray-950 text-[15px] leading-snug mb-2">{post.title}</p>
+              <p className={`text-[13px] text-gray-600 leading-relaxed ${isOpen ? '' : 'line-clamp-3'}`}>{post.content}</p>
+              {post.content.length > 200 && (
+                <button onClick={() => setExpanded(isOpen ? null : post.id)} className="text-[12px] font-bold text-gray-950 mt-1.5 hover:underline">
+                  {isOpen ? 'Show less' : 'Read more'}
+                </button>
+              )}
+              <div className="mt-3 flex items-center gap-2 pt-3 border-t border-gray-50">
+                {post.author_avatar
+                  ? <img src={post.author_avatar} alt="" className="w-5 h-5 rounded-full" />
+                  : <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-black text-gray-500">{post.author_name?.[0]}</div>}
+                <span className="text-[11px] text-gray-400">{post.author_name}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (embedded) return <>{postList}</>;
+
+  return (
+    <div className="w-full h-[100dvh] flex flex-col bg-gray-50 font-sans">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-100 px-5 py-4 flex items-center gap-3 shrink-0">
+        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
+          <ChevronLeft size={20} />
+        </button>
+        <div className="flex-1">
+          <p className="font-black text-gray-950 text-base">News & Updates</p>
+          <p className="text-[11px] text-gray-400">{posts.length} post{posts.length !== 1 ? 's' : ''}</p>
+        </div>
+        <Newspaper size={20} className="text-gray-300" />
+      </div>
+      <div className="flex-1 overflow-y-auto p-4">{postList}</div>
+    </div>
+  );
+};
+
 // ─── Admin Dashboard ───────────────────────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'teams' | 'settings';
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'teams' | 'news' | 'settings';
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'live', label: 'Live Operations' },
   { id: 'drivers', label: 'Driver Management' },
   { id: 'riders', label: 'Rider Verification' },
   { id: 'teams', label: 'Team Management' },
+  { id: 'news', label: 'News Feed' },
   { id: 'analytics', label: 'Booking Analytics' },
   { id: 'finances', label: 'Revenue Dashboard' },
   { id: 'reviews', label: 'Ride Reviews' },
@@ -4375,6 +4667,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
     { id: 'drivers' as AdminTab, label: 'Driver Management', icon: Users },
     { id: 'riders' as AdminTab, label: 'Rider Verification', icon: FileText },
     { id: 'teams' as AdminTab, label: 'Team Management', icon: Users2 },
+    { id: 'news' as AdminTab, label: 'News Feed', icon: Newspaper },
     { id: 'analytics' as AdminTab, label: 'Booking Analytics', icon: TrendingUp },
     { id: 'finances' as AdminTab, label: 'Revenue Dashboard', icon: BarChart },
     { id: 'reviews' as AdminTab, label: 'Ride Reviews', icon: Star },
@@ -5210,6 +5503,11 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
           {/* Team Management */}
           {activeTab === 'teams' && (
             <TeamManagementPanel currentProfile={profile} />
+          )}
+
+          {/* News Feed */}
+          {activeTab === 'news' && (
+            <NewsFeedPanel currentProfile={profile} />
           )}
 
           {/* Ride Reviews */}
