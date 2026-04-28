@@ -2387,6 +2387,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const pendingTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // Tracks rideIds that have been accepted/completed so re-broadcasts don't re-enqueue them
   const usedRideIdsRef = React.useRef<Set<string>>(new Set());
+  // Tracks the rideId this rider personally accepted — avoids stale closure issues in channel handlers
+  const myAcceptedRideIdRef = React.useRef<string | null>(null);
 
   // Check location permission on mount
   useEffect(() => {
@@ -2719,8 +2721,10 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       const t = timers.get(rideId);
       if (t) { clearTimeout(t); timers.delete(rideId); }
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
+      const isMyRide = myAcceptedRideIdRef.current === rideId;
       setCurrentRequest((current: any) => {
-        if (current?.rideId === rideId) {
+        if (current?.rideId === rideId || isMyRide) {
+          myAcceptedRideIdRef.current = null;
           setHasRequest(false);
           setRequestAccepted(false);
           setWaitingForUserConfirm(false);
@@ -2734,8 +2738,10 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     });
 
     channel.on('broadcast', { event: 'USER_CONFIRMED_RIDER' }, (payload) => {
+      const { rideId } = payload.payload;
+      const isMyRide = myAcceptedRideIdRef.current === rideId;
       setCurrentRequest((current: any) => {
-        if (current?.rideId === payload.payload.rideId) {
+        if (current?.rideId === rideId || isMyRide) {
           setWaitingForUserConfirm(false);
           setShowActiveRide(true);
         }
@@ -2750,13 +2756,16 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       const t = timers.get(rideId);
       if (t) { clearTimeout(t); timers.delete(rideId); }
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
-      setCurrentRequest((current: any) => {
-        if (current?.rideId === rideId && !requestAccepted) {
-          setHasRequest(false);
-          return null;
-        }
-        return current;
-      });
+      // Use ref (not state) to avoid stale closure — myAcceptedRideIdRef is set synchronously on accept
+      if (myAcceptedRideIdRef.current !== rideId) {
+        setCurrentRequest((current: any) => {
+          if (current?.rideId === rideId) {
+            setHasRequest(false);
+            return null;
+          }
+          return current;
+        });
+      }
     });
 
     channel.subscribe(async (status) => {
@@ -2828,6 +2837,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_COMPLETED', payload: { rideId: doneId } });
           localStorage.removeItem(RIDER_RIDE_KEY);
           setIncomingRequests(prev => prev.filter(r => r.rideId !== doneId));
+          myAcceptedRideIdRef.current = null;
           setRequestAccepted(false);
           setCurrentRequest(null);
           setHasRequest(false);
@@ -3287,13 +3297,15 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                 </button>
                 <button
                   onClick={() => {
-                    usedRideIdsRef.current.add(currentRequest.rideId);
+                    const rid = currentRequest.rideId;
+                    usedRideIdsRef.current.add(rid);
+                    myAcceptedRideIdRef.current = rid;
                     setRequestAccepted(true);
                     setWaitingForUserConfirm(true);
                     setHasRequest(false);
-                    supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_ACCEPTED', payload: { rideId: currentRequest.rideId, rider: currentProfile } });
+                    supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_ACCEPTED', payload: { rideId: rid, rider: currentProfile } });
                     // Mark as accepted in DB so other riders don't pick it up
-                    supabase.from('rides').update({ status: 'accepted', rider_id: currentProfile.id }).eq('id', currentRequest.rideId).eq('status', 'pending');
+                    supabase.from('rides').update({ status: 'accepted', rider_id: currentProfile.id }).eq('id', rid).eq('status', 'pending');
                   }}
                   className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
                 >
