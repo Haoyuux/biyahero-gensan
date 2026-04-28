@@ -12,7 +12,7 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, blockUser, unblockUser, getBlockableProfiles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
+import { supabase, supabaseAdmin, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, blockUser, unblockUser, getBlockableProfiles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
@@ -2263,6 +2263,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [allRidersForTeam, setAllRidersForTeam] = useState<Profile[]>([]);
   const [teamMemberSearch, setTeamMemberSearch] = useState('');
   const [addingMember, setAddingMember] = useState(false);
+  const [isTeamLeader, setIsTeamLeader] = useState(false);
   const [teamSubTab, setTeamSubTab] = useState<'members' | 'remittances'>('members');
   const [teamRemittances, setTeamRemittances] = useState<Remittance[]>([]);
   const [teamRemitDate, setTeamRemitDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2383,9 +2384,17 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     })();
   }, [riderTab, initialProfile.id, remitDate, remitting]);
 
-  // ── My Team (team leader) ─────────────────────────────────────────────────
+  // ── My Team (team leader check — any rider can lead a team) ──────────────
   useEffect(() => {
-    if (riderTab !== 'team' || initialProfile.role !== 'team_leader') return;
+    // Check on mount if this rider leads a team
+    fetchMyTeam(initialProfile.id).then(team => {
+      setIsTeamLeader(!!team);
+      if (team) setMyTeam(team);
+    });
+  }, [initialProfile.id]);
+
+  useEffect(() => {
+    if (riderTab !== 'team' || !isTeamLeader) return;
     setMyTeamLoading(true);
     Promise.all([
       fetchMyTeam(initialProfile.id),
@@ -2395,7 +2404,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       setAllRidersForTeam(allRiders.filter(r => r.rider_status === 'approved'));
       setMyTeamLoading(false);
     });
-  }, [riderTab, initialProfile.id, initialProfile.role]);
+  }, [riderTab, initialProfile.id, isTeamLeader]);
 
   useEffect(() => {
     if (riderTab !== 'team' || teamSubTab !== 'remittances' || !myTeam) return;
@@ -2735,7 +2744,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
       {/* Tab Bar */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 flex gap-1">
-        {((['home', 'history', 'remit', ...(currentProfile.role === 'team_leader' ? ['team'] : [])] as const) as Array<'home'|'history'|'remit'|'team'>).map(tab => (
+        {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : [])] as const) as Array<'home'|'history'|'remit'|'team'>).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
@@ -3305,7 +3314,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       </div>
 
       {/* ── My Team Tab (team leaders only) ── */}
-      {riderTab === 'team' && currentProfile.role === 'team_leader' && (
+      {riderTab === 'team' && isTeamLeader && (
         <div className="space-y-4">
           {myTeamLoading ? (
             <div className="flex justify-center py-10">
