@@ -4073,6 +4073,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingPost, setEditingPost] = useState<NewsPost | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
 
   const [form, setForm] = useState({
@@ -4081,10 +4082,11 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
 
   const resetForm = () => setForm({ title: '', content: '', category: 'Announcement', image_url: null, published: true });
 
-  const openCreate = () => { resetForm(); setEditingPost(null); setShowForm(true); };
+  const openCreate = () => { resetForm(); setEditingPost(null); setSaveError(''); setShowForm(true); };
   const openEdit = (p: NewsPost) => {
     setForm({ title: p.title, content: p.content, category: p.category, image_url: p.image_url, published: p.published });
     setEditingPost(p);
+    setSaveError('');
     setShowForm(true);
   };
 
@@ -4106,18 +4108,22 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
     setImageUploading(false);
   };
 
+  const reload = () => fetchNewsPosts(true).then(setPosts);
+
   const handleSave = async () => {
     if (!form.title.trim() || !form.content.trim()) return;
     setSaving(true);
+    setSaveError('');
     const authorName = currentProfile.full_name || `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || 'Admin';
     if (editingPost) {
       const ok = await updateNewsPost(editingPost.id, { title: form.title, content: form.content, category: form.category, image_url: form.image_url, published: form.published });
-      if (ok) setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, title: form.title, content: form.content, category: form.category, image_url: form.image_url, published: form.published } : p));
+      if (ok) { await reload(); setShowForm(false); }
+      else setSaveError('Failed to update post. Please try again.');
     } else {
       const post = await createNewsPost(form.title, form.content, form.category, form.image_url, currentProfile.id, authorName, currentProfile.avatar_url, form.published);
-      if (post) setPosts(prev => [post, ...prev]);
+      if (post) { await reload(); setShowForm(false); }
+      else setSaveError('Failed to create post. Check console for details.');
     }
-    setShowForm(false);
     setSaving(false);
   };
 
@@ -4211,6 +4217,9 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
               placeholder="Write your post content… *" value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
               rows={5} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
             />
+            {saveError && (
+              <p className="text-[12px] font-semibold text-red-500 bg-red-50 px-3 py-2 rounded-xl">{saveError}</p>
+            )}
             <div className="flex items-center justify-between flex-wrap gap-3">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <div onClick={() => setForm(f => ({ ...f, published: !f.published }))}

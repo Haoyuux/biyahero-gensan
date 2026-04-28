@@ -43,16 +43,19 @@ export interface NewsPost {
   updated_at: string;
 }
 
-/** Fetch posts for public feed — only published, non-archived. */
+/** Fetch posts for public feed (published + non-archived). Pass includeAll=true for admin view. */
 export async function fetchNewsPosts(includeAll = false): Promise<NewsPost[]> {
-  let query = supabase
+  // Admin uses service role to bypass RLS and see drafts/archived too
+  const client = includeAll ? supabaseAdmin : supabase;
+  let query = client
     .from('news_posts')
     .select('*')
     .order('created_at', { ascending: false });
   if (!includeAll) {
     query = query.eq('published', true).eq('is_archived', false);
   }
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) console.error('fetchNewsPosts:', error);
   return (data as NewsPost[]) ?? [];
 }
 
@@ -69,20 +72,20 @@ export async function createNewsPost(
   const { data, error } = await supabaseAdmin
     .from('news_posts')
     .insert({ title, content, category, image_url: imageUrl, author_id: authorId, author_name: authorName, author_avatar: authorAvatar, published, is_archived: false })
-    .select()
-    .single();
-  if (error) { console.error('createNewsPost:', error); return null; }
-  return data as NewsPost;
+    .select();
+  if (error || !data?.length) { console.error('createNewsPost:', error); return null; }
+  return data[0] as NewsPost;
 }
 
 export async function updateNewsPost(
   id: string,
   updates: Partial<Pick<NewsPost, 'title' | 'content' | 'category' | 'image_url' | 'published' | 'is_archived'>>,
 ): Promise<boolean> {
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('news_posts')
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .select();
   if (error) { console.error('updateNewsPost:', error); return false; }
   return true;
 }
