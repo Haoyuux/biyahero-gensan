@@ -2259,6 +2259,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [riderCurrentLoc, setRiderCurrentLoc] = useState<[number, number] | null>(null);
   // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
   const pendingTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Tracks rideIds that have been accepted/completed so re-broadcasts don't re-enqueue them
+  const usedRideIdsRef = React.useRef<Set<string>>(new Set());
 
   // Check location permission on mount
   useEffect(() => {
@@ -2504,6 +2506,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     // Closest rider (index 0) gets delay = 0; every subsequent rank adds 15 s.
     const scheduleRequest = (req: any) => {
       if (timers.has(req.rideId)) return; // already scheduled
+      if (usedRideIdsRef.current.has(req.rideId)) return; // already accepted/completed
       const priority: string[] = req.priorityRiderIds ?? [];
       const pos = priority.indexOf(riderId);
       const delay = pos >= 0 ? pos * PRIORITY_DELAY_MS : priority.length * PRIORITY_DELAY_MS;
@@ -2550,6 +2553,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     // Remove rides accepted by ANOTHER rider from this rider's queue
     channel.on('broadcast', { event: 'RIDE_ACCEPTED' }, (payload) => {
       const { rideId } = payload.payload;
+      usedRideIdsRef.current.add(rideId); // prevent re-scheduling from re-broadcasts
       const t = timers.get(rideId);
       if (t) { clearTimeout(t); timers.delete(rideId); }
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
@@ -2626,8 +2630,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         restored={rideRestored}
         onBack={() => setShowActiveRide(false)}
         onComplete={() => {
-          supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_COMPLETED', payload: { rideId: currentRequest.rideId } });
+          const doneId = currentRequest.rideId;
+          usedRideIdsRef.current.add(doneId);
+          supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_COMPLETED', payload: { rideId: doneId } });
           localStorage.removeItem(RIDER_RIDE_KEY);
+          setIncomingRequests(prev => prev.filter(r => r.rideId !== doneId));
           setRequestAccepted(false);
           setCurrentRequest(null);
           setHasRequest(false);
@@ -3051,6 +3058,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                 </button>
                 <button
                   onClick={() => {
+                    usedRideIdsRef.current.add(currentRequest.rideId);
                     setRequestAccepted(true);
                     setHasRequest(false);
                     setShowActiveRide(true);
