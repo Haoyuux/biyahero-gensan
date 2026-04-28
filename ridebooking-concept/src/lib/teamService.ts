@@ -21,7 +21,7 @@ export interface TeamMember {
   rider?: Pick<Profile, 'id' | 'full_name' | 'first_name' | 'last_name' | 'avatar_url'>;
 }
 
-const TEAM_SELECT = 'id, name, capacity, leader_id, created_by, created_at, leader:profiles!teams_leader_id_fkey(id, full_name, first_name, last_name, avatar_url)';
+const TEAM_SELECT = 'id, name, capacity, schedule_days, leader_id, created_by, created_at, leader:profiles!teams_leader_id_fkey(id, full_name, first_name, last_name, avatar_url)';
 const MEMBER_SELECT = 'id, team_id, rider_id, joined_at, rider:profiles!team_members_rider_id_fkey(id, full_name, first_name, last_name, avatar_url)';
 
 export async function fetchTeams(): Promise<Team[]> {

@@ -3694,8 +3694,8 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   const handleSaveEdit = async () => {
     if (!editingTeam) return;
     setSaving(true);
-    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity });
-    if (ok) setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity } : t));
+    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [] });
+    if (ok) setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [] } : t));
     setEditingTeam(null);
     setSaving(false);
   };
@@ -3833,16 +3833,36 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
 
                 {/* Inline edit */}
                 {editingTeam?.id === team.id && (
-                  <div className="px-5 pb-4 flex gap-3 flex-wrap border-t border-gray-50 pt-4">
-                    <input
-                      type="text" value={editingTeam.name} onChange={e => setEditingTeam({ ...editingTeam, name: e.target.value })}
-                      className="flex-1 min-w-[160px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    />
-                    <div className="flex items-center gap-2">
-                      <label className="text-[12px] font-semibold text-gray-500">Capacity</label>
-                      <input type="number" min={1} max={100} value={editingTeam.capacity} onChange={e => setEditingTeam({ ...editingTeam, capacity: Number(e.target.value) })}
-                        className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  <div className="px-5 pb-4 border-t border-gray-50 pt-4 space-y-3">
+                    <div className="flex gap-3 flex-wrap">
+                      <input
+                        type="text" value={editingTeam.name} onChange={e => setEditingTeam({ ...editingTeam, name: e.target.value })}
+                        className="flex-1 min-w-[160px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                       />
+                      <div className="flex items-center gap-2">
+                        <label className="text-[12px] font-semibold text-gray-500">Capacity</label>
+                        <input type="number" min={1} max={100} value={editingTeam.capacity} onChange={e => setEditingTeam({ ...editingTeam, capacity: Number(e.target.value) })}
+                          className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 mb-1.5">Schedule Days</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) => {
+                          const active = (editingTeam.schedule_days ?? []).includes(i);
+                          return (
+                            <button key={i} type="button"
+                              onClick={() => {
+                                const current = editingTeam.schedule_days ?? [];
+                                const next = active ? current.filter(x => x !== i) : [...current, i].sort((a, b) => a - b);
+                                setEditingTeam({ ...editingTeam, schedule_days: next });
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-colors ${active ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                            >{d}</button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setEditingTeam(null)} className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>
@@ -3884,21 +3904,14 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                         <div>
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Schedule Days</p>
                           <div className="flex gap-1.5 flex-wrap">
-                            {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) => {
-                              const active = (team.schedule_days ?? []).includes(i);
-                              return (
-                                <button
-                                  key={i}
-                                  onClick={async () => {
-                                    const current = team.schedule_days ?? [];
-                                    const next = active ? current.filter(x => x !== i) : [...current, i].sort((a, b) => a - b);
-                                    const ok = await updateTeam(team.id, { schedule_days: next });
-                                    if (ok) setTeams(prev => prev.map(t => t.id === team.id ? { ...t, schedule_days: next } : t));
-                                  }}
-                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-colors ${active ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                                >{d}</button>
-                              );
-                            })}
+                            {(team.schedule_days ?? []).length === 0
+                              ? <span className="text-[12px] text-gray-300">No days set — click edit to configure</span>
+                              : ['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) =>
+                                  (team.schedule_days ?? []).includes(i)
+                                    ? <span key={i} className="px-2.5 py-1 bg-gray-900 text-white text-[11px] font-black rounded-lg">{d}</span>
+                                    : <span key={i} className="px-2.5 py-1 bg-gray-100 text-gray-300 text-[11px] font-black rounded-lg">{d}</span>
+                                )
+                            }
                           </div>
                         </div>
 
