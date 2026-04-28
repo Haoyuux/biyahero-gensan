@@ -5,6 +5,7 @@ export interface Team {
   id: string;
   name: string;
   capacity: number;
+  schedule_days: number[]; // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
   leader_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -53,7 +54,7 @@ export async function createTeam(name: string, capacity: number, createdBy: stri
   return data as unknown as Team;
 }
 
-export async function updateTeam(id: string, updates: Partial<Pick<Team, 'name' | 'capacity' | 'leader_id'>>): Promise<boolean> {
+export async function updateTeam(id: string, updates: Partial<Pick<Team, 'name' | 'capacity' | 'leader_id' | 'schedule_days'>>): Promise<boolean> {
   const { error } = await supabase.from('teams').update(updates).eq('id', id);
   if (error) console.error('updateTeam:', error);
   return !error;

@@ -3803,6 +3803,15 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                           ? <span className="flex items-center gap-1"><Crown size={10} className="text-amber-500" />{leaderName}</span>
                           : <span className="text-gray-300">No leader assigned</span>}
                       </p>
+                      {(team.schedule_days ?? []).length > 0 && (
+                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                          {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) =>
+                            (team.schedule_days ?? []).includes(i) ? (
+                              <span key={i} className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-black rounded">{d}</span>
+                            ) : null
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-[11px] font-bold text-gray-900">{memberCount} / {team.capacity}</p>
@@ -3868,6 +3877,28 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                                 <option key={r.id} value={r.id}>{r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()}</option>
                               ))}
                             </select>
+                          </div>
+                        </div>
+
+                        {/* Schedule */}
+                        <div>
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Schedule Days</p>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d, i) => {
+                              const active = (team.schedule_days ?? []).includes(i);
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={async () => {
+                                    const current = team.schedule_days ?? [];
+                                    const next = active ? current.filter(x => x !== i) : [...current, i].sort((a, b) => a - b);
+                                    const ok = await updateTeam(team.id, { schedule_days: next });
+                                    if (ok) setTeams(prev => prev.map(t => t.id === team.id ? { ...t, schedule_days: next } : t));
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-colors ${active ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                >{d}</button>
+                              );
+                            })}
                           </div>
                         </div>
 
