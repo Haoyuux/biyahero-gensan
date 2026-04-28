@@ -1,27 +1,4 @@
 // ─── News Feed Service ────────────────────────────────────────────────────────
-//
-// Required Supabase migration (run once in SQL editor):
-// ──────────────────────────────────────────────────────
-// create table if not exists news_posts (
-//   id           uuid primary key default gen_random_uuid(),
-//   title        text not null,
-//   content      text not null,
-//   image_url    text,
-//   category     text not null default 'Announcement',
-//   author_id    uuid references auth.users(id) on delete set null,
-//   author_name  text not null,
-//   author_avatar text,
-//   published    boolean not null default true,
-//   is_archived  boolean not null default false,
-//   created_at   timestamptz default now() not null,
-//   updated_at   timestamptz default now() not null
-// );
-// alter table news_posts enable row level security;
-// create policy "anyone can read published" on news_posts for select using (published = true and is_archived = false);
-// create policy "authenticated read all" on news_posts for select using (auth.role() = 'authenticated');
-//
-// If the table already exists, run:
-// alter table news_posts add column if not exists is_archived boolean not null default false;
 
 import { supabase, supabaseAdmin } from './supabase';
 
@@ -43,11 +20,9 @@ export interface NewsPost {
   updated_at: string;
 }
 
-/** Fetch posts for public feed (published + non-archived). Pass includeAll=true for admin view. */
+/** Public feed: published + non-archived. Admin pass includeAll=true. */
 export async function fetchNewsPosts(includeAll = false): Promise<NewsPost[]> {
-  // Admin uses service role to bypass RLS and see drafts/archived too
-  const client = includeAll ? supabaseAdmin : supabase;
-  let query = client
+  let query = supabase
     .from('news_posts')
     .select('*')
     .order('created_at', { ascending: false });
@@ -69,7 +44,7 @@ export async function createNewsPost(
   authorAvatar: string | null,
   published: boolean,
 ): Promise<NewsPost | null> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('news_posts')
     .insert({ title, content, category, image_url: imageUrl, author_id: authorId, author_name: authorName, author_avatar: authorAvatar, published, is_archived: false })
     .select();
@@ -81,17 +56,17 @@ export async function updateNewsPost(
   id: string,
   updates: Partial<Pick<NewsPost, 'title' | 'content' | 'category' | 'image_url' | 'published' | 'is_archived'>>,
 ): Promise<boolean> {
-  const { data, error } = await supabaseAdmin
+  const { error } = await supabase
     .from('news_posts')
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select();
+    .eq('id', id);
   if (error) { console.error('updateNewsPost:', error); return false; }
   return true;
 }
 
 export async function deleteNewsPost(id: string): Promise<boolean> {
-  const { error } = await supabaseAdmin.from('news_posts').delete().eq('id', id);
+  const { error } = await supabase.from('news_posts').delete().eq('id', id);
+  if (error) console.error('deleteNewsPost:', error);
   return !error;
 }
 
