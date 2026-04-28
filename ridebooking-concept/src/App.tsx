@@ -1957,8 +1957,20 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     return () => clearTimeout(t);
   }, [restored]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isChatOpenRef = React.useRef(false);
+  isChatOpenRef.current = isChatOpen;
   const targetCoords = ridePhase === 'pickup' ? request.pickup.coords : request.dropoff.coords;
   const pickupCoords = request.pickup.coords;
+
+  useEffect(() => {
+    const unsub = subscribeToMessages(request.rideId, (msg) => {
+      if (msg.sender_id !== profile.id && !isChatOpenRef.current) {
+        setUnreadCount(prev => prev + 1);
+      }
+    });
+    return unsub;
+  }, [request.rideId, profile.id]);
 
   useEffect(() => {
     const ch = supabase.channel('rider-locations');
@@ -2137,12 +2149,19 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
 
         {/* Action buttons — always visible */}
         <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-2 flex gap-3">
-          <button
-            onClick={() => setIsChatOpen(true)}
-            className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors shrink-0"
-          >
-            <MessageSquare size={22} />
-          </button>
+          <div className="relative shrink-0">
+            <button
+              onClick={() => { setUnreadCount(0); setIsChatOpen(true); }}
+              className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors"
+            >
+              <MessageSquare size={22} />
+            </button>
+            {unreadCount > 0 && (
+              <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => {
               if (ridePhase === 'pickup') {
@@ -6213,8 +6232,21 @@ const SearchingPanel = ({ onCancel }: { onCancel?: () => void; key?: string }) =
 const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, activeRider, fareBreakdown, pricingConfig, rideId, userId, userName }: any) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isChatOpenRef = React.useRef(false);
+  isChatOpenRef.current = isChatOpen;
   const [isExpanded, setIsExpanded] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
   const [riderReviews, setRiderReviews] = useState<{ rating: number; comment: string | null; user_name: string | null; completed_at: string }[]>([]);
+
+  useEffect(() => {
+    if (!rideId || !userId) return;
+    const unsub = subscribeToMessages(rideId, (msg) => {
+      if (msg.sender_id !== userId && !isChatOpenRef.current) {
+        setUnreadCount(prev => prev + 1);
+      }
+    });
+    return unsub;
+  }, [rideId, userId]);
 
   useEffect(() => {
     if (!activeRider?.id) return;
@@ -6342,11 +6374,18 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
                   <p className="text-[11px] font-semibold text-gray-500 mt-0.5 truncate">{activeRider?.vehicle_make} {activeRider?.vehicle_model} · {activeRider?.vehicle_plate}</p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => rideId && setIsChatOpen(true)}
-                    disabled={!rideId}
-                    className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-40">
-                    <MessageSquare size={16} />
-                  </button>
+                  <div className="relative">
+                    <button onClick={() => { if (rideId) { setUnreadCount(0); setIsChatOpen(true); } }}
+                      disabled={!rideId}
+                      className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-40">
+                      <MessageSquare size={16} />
+                    </button>
+                    {unreadCount > 0 && (
+                      <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </div>
+                    )}
+                  </div>
                   <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
                     <Phone size={16} />
                   </button>
