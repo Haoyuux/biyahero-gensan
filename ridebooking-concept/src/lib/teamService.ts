@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
 import type { Profile } from './supabase';
 
 export interface Team {
@@ -55,7 +55,7 @@ export async function createTeam(name: string, capacity: number, createdBy: stri
 }
 
 export async function updateTeam(id: string, updates: Partial<Pick<Team, 'name' | 'capacity' | 'leader_id' | 'schedule_days'>>): Promise<boolean> {
-  const { error } = await supabase.from('teams').update(updates).eq('id', id);
+  const { error } = await supabaseAdmin.from('teams').update(updates).eq('id', id);
   if (error) console.error('updateTeam:', error);
   return !error;
 }
