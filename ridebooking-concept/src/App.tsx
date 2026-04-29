@@ -1821,8 +1821,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
         <RotatableMap ref={userMapRef} center={startLoc} zoom={15} zoomControl={false} rotate bearingSnap={10} className="absolute inset-0 w-full h-full">
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
           <Marker
             position={startLoc}
@@ -2408,8 +2408,8 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
       <div className="flex-1 relative">
         <RotatableMap ref={riderMapRef} center={riderCoords ?? targetCoords} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
           {riderCoords && <Marker position={riderCoords} icon={riderIcon} />}
           <Marker position={targetCoords} icon={ridePhase === 'pickup' ? pickupIcon : destinationIcon} />
