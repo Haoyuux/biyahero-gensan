@@ -5950,6 +5950,33 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                   );
                 })}
               </div>
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 bg-emerald-50/40">
+                  <h3 className="font-bold text-sm text-gray-900">Team Booking Fee Discount</h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Applied when a team is active and the rider is on schedule for the remittance date.</p>
+                </div>
+                <div className="p-5">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Discount Percentage</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={0} max={100} step={1}
+                      value={pricingCfg.teamBookingFeeDiscount}
+                      onChange={e => {
+                        const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                        setPricingCfg(prev => ({ ...prev, teamBookingFeeDiscount: val }));
+                        setPricingSaved(false);
+                      }}
+                      className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <span className="text-gray-400 text-sm font-semibold">%</span>
+                    {pricingCfg.teamBookingFeeDiscount > 0 && (
+                      <span className="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                        e.g. ₱50 fee → remit ₱{(50 * (1 - pricingCfg.teamBookingFeeDiscount / 100)).toFixed(0)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={() => { savePricingConfig(pricingCfg); setPricingSaved(true); }}
