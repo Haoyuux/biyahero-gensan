@@ -1822,7 +1822,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         <RotatableMap ref={userMapRef} center={startLoc} zoom={15} zoomControl={false} rotate bearingSnap={10} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <Marker
             position={startLoc}
@@ -2408,8 +2408,8 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
       <div className="flex-1 relative">
         <RotatableMap ref={riderMapRef} center={riderCoords ?? targetCoords} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {riderCoords && <Marker position={riderCoords} icon={riderIcon} />}
           <Marker position={targetCoords} icon={ridePhase === 'pickup' ? pickupIcon : destinationIcon} />
@@ -5328,7 +5328,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                   </div>
                   <div className="h-[680px] w-full">
                     <MapContainer center={[6.1164, 125.1716]} zoom={13} zoomControl={true} className="w-full h-full">
-                      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                      <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {(Object.entries(liveRiderLocations) as [string, { lat: number; lng: number; riderName?: string; riderAvatar?: string; status?: string }][]).map(([id, loc]) => {
                         const initial = (loc.riderName || 'R')[0].toUpperCase();
                         const isSelected = selectedLiveRiderId === id;
