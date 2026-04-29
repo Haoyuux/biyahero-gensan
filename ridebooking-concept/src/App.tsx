@@ -126,6 +126,27 @@ async function fetchOsrmRoute(
   }
 }
 
+// Like fetchOsrmRoute but also returns distance (m) and duration (s)
+async function fetchOsrmRouteWithInfo(
+  from: [number, number],
+  to: [number, number],
+  signal?: AbortSignal,
+): Promise<{ coords: [number, number][]; distance: number; duration: number } | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const r = await fetch(url, { signal });
+    const data = await r.json();
+    if (data.routes?.length > 0) {
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+      return { coords, distance: route.distance, duration: route.duration };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
@@ -2367,6 +2388,16 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const routeMounted = useRef(true);
   useEffect(() => { return () => { routeMounted.current = false; }; }, []);
 
+  // ── Show a placeholder polyline immediately (before GPS arrives) ─────────────
+  // Seeds routeCoords with a degenerate point at the target so the Polyline
+  // component renders right away. The GPS-triggered effect below replaces it
+  // with the real road-snapped route on first GPS fix.
+  useEffect(() => {
+    const to: [number, number] = [targetCoords[0], targetCoords[1]];
+    setRouteCoords(prev => prev ?? [to, to]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // mount only
+
   // Reset threshold on phase change so new target always triggers a fresh fetch
   useEffect(() => { lastRouteFetchPos.current = null; }, [targetCoords]);
 
@@ -2375,16 +2406,25 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     const dist = lastRouteFetchPos.current
       ? haversineMeters(lastRouteFetchPos.current, riderCoords)
       : Infinity;
+    // First GPS fix always fetches (dist === Infinity); subsequent only if moved 50m+
     if (lastRouteFetchPos.current && dist < 50) return;
     lastRouteFetchPos.current = riderCoords;
 
     const gen = ++routeGen.current;
     const from: [number, number] = [riderCoords[0], riderCoords[1]];
     const to: [number, number] = [targetCoords[0], targetCoords[1]];
-    // No AbortController — let fetch complete; generation check drops stale results
-    fetchOsrmRoute(from, to).then(coords => {
+
+    // Show straight-line immediately so something is visible while OSRM responds
+    setRouteCoords(prev => prev ?? [from, to]);
+
+    fetchOsrmRouteWithInfo(from, to).then(result => {
       if (routeGen.current !== gen || !routeMounted.current) return;
-      setRouteCoords(coords ?? [from, to]);
+      if (result) {
+        setRouteCoords(result.coords);
+        setRouteInfo({ distance: result.distance, duration: result.duration });
+      } else {
+        setRouteCoords([from, to]);
+      }
     });
   }, [riderCoords, targetCoords]);
 
