@@ -1373,12 +1373,6 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       }
     });
 
-    channel.on('broadcast', { event: 'RIDER_LOCATION' }, (payload) => {
-      if (payload.payload.rideId === currentRideId) {
-        setRiderLocation([payload.payload.lat, payload.payload.lng]);
-      }
-    });
-
     channel.on('broadcast', { event: 'RIDE_CANCELLED' }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
         showNotification('Your rider cancelled the booking.');
@@ -1419,6 +1413,19 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     channel.subscribe();
     return () => { supabase.removeChannel(channel); };
   // reconnectTick forces channel teardown+recreate on network recovery
+  }, [currentRideId, reconnectTick]);
+
+  // Dedicated per-ride channel for rider GPS location (avoids name conflict with RiderDashboard 'rides' channel)
+  useEffect(() => {
+    if (!currentRideId) return;
+    const locCh = supabase.channel('ride-loc-' + currentRideId);
+    locCh.on('broadcast', { event: 'RIDER_LOCATION' }, (payload) => {
+      if (payload.payload.rideId === currentRideId) {
+        setRiderLocation([payload.payload.lat, payload.payload.lng]);
+      }
+    });
+    locCh.subscribe();
+    return () => { supabase.removeChannel(locCh); };
   }, [currentRideId, reconnectTick]);
 
   useEffect(() => {
@@ -1812,7 +1819,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
       {/* Map — full screen on mobile (behind panels), fills right on desktop */}
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
-        <RotatableMap ref={userMapRef} center={startLoc} zoom={15} zoomControl={false} rotate touchRotate bearingSnap={10} className="absolute inset-0 w-full h-full">
+        <RotatableMap ref={userMapRef} center={startLoc} zoom={15} zoomControl={false} rotate bearingSnap={10} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -1856,7 +1863,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           <MapAutoSize />
           <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
           <MapSmoothFollow position={step === 'matched' ? riderLocation : null} resetKey={riderTrackKey} />
-          <MapZoomControl position="bottomright" />
+          <MapZoomControl position="topright" />
         </RotatableMap>
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -2278,11 +2285,11 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const riderMapRef = useRef<any>(null);
 
+  const rideChannelRef = useRef<any>(null);
+
   const handleRiderCancel = async () => {
-    await supabase.channel('rides').send({
-      type: 'broadcast', event: 'RIDE_CANCELLED',
-      payload: { rideId: request.rideId },
-    });
+    // Send cancel on 'rides' channel — user listens there for RIDE_CANCELLED
+    await supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_CANCELLED', payload: { rideId: request.rideId } });
     await supabase.from('rides').update({ status: 'cancelled' }).eq('id', request.rideId);
     localStorage.removeItem('fetch_rider_ride');
     if (onBack) onBack();
@@ -2302,7 +2309,8 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   }, [request.rideId, profile.id]);
 
   useEffect(() => {
-    const ch = supabase.channel('rides');
+    const ch = supabase.channel('ride-loc-' + request.rideId);
+    rideChannelRef.current = ch;
     const lastBroadcast = { time: 0 };
     let channelReady = false;
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') channelReady = true; });
@@ -2328,6 +2336,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
+      rideChannelRef.current = null;
       supabase.removeChannel(ch);
     };
   }, [request.rideId]);
@@ -3064,7 +3073,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         request={currentRequest}
         profile={currentProfile}
         restored={rideRestored}
-        onBack={() => setShowActiveRide(false)}
+        onBack={() => {
+          localStorage.removeItem(RIDER_RIDE_KEY);
+          myAcceptedRideIdRef.current = null;
+          setRequestAccepted(false);
+          setCurrentRequest(null);
+          setHasRequest(false);
+          setShowActiveRide(false);
+        }}
         onComplete={() => {
           const doneId = currentRequest.rideId;
           usedRideIdsRef.current.add(doneId);
