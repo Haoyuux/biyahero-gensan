@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useDragControls } from 'motion/react';
 import {
   Car, Bike, CreditCard, Menu, User, Clock, Star,
@@ -8495,21 +8496,26 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
       </div>
     </motion.div>
 
-      {/* Vehicle photo modal */}
-      <AnimatePresence>
-        {vehicleModalOpen && activeRider?.vehicle_image_url && (
+      {/* Vehicle photo modal — portalled to body so it truly covers full viewport */}
+      {vehicleModalOpen && activeRider?.vehicle_image_url && createPortal(
+        <AnimatePresence>
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-6"
             onClick={() => setVehicleModalOpen(false)}
           >
             <motion.div
               initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}
               transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-              className="relative max-w-lg w-full"
+              className="relative w-full max-w-md"
               onClick={e => e.stopPropagation()}
             >
-              <img src={activeRider.vehicle_image_url} alt="Vehicle" className="w-full rounded-2xl object-contain max-h-[80vh]" />
+              <img
+                src={activeRider.vehicle_image_url}
+                alt="Vehicle"
+                className="w-full rounded-2xl object-contain"
+                style={{ maxHeight: '75vh' }}
+              />
               <button
                 onClick={() => setVehicleModalOpen(false)}
                 className="absolute top-3 right-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
@@ -8521,8 +8527,9 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
               </p>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 };
