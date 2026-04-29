@@ -8242,6 +8242,7 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const isChatOpenRef = React.useRef(false);
   isChatOpenRef.current = isChatOpen;
   const [isExpanded, setIsExpanded] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
@@ -8314,6 +8315,7 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
   }
 
   return (
+    <>
     <motion.div
       initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
@@ -8400,6 +8402,19 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
                   </button>
                 </div>
               </div>
+              {/* Vehicle photo */}
+              {activeRider?.vehicle_image_url && (
+                <button
+                  onClick={() => setVehicleModalOpen(true)}
+                  className="w-full mb-5 rounded-2xl overflow-hidden border border-gray-100 relative group"
+                >
+                  <img src={activeRider.vehicle_image_url} alt="Vehicle" className="w-full h-36 object-cover" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full">View Photo</div>
+                  </div>
+                  <div className="absolute bottom-2 left-3 text-[10px] font-bold text-white/80 uppercase tracking-widest drop-shadow">Vehicle Photo</div>
+                </button>
+              )}
               {/* Fare breakdown */}
               <div className="mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
@@ -8479,6 +8494,36 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
         )}
       </div>
     </motion.div>
+
+      {/* Vehicle photo modal */}
+      <AnimatePresence>
+        {vehicleModalOpen && activeRider?.vehicle_image_url && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setVehicleModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 260 }}
+              className="relative max-w-lg w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <img src={activeRider.vehicle_image_url} alt="Vehicle" className="w-full rounded-2xl object-contain max-h-[80vh]" />
+              <button
+                onClick={() => setVehicleModalOpen(false)}
+                className="absolute top-3 right-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <p className="text-center text-white/60 text-xs mt-3 font-medium">
+                {activeRider.vehicle_make} {activeRider.vehicle_model} · {activeRider.vehicle_plate}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
