@@ -68,7 +68,7 @@ const destinationIcon = new L.DivIcon({
 });
 
 const riderIcon = new L.DivIcon({
-  className: 'bg-transparent',
+  className: 'rider-moving-icon',
   html: `<div style="width:48px;height:48px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.45))"><img src="${biyaScooterImg}" style="width:100%;height:100%;object-fit:contain" /></div>`,
   iconSize: [48, 48], iconAnchor: [24, 24],
 });
@@ -90,6 +90,14 @@ const draggableDestIcon = new L.DivIcon({
   html: `<div style="position:relative;cursor:grab"><div style="width:28px;height:28px;background:#10b981;border:4px solid white;border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M13 6V11H18V8.75L21.25 12L18 15.25V13H13V18H15.25L12 21.25L8.75 18H11V13H6V15.25L2.75 12L6 8.75V11H11V6H8.75L12 2.75L15.25 6H13Z"/></svg></div></div>`,
   iconSize: [28, 28], iconAnchor: [14, 14],
 });
+
+// Inject smooth CSS transition for rider marker so it glides between GPS ticks
+const _riderMarkerStyle = document.createElement('style');
+_riderMarkerStyle.textContent = '.rider-moving-icon { transition: transform 1.8s linear !important; }';
+document.head.appendChild(_riderMarkerStyle);
+
+// Shared GPS options — high accuracy, short timeout, no cached positions
+const GPS_OPTS: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
 
 function haversineMeters(a: [number, number], b: [number, number]): number {
   const R = 6371000;
@@ -1299,8 +1307,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
   useEffect(() => {
     if ('geolocation' in navigator) {
+      let bestAccuracy = Infinity;
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
+          // Skip if accuracy regressed and is still poor (> 50 m)
+          if (pos.coords.accuracy > 50 && pos.coords.accuracy > bestAccuracy) return;
+          bestAccuracy = pos.coords.accuracy;
           const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
           setDeviceLocation(coords);
           // Center map on first GPS fix only — never again from GPS ticks
@@ -1318,7 +1330,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             setMapFocus({ coords: fallback, key: Date.now() });
           }
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+        GPS_OPTS
       );
       return () => navigator.geolocation.clearWatch(watchId);
     } else {
@@ -2276,18 +2288,22 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') channelReady = true; });
 
     // Start GPS immediately — don't wait for channel subscription
+    let bestAccuracy = Infinity;
     const watchId = navigator.geolocation.watchPosition(
       pos => {
+        // Skip if accuracy regressed and is still poor (> 50 m)
+        if (pos.coords.accuracy > 50 && pos.coords.accuracy > bestAccuracy) return;
+        bestAccuracy = pos.coords.accuracy;
         const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setRiderCoords(coords);
         const now = Date.now();
-        if (channelReady && now - lastBroadcast.time >= 4000) {
+        if (channelReady && now - lastBroadcast.time >= 2000) {
           lastBroadcast.time = now;
           ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: { rideId: request.rideId, lat: coords[0], lng: coords[1] } });
         }
       },
       () => setRiderCoords([6.1164, 125.1716]),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+      GPS_OPTS,
     );
 
     return () => {
@@ -2809,7 +2825,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           setIsOnline(false);
         }
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+      GPS_OPTS,
     );
     return () => {
       navigator.geolocation.clearWatch(watchId);
