@@ -4007,9 +4007,14 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   const handleSaveEdit = async () => {
     if (!editingTeam) return;
     setSaving(true);
-    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: editingTeam.is_active });
-    if (ok) setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: editingTeam.is_active } : t));
-    setEditingTeam(null);
+    const isActive = editingTeam.is_active ?? false;
+    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: isActive });
+    if (ok) {
+      setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: isActive } : t));
+      setEditingTeam(null);
+    } else {
+      alert('Failed to save team. Please try again.');
+    }
     setSaving(false);
   };
 
@@ -4186,7 +4191,7 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                       <p className="text-[11px] font-semibold text-gray-400 mb-1.5">Status</p>
                       <button
                         type="button"
-                        onClick={() => setEditingTeam({ ...editingTeam, is_active: !editingTeam.is_active })}
+                        onClick={() => setEditingTeam(prev => prev ? { ...prev, is_active: !(prev.is_active ?? false) } : prev)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${editingTeam.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'}`}
                       >
                         <span className={`w-2 h-2 rounded-full ${editingTeam.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
