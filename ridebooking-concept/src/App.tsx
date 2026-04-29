@@ -2272,25 +2272,26 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   useEffect(() => {
     const ch = supabase.channel('rides');
     const lastBroadcast = { time: 0 };
-    let watchId: number;
-    ch.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return;
-      watchId = navigator.geolocation.watchPosition(
-        pos => {
-          const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          setRiderCoords(coords);
-          const now = Date.now();
-          if (now - lastBroadcast.time >= 4000) {
-            lastBroadcast.time = now;
-            ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: { rideId: request.rideId, lat: coords[0], lng: coords[1] } });
-          }
-        },
-        () => setRiderCoords([6.1164, 125.1716]),
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
-      );
-    });
+    let channelReady = false;
+    ch.subscribe((status) => { if (status === 'SUBSCRIBED') channelReady = true; });
+
+    // Start GPS immediately — don't wait for channel subscription
+    const watchId = navigator.geolocation.watchPosition(
+      pos => {
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setRiderCoords(coords);
+        const now = Date.now();
+        if (channelReady && now - lastBroadcast.time >= 4000) {
+          lastBroadcast.time = now;
+          ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: { rideId: request.rideId, lat: coords[0], lng: coords[1] } });
+        }
+      },
+      () => setRiderCoords([6.1164, 125.1716]),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+    );
+
     return () => {
-      if (watchId!) navigator.geolocation.clearWatch(watchId);
+      navigator.geolocation.clearWatch(watchId);
       supabase.removeChannel(ch);
     };
   }, [request.rideId]);
