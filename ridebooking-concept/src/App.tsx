@@ -18,7 +18,7 @@ import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, getTeamRemittances, type Remittance } from '@/src/lib/remittanceService';
 import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
-import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, fetchRiderMembership, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, toggleTeamActive, type Team, type TeamMember } from '@/src/lib/teamService';
+import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, fetchRiderMembership, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
 import { fetchNewsPosts, createNewsPost, updateNewsPost, deleteNewsPost, uploadNewsImage, NEWS_CATEGORIES, type NewsPost } from '@/src/lib/newsService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
@@ -4007,8 +4007,8 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   const handleSaveEdit = async () => {
     if (!editingTeam) return;
     setSaving(true);
-    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [] });
-    if (ok) setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [] } : t));
+    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: editingTeam.is_active });
+    if (ok) setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: editingTeam.is_active } : t));
     setEditingTeam(null);
     setSaving(false);
   };
@@ -4041,12 +4041,6 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
     setTeamDetail(prev => prev ? { ...prev, members: (prev.members ?? []).filter(m => m.rider_id !== riderId) } : prev);
   };
 
-  const handleToggleActive = async (teamId: string, current: boolean) => {
-    const next = !current;
-    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, is_active: next } : t));
-    const ok = await toggleTeamActive(teamId, next);
-    if (!ok) setTeams(prev => prev.map(t => t.id === teamId ? { ...t, is_active: current } : t));
-  };
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
@@ -4142,17 +4136,10 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                     </div>
                   </button>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleToggleActive(team.id, team.is_active)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
-                        team.is_active
-                          ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200 border border-gray-200'
-                      }`}
-                    >
+                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${team.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${team.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                       {team.is_active ? 'Active' : 'Inactive'}
-                    </button>
+                    </span>
                     <button onClick={() => setEditingTeam(editingTeam?.id === team.id ? null : { ...team })} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
                       <Edit3 size={14} />
                     </button>
@@ -4194,6 +4181,17 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                           );
                         })}
                       </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 mb-1.5">Status</p>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTeam({ ...editingTeam, is_active: !editingTeam.is_active })}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${editingTeam.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${editingTeam.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                        {editingTeam.is_active ? 'Active' : 'Inactive'}
+                      </button>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setEditingTeam(null)} className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>

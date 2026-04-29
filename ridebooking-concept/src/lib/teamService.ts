@@ -55,7 +55,7 @@ export async function createTeam(name: string, capacity: number, createdBy: stri
   return data as unknown as Team;
 }
 
-export async function updateTeam(id: string, updates: Partial<Pick<Team, 'name' | 'capacity' | 'leader_id' | 'schedule_days'>>): Promise<boolean> {
+export async function updateTeam(id: string, updates: Partial<Pick<Team, 'name' | 'capacity' | 'leader_id' | 'schedule_days' | 'is_active'>>): Promise<boolean> {
   const { error } = await supabaseAdmin.from('teams').update(updates).eq('id', id);
   if (error) console.error('updateTeam:', error);
   return !error;
