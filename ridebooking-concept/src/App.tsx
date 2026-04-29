@@ -2270,7 +2270,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   }, [request.rideId, profile.id]);
 
   useEffect(() => {
-    const ch = supabase.channel('rider-locations');
+    const ch = supabase.channel('rides');
     const lastBroadcast = { time: 0 };
     let watchId: number;
     ch.subscribe((status) => {
