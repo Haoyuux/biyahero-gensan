@@ -7,8 +7,7 @@ import {
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
   FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download,
-  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag, Archive, ArchiveRestore,
-  RotateCcw, RotateCw
+  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag, Archive, ArchiveRestore
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -1829,12 +1828,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             <Navigation size={18} />
           </button>
         )}
-        {/* Rotate controls */}
-        <div className="absolute bottom-4 left-4 z-[999] flex flex-col gap-1">
-          <button onClick={() => userMapRef.current?.setBearing((userMapRef.current.getBearing() - 45 + 360) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate left"><RotateCcw size={16} /></button>
-          <button onClick={() => userMapRef.current?.setBearing(0)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-xs font-bold" title="North up">N</button>
-          <button onClick={() => userMapRef.current?.setBearing((userMapRef.current.getBearing() + 45) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate right"><RotateCw size={16} /></button>
-        </div>
+        {/* North-up reset — tap after rotating by gesture */}
+        <button onClick={() => userMapRef.current?.setBearing(0)} className="absolute bottom-4 left-4 z-[999] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
       </div>
     </div>
   );
@@ -2364,12 +2359,8 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         >
           <Navigation size={18} />
         </button>
-        {/* Rotate controls */}
-        <div className="absolute top-4 right-4 z-[999] flex flex-col gap-1">
-          <button onClick={() => riderMapRef.current?.setBearing((riderMapRef.current.getBearing() - 45 + 360) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate left"><RotateCcw size={16} /></button>
-          <button onClick={() => riderMapRef.current?.setBearing(0)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-xs font-bold" title="North up">N</button>
-          <button onClick={() => riderMapRef.current?.setBearing((riderMapRef.current.getBearing() + 45) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate right"><RotateCw size={16} /></button>
-        </div>
+        {/* North-up reset — tap after rotating by gesture */}
+        <button onClick={() => riderMapRef.current?.setBearing(0)} className="absolute top-4 right-4 z-[999] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
       </div>
 
       {/* Bottom Panel — collapsible */}
