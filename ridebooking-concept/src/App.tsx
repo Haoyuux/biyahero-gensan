@@ -1219,12 +1219,13 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
   // ── Active-ride persistence (survives refresh / internet loss) ──────────────
   // Restore on mount — batched setState so there's no partial-render flash
+  const userSaveReady = useRef(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(USER_RIDE_KEY);
-      if (!raw) return;
+      if (!raw) { userSaveReady.current = true; return; }
       const s = JSON.parse(raw);
-      if (!s.currentRideId) return;
+      if (!s.currentRideId) { userSaveReady.current = true; return; }
       setCurrentRideId(s.currentRideId);
       setStep(s.step || 'searching');
       if (s.pickup)             setPickup(s.pickup);
@@ -1236,13 +1237,14 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       if (s.activeRider)        setActiveRider(s.activeRider);
       showNotification('Resumed your active booking');
     } catch { /* ignore malformed data */ }
+    userSaveReady.current = true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount only
 
   // Save whenever the active-ride state changes.
-  // When the user navigates back to 'home' while a ride is active, preserve the booking
-  // by saving the *effective* step (matched / searching) so restore works correctly.
+  // Guard: skip first run (before recovery setState has propagated) to avoid wiping localStorage.
   useEffect(() => {
+    if (!userSaveReady.current) return;
     if (!currentRideId || step === 'review') {
       localStorage.removeItem(USER_RIDE_KEY);
       return;
@@ -2920,9 +2922,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   useEffect(() => {
     if (!isOnline) {
       setHasRequest(false);
-      setRequestAccepted(false);
       setIncomingRequests([]);
-      setCurrentRequest(null);
+      // Preserve active ride state when offline — don't wipe an in-progress trip
+      if (!localStorage.getItem(RIDER_RIDE_KEY)) {
+        setRequestAccepted(false);
+        setCurrentRequest(null);
+      }
       return;
     }
     const PRIORITY_DELAY_MS = 15_000; // 15 s per priority rank
