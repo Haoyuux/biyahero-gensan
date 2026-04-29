@@ -511,7 +511,37 @@ Replace with:
                           )}
 ```
 
-- [ ] **Step 6: Type-check**
+- [ ] **Step 6: Add discount label to team leader remittances subtab**
+
+Find the rider name sub-line in the `teamRemittances.map` block:
+
+```tsx
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className="text-[10px] text-gray-400">{r.rides_count} ride{r.rides_count !== 1 ? 's' : ''}</span>
+                                  <span className="text-[10px] text-gray-300">·</span>
+                                  <span className="text-[10px] text-gray-400">₱{r.amount_remitted.toFixed(2)} remitted</span>
+                                </div>
+```
+
+Replace with:
+
+```tsx
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className="text-[10px] text-gray-400">{r.rides_count} ride{r.rides_count !== 1 ? 's' : ''}</span>
+                                  <span className="text-[10px] text-gray-300">·</span>
+                                  <span className="text-[10px] text-gray-400">₱{r.amount_remitted.toFixed(2)} remitted</span>
+                                  {r.amount_remitted < r.total_booking_fee && (
+                                    <>
+                                      <span className="text-[10px] text-gray-300">·</span>
+                                      <span className="text-[10px] text-emerald-600 font-bold">
+                                        {Math.round((1 - r.amount_remitted / r.total_booking_fee) * 100)}% discount
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+```
+
+- [ ] **Step 7: Type-check**
 
 ```bash
 npm run lint
@@ -519,7 +549,7 @@ npm run lint
 
 Expected: no errors.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/App.tsx
