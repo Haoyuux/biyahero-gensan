@@ -2445,6 +2445,16 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
   const [remitDate, setRemitDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [remitStats, setRemitStats] = useState<{ ridesCount: number; earnings: number; bookingFee: number }>({ ridesCount: 0, earnings: 0, bookingFee: 0 });
+  const [pricingCfg] = useState<PricingConfig>(() => loadPricingConfig());
+  const isDiscountEligible = (() => {
+    const team = riderTeam ?? myTeam;
+    if (!team || !team.is_active) return false;
+    const dow = new Date(remitDate + 'T00:00:00').getDay();
+    return (team.schedule_days ?? []).includes(dow);
+  })();
+  const discountPct = isDiscountEligible ? pricingCfg.teamBookingFeeDiscount : 0;
+  const discountAmount = Math.round(remitStats.bookingFee * discountPct / 100);
+  const feeToRemit = remitStats.bookingFee - discountAmount;
   const [remitHistory, setRemitHistory] = useState<Remittance[]>([]);
   const [remitLoading, setRemitLoading] = useState(false);
   const [remitFile, setRemitFile] = useState<File | null>(null);
@@ -3441,8 +3451,21 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                     </div>
                     <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
                       <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Due Fee</p>
-                      <p className="text-xl font-black text-emerald-700">₱{remitStats.bookingFee}</p>
-                      <p className="text-[11px] text-emerald-600/70 mt-1">To remit</p>
+                      {discountAmount > 0 ? (
+                        <>
+                          <p className="text-sm font-bold text-emerald-400 line-through">₱{remitStats.bookingFee}</p>
+                          <p className="text-xl font-black text-emerald-700">₱{feeToRemit}</p>
+                          <p className="text-[11px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                            Team {discountPct}% discount
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xl font-black text-emerald-700">₱{remitStats.bookingFee}</p>
+                          <p className="text-[11px] text-emerald-600/70 mt-1">To remit</p>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -3487,7 +3510,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                                 remitDate,
                                 remitStats.earnings,
                                 remitStats.bookingFee,
-                                remitStats.bookingFee, // default to paying full amount
+                                feeToRemit,
                                 url,
                                 remitStats.ridesCount
                               );
@@ -3529,6 +3552,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{new Date(r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                             <p className="font-black text-[15px] text-gray-900">₱{r.amount_remitted}</p>
+                            {r.amount_remitted < r.total_booking_fee && (
+                              <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                                was ₱{r.total_booking_fee} · {Math.round((1 - r.amount_remitted / r.total_booking_fee) * 100)}% team discount
+                              </p>
+                            )}
                           </div>
                           <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
                             r.status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
@@ -3733,6 +3761,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                                   <span className="text-[10px] text-gray-400">{r.rides_count} ride{r.rides_count !== 1 ? 's' : ''}</span>
                                   <span className="text-[10px] text-gray-300">·</span>
                                   <span className="text-[10px] text-gray-400">₱{r.amount_remitted.toFixed(2)} remitted</span>
+                                  {r.amount_remitted < r.total_booking_fee && (
+                                    <>
+                                      <span className="text-[10px] text-gray-300">·</span>
+                                      <span className="text-[10px] text-emerald-600 font-bold">
+                                        {Math.round((1 - r.amount_remitted / r.total_booking_fee) * 100)}% discount
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
