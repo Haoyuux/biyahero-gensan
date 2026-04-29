@@ -4011,16 +4011,9 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
     if (!current) return;
     setSaving(true);
     const isActive = current.is_active ?? false;
-    const payload = { name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive };
-    console.log('[save] payload:', JSON.stringify(payload));
-    const ok = await updateTeam(current.id, payload);
-    console.log('[save] ok:', ok);
+    const ok = await updateTeam(current.id, { name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive });
     if (ok) {
-      setTeams(prev => {
-        const next = prev.map(t => t.id === current.id ? { ...t, ...payload } : t);
-        console.log('[save] updated team in state:', JSON.stringify(next.find(t => t.id === current.id)));
-        return next;
-      });
+      setTeams(prev => prev.map(t => t.id === current.id ? { ...t, name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive } : t));
       setEditingTeam(null);
     } else {
       alert('Failed to save team. Please try again.');
@@ -4201,7 +4194,7 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
                       <p className="text-[11px] font-semibold text-gray-400 mb-1.5">Status</p>
                       <button
                         type="button"
-                        onClick={() => setEditingTeam(prev => { const next = prev ? { ...prev, is_active: !(prev.is_active ?? false) } : prev; console.log('[toggle] prev.is_active:', prev?.is_active, '→ next.is_active:', next?.is_active); return next; })}
+                        onClick={() => setEditingTeam(prev => prev ? { ...prev, is_active: !(prev.is_active ?? false) } : prev)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${editingTeam.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'}`}
                       >
                         <span className={`w-2 h-2 rounded-full ${editingTeam.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
