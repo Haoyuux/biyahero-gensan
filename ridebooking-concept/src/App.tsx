@@ -152,6 +152,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [impersonating, setImpersonating] = useState<Profile | null>(null);
   const [globalSettings, setGlobalSettings] = useState<AppSettings | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  const mapLoadShownRef = React.useRef(false);
 
   useEffect(() => {
     getAppSettings().then(setGlobalSettings);
@@ -190,6 +192,18 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Show map loading screen once on first login for user/rider roles
+  React.useEffect(() => {
+    if (!profile || mapLoadShownRef.current) return;
+    const role = profile.role;
+    if (role === 'user' || role === 'rider' || role === 'team_leader') {
+      mapLoadShownRef.current = true;
+      setMapLoading(true);
+      const t = setTimeout(() => setMapLoading(false), 2800);
+      return () => clearTimeout(t);
+    }
+  }, [profile?.id]);
+
   if (authLoading || (session && !profile)) return <SplashScreen settings={globalSettings} />;
   if (!session || !profile) return <LoginScreen settings={globalSettings} />;
   if (!profile.onboarded) return <OnboardingScreen profile={profile} settings={globalSettings} onComplete={setProfile} />;
@@ -197,6 +211,8 @@ export default function App() {
     return <BlockedScreen profile={profile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
     return <ProfileSetupScreen profile={profile} onComplete={setProfile} />;
+
+  if (mapLoading) return <MapLoadingScreen settings={globalSettings} />;
 
   if (impersonating) {
     const exitBanner = (
@@ -222,6 +238,30 @@ export default function App() {
   if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} onImpersonate={setImpersonating} />;
   return <UserApp profile={profile} settings={globalSettings} />;
 }
+
+// ─── Map Loading Screen ───────────────────────────────────────────────────────
+
+const MapLoadingScreen = ({ settings }: { settings: AppSettings | null }) => (
+  <div className="w-full h-[100dvh] bg-gray-950 flex flex-col items-center justify-center font-sans gap-8">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-16 h-16 flex items-center justify-center mb-1 overflow-hidden">
+        {settings?.app_logo_url
+          ? <img src={settings.app_logo_url} className="w-full h-full object-contain" />
+          : <Navigation size={30} className="text-white" />}
+      </div>
+      <h2 className="text-white font-black text-xl tracking-tight">Loading Map</h2>
+      <p className="text-white/40 text-sm">Preparing your navigation…</p>
+    </div>
+    <div className="w-56 h-1 bg-white/10 rounded-full overflow-hidden">
+      <motion.div
+        initial={{ width: '0%' }}
+        animate={{ width: '100%' }}
+        transition={{ duration: 2.5, ease: 'easeInOut' }}
+        className="h-full bg-white rounded-full"
+      />
+    </div>
+  </div>
+);
 
 // ─── Splash Screen ────────────────────────────────────────────────────────────
 
@@ -1024,6 +1064,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
   const [currentRideId, setCurrentRideId] = useState<string | null>(null);
   const [activeRider, setActiveRider] = useState<any>(null);
+  const [pendingRider, setPendingRider] = useState<any>(null);
   const [pricingConfig] = useState<PricingConfig>(() => loadPricingConfig());
   const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -1038,6 +1079,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
+  const pickupGpsNeedsResolve = useRef(true);
   // Ref keeps latest ride data accessible in stale closures inside channel useEffect
   const completionDataRef = React.useRef({ pickup: '', dropoff: '', fareBreakdown: null as FareBreakdown | null, selectedRide: 'eco', activeRider: null as any });
 
@@ -1172,6 +1214,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     }
     localStorage.removeItem(USER_RIDE_KEY);
     setStep('home');
+    setPendingRider(null);
+    pickupGpsNeedsResolve.current = true;
     setPickup('Current Location');
     setPickupCoords(null);
     setDropoff('');
@@ -1226,6 +1270,15 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     }
   }, []);
 
+  // Resolve GPS coords to a real place name on first fix
+  useEffect(() => {
+    if (!deviceLocation || !pickupGpsNeedsResolve.current) return;
+    pickupGpsNeedsResolve.current = false;
+    reverseGeocode(deviceLocation[0], deviceLocation[1]).then(name => {
+      setPickup(prev => prev === 'Current Location' ? name : prev);
+    });
+  }, [deviceLocation]);
+
   const startLoc = pickupCoords || deviceLocation;
   const endLoc = destinationCoords;
 
@@ -1234,11 +1287,10 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     
     channel.on('broadcast', { event: 'RIDE_ACCEPTED' }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
-        setActiveRider(payload.payload.rider);
-        setStep('matched');
-        showNotification('Rider accepted your booking!');
-        pushNotification('Rider on the way 🛵', 'Your rider accepted the booking and is heading to you.');
-        pushAppNotification('Rider on the way 🛵', 'Your rider accepted the booking and is heading to you.');
+        setPendingRider(payload.payload.rider);
+        showNotification('A rider accepted! Review details to confirm.');
+        pushNotification('Rider found! 🛵', 'Review driver details and confirm your booking.');
+        pushAppNotification('Rider found! 🛵', 'Tap to review and confirm your driver.');
       }
     });
 
@@ -1565,7 +1617,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   setStep(s);
                 }} pickup={pickup} setPickup={setPickup}
                   setPickupCoords={setPickupCoords} dropoff={dropoff} setDropoff={setDropoff}
-                  setDestinationCoords={setDestinationCoords}
+                  setDestinationCoords={setDestinationCoords} deviceLocation={deviceLocation}
                   favorites={favorites} onSaveFavorite={saveFavorite} onRemoveFavorite={removeFavorite}
                   onPickupFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })}
                   onDropoffFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })} />
@@ -1639,7 +1691,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   });
                 }} />
             )}
-            {step === 'searching' && <SearchingPanel key="search" onCancel={() => handleCancelBooking(true)} />}
+            {step === 'searching' && <SearchingPanel key="search" onCancel={pendingRider ? undefined : () => handleCancelBooking(true)} />}
             {step === 'matched' && (
               <MatchedPanel key="matched" onCancel={() => handleCancelBooking(true)} activeRider={activeRider}
                 selectedRide={selectedRide} routeInfo={routeInfo} showNotification={showNotification}
@@ -1654,6 +1706,30 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           </AnimatePresence>
         </div>
       </div>
+
+      {pendingRider && (
+        <RiderConfirmModal
+          rider={pendingRider}
+          rideId={currentRideId}
+          onAccept={() => {
+            setActiveRider(pendingRider);
+            setPendingRider(null);
+            setStep('matched');
+            if (currentRideId) {
+              supabase.channel('rides').send({ type: 'broadcast', event: 'USER_CONFIRMED_RIDER', payload: { rideId: currentRideId } });
+            }
+            pushAppNotification('Rider on the way 🛵', 'Your rider is heading to you now.');
+          }}
+          onCancel={() => {
+            if (currentRideId) {
+              supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
+              supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
+            }
+            setPendingRider(null);
+            handleCancelBooking();
+          }}
+        />
+      )}
 
       {/* Map — full screen on mobile (behind panels), fills right on desktop */}
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
@@ -2319,10 +2395,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
+  const [riderNotification, setRiderNotification] = useState<string | null>(null);
+  const showRiderNotification = (msg: string) => { setRiderNotification(msg); setTimeout(() => setRiderNotification(null), 3500); };
   const [isOnline, setIsOnline] = useState(false);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   const [requestAccepted, setRequestAccepted] = useState(false);
+  const [waitingForUserConfirm, setWaitingForUserConfirm] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
 
@@ -2344,6 +2423,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const pendingTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // Tracks rideIds that have been accepted/completed so re-broadcasts don't re-enqueue them
   const usedRideIdsRef = React.useRef<Set<string>>(new Set());
+  // Tracks the rideId this rider personally accepted — avoids stale closure issues in channel handlers
+  const myAcceptedRideIdRef = React.useRef<string | null>(null);
 
   // Check location permission on mount
   useEffect(() => {
@@ -2676,13 +2757,29 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       const t = timers.get(rideId);
       if (t) { clearTimeout(t); timers.delete(rideId); }
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
+      const isMyRide = myAcceptedRideIdRef.current === rideId;
       setCurrentRequest((current: any) => {
-        if (current?.rideId === rideId) {
+        if (current?.rideId === rideId || isMyRide) {
+          myAcceptedRideIdRef.current = null;
           setHasRequest(false);
           setRequestAccepted(false);
+          setWaitingForUserConfirm(false);
+          setShowActiveRide(false);
           setAppNotifications(prev => [{ id: genId(), title: 'Ride cancelled', body: 'The passenger cancelled their booking.', time: Date.now(), read: false }, ...prev]);
-          alert('The passenger cancelled the ride.');
+          showRiderNotification('Passenger cancelled the ride.');
           return null;
+        }
+        return current;
+      });
+    });
+
+    channel.on('broadcast', { event: 'USER_CONFIRMED_RIDER' }, (payload) => {
+      const { rideId } = payload.payload;
+      const isMyRide = myAcceptedRideIdRef.current === rideId;
+      setCurrentRequest((current: any) => {
+        if (current?.rideId === rideId || isMyRide) {
+          setWaitingForUserConfirm(false);
+          setShowActiveRide(true);
         }
         return current;
       });
@@ -2695,13 +2792,16 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       const t = timers.get(rideId);
       if (t) { clearTimeout(t); timers.delete(rideId); }
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
-      setCurrentRequest((current: any) => {
-        if (current?.rideId === rideId && !requestAccepted) {
-          setHasRequest(false);
-          return null;
-        }
-        return current;
-      });
+      // Use ref (not state) to avoid stale closure — myAcceptedRideIdRef is set synchronously on accept
+      if (myAcceptedRideIdRef.current !== rideId) {
+        setCurrentRequest((current: any) => {
+          if (current?.rideId === rideId) {
+            setHasRequest(false);
+            return null;
+          }
+          return current;
+        });
+      }
     });
 
     channel.subscribe(async (status) => {
@@ -2773,6 +2873,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_COMPLETED', payload: { rideId: doneId } });
           localStorage.removeItem(RIDER_RIDE_KEY);
           setIncomingRequests(prev => prev.filter(r => r.rideId !== doneId));
+          myAcceptedRideIdRef.current = null;
           setRequestAccepted(false);
           setCurrentRequest(null);
           setHasRequest(false);
@@ -2788,6 +2889,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900">
       <ConnectionBanner state={riderConnectionState} />
+      <NotificationToast message={riderNotification} />
+
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 md:px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3 md:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
@@ -2800,8 +2903,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           </div>
         </div>
         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-          <div className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black tracking-wide ${isOnline && !requestAccepted ? 'bg-emerald-50 text-emerald-700' : requestAccepted ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-500'}`}>
-            {requestAccepted ? 'ON TRIP' : isOnline ? 'ONLINE' : 'OFFLINE'}
+          <div className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black tracking-wide ${waitingForUserConfirm ? 'bg-amber-100 text-amber-700' : isOnline && !requestAccepted ? 'bg-emerald-50 text-emerald-700' : requestAccepted ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-500'}`}>
+            {waitingForUserConfirm ? 'PENDING' : requestAccepted ? 'ON TRIP' : isOnline ? 'ONLINE' : 'OFFLINE'}
           </div>
           <button onClick={() => setShowChatHistory(true)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors">
             <MessageSquare size={15} className="text-gray-600" />
@@ -2877,20 +2980,24 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
               key="rider-ongoing"
               initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             >
-              <div className="bg-gray-950 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <div className={`${waitingForUserConfirm ? 'bg-amber-500' : 'bg-gray-950'} text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20`}>
+                <div className={`w-2 h-2 rounded-full ${waitingForUserConfirm ? 'bg-white animate-pulse' : 'bg-emerald-400 animate-pulse'} shrink-0`} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[13px] leading-tight">Ongoing trip</p>
-                  <p className="text-gray-400 text-[11px] font-medium truncate mt-0.5">
+                  <p className="font-bold text-[13px] leading-tight">
+                    {waitingForUserConfirm ? 'Waiting for passenger...' : 'Ongoing trip'}
+                  </p>
+                  <p className="text-white/70 text-[11px] font-medium truncate mt-0.5">
                     {currentRequest.user?.first_name || 'Passenger'} · {currentRequest.pickup?.label}
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowActiveRide(true)}
-                  className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
-                >
-                  View
-                </button>
+                {!waitingForUserConfirm && (
+                  <button
+                    onClick={() => setShowActiveRide(true)}
+                    className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    View
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -3227,6 +3334,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
                   <span className="text-[13px] text-gray-600 truncate">{currentRequest?.dropoff?.label}</span>
                 </div>
+                {currentRequest?.pickup?.coords && currentRequest?.dropoff?.coords && (() => {
+                  const d = haversineKm(currentRequest.pickup.coords[0], currentRequest.pickup.coords[1], currentRequest.dropoff.coords[0], currentRequest.dropoff.coords[1]);
+                  return (
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
+                      <span className="text-[11px] font-semibold text-gray-400">{d < 1 ? (d * 1000).toFixed(0) + ' m' : d.toFixed(1) + ' km'} trip</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex gap-2.5">
                 <button
@@ -3240,13 +3355,15 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                 </button>
                 <button
                   onClick={() => {
-                    usedRideIdsRef.current.add(currentRequest.rideId);
+                    const rid = currentRequest.rideId;
+                    usedRideIdsRef.current.add(rid);
+                    myAcceptedRideIdRef.current = rid;
                     setRequestAccepted(true);
+                    setWaitingForUserConfirm(true);
                     setHasRequest(false);
-                    setShowActiveRide(true);
-                    supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_ACCEPTED', payload: { rideId: currentRequest.rideId, rider: currentProfile } });
+                    supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_ACCEPTED', payload: { rideId: rid, rider: currentProfile } });
                     // Mark as accepted in DB so other riders don't pick it up
-                    supabase.from('rides').update({ status: 'accepted', rider_id: currentProfile.id }).eq('id', currentRequest.rideId).eq('status', 'pending');
+                    supabase.from('rides').update({ status: 'accepted', rider_id: currentProfile.id }).eq('id', rid).eq('status', 'pending');
                   }}
                   className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
                 >
@@ -3376,11 +3493,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                               );
                               setRemitFile(null);
                             } else {
-                              alert("Failed to upload receipt.");
+                              showRiderNotification('Failed to upload receipt. Try again.');
                             }
                           } catch (e) {
                             console.error(e);
-                            alert("An error occurred during remittance.");
+                            showRiderNotification('An error occurred during remittance.');
                           } finally {
                             setRemitting(false);
                           }
@@ -7292,7 +7409,7 @@ const ChatHistoryScreen = ({ userId, userName, role = 'user', onBack }: { userId
 
 // ─── Panel Components ─────────────────────────────────────────────────────────
 
-const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, favorites = [], onSaveFavorite, onRemoveFavorite, onPickupFocus, onDropoffFocus }: any) => {
+const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, deviceLocation, favorites = [], onSaveFavorite, onRemoveFavorite, onPickupFocus, onDropoffFocus }: any) => {
   const [activeField, setActiveField] = useState<'pickup' | 'dropoff'>('dropoff');
   const [query, setQuery] = useState(dropoff);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -7461,7 +7578,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
                 <>
                   {activeField === 'pickup' && (
                     <div className="flex items-center gap-3 p-3.5 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                      onClick={() => { setPickup('Current Location'); setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); /* mapFocus will be current deviceLocation — no explicit coords needed */ }}>
+                      onClick={async () => { setPickupCoords(null); setActiveField('dropoff'); setQuery(dropoff); setIsExpanded(false); if (deviceLocation) { const name = await reverseGeocode(deviceLocation[0], deviceLocation[1]); setPickup(name); } else { setPickup('Current Location'); } }}>
                       <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Navigation size={16} className="text-gray-600" /></div>
                       <div>
                         <p className="font-semibold text-sm text-gray-900">Current Location</p>
@@ -7667,6 +7784,125 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
         )}
       </AnimatePresence>
     </motion.div>
+  );
+};
+
+const RiderConfirmModal = ({ rider, rideId, onAccept, onCancel }: { rider: any; rideId: string | null; onAccept: () => void; onCancel: () => void }) => {
+  const [riderRating, setRiderRating] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!rider?.id) return;
+    supabase
+      .from('rides')
+      .select('rating')
+      .eq('rider_id', rider.id)
+      .not('rating', 'is', null)
+      .then(({ data }) => {
+        if (data?.length) {
+          const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+          setRiderRating(Math.round(avg * 10) / 10);
+        }
+      });
+  }, [rider?.id]);
+
+  const age = rider?.birthday
+    ? Math.floor((Date.now() - new Date(rider.birthday).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
+
+  const vehicleName = [rider?.vehicle_make, rider?.vehicle_model].filter(Boolean).join(' ');
+  const vehicleType = rider?.vehicle_type
+    ? rider.vehicle_type.charAt(0).toUpperCase() + rider.vehicle_type.slice(1)
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 80, opacity: 0 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+        className="relative w-full max-w-sm bg-white rounded-t-[28px] md:rounded-2xl shadow-2xl px-6 pt-5 pb-[max(2rem,env(safe-area-inset-bottom))] md:pb-6 pointer-events-auto"
+      >
+        <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-5 md:hidden" />
+
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Driver Found</p>
+
+        {/* Avatar + name */}
+        <div className="flex items-center gap-4 mb-5">
+          <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden shrink-0 border-2 border-gray-200">
+            {rider?.avatar_url
+              ? <img src={rider.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center font-black text-2xl text-gray-500">{(rider?.first_name || rider?.full_name || 'R')[0].toUpperCase()}</div>
+            }
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-black text-[17px] text-gray-950 leading-tight truncate">
+              {rider?.first_name} {rider?.last_name || ''}
+            </h3>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {age && (
+                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{age} yrs</span>
+              )}
+              {rider?.sex && (
+                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full capitalize">{rider.sex}</span>
+              )}
+              {riderRating !== null && riderRating >= 4 && (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                  <Star size={10} className="fill-amber-400 text-amber-400" />{riderRating.toFixed(1)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Vehicle info */}
+        {(vehicleName || vehicleType || rider?.vehicle_plate) && (
+          <div className="bg-gray-50 rounded-2xl p-4 mb-5 border border-gray-100 space-y-2.5">
+            {vehicleType && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Type</span>
+                <span className="text-[13px] font-semibold text-gray-800">{vehicleType}</span>
+              </div>
+            )}
+            {vehicleName && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Vehicle</span>
+                <span className="text-[13px] font-semibold text-gray-800">{vehicleName}</span>
+              </div>
+            )}
+            {rider?.vehicle_color && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Color</span>
+                <span className="text-[13px] font-semibold text-gray-800 capitalize">{rider.vehicle_color}</span>
+              </div>
+            )}
+            {rider?.vehicle_plate && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Plate</span>
+                <span className="text-[13px] font-bold text-gray-950 font-mono tracking-wider">{rider.vehicle_plate}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2.5">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onAccept}
+            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+          >
+            Accept Rider
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 
