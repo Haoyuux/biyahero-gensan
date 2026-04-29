@@ -66,8 +66,8 @@ const destinationIcon = new L.DivIcon({
 
 const riderIcon = new L.DivIcon({
   className: 'bg-transparent',
-  html: `<div class="w-6 h-6 bg-blue-600 border-4 border-white rounded-full shadow-lg flex items-center justify-center"><div class="w-1.5 h-1.5 bg-white rounded-full"></div></div>`,
-  iconSize: [24, 24], iconAnchor: [12, 12],
+  html: `<div style="background:#2563eb;border:3px solid white;border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.4)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="22" height="22"><path d="M19 7c0-1.1-.9-2-2-2h-3l2 4H4c-1.1 0-2 .9-2 2v3h2c0 1.66 1.34 3 3 3s3-1.34 3-3h4c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-3c0-1.1-.9-2-2-2h-1l-2-4zM7 14c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm10 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg></div>`,
+  iconSize: [38, 38], iconAnchor: [19, 19],
 });
 
 const pickupIcon = new L.DivIcon({
@@ -141,6 +141,34 @@ function MapBounds({ mapFocus, routeCoords }: { mapFocus: MapFocus; routeCoords:
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapFocus?.key]);
 
+  return null;
+}
+
+// Smooth-pan to a moving position; stops when user drags; resetKey re-enables follow
+function MapSmoothFollow({ position, resetKey = 0 }: { position: [number, number] | null; resetKey?: number }) {
+  const map = useMap();
+  const userInteracted = useRef(false);
+
+  useMapEvents({ dragstart: () => { userInteracted.current = true; } });
+
+  useEffect(() => { userInteracted.current = false; }, [resetKey]);
+
+  useEffect(() => {
+    if (!position || userInteracted.current) return;
+    map.panTo(position, { animate: true, duration: 0.6 });
+  }, [position, map]);
+
+  return null;
+}
+
+// Zoom control at a custom corner (avoids conflicts with existing UI)
+function MapZoomControl({ position = 'bottomright' }: { position?: 'topright' | 'bottomright' | 'topleft' | 'bottomleft' }) {
+  const map = useMap();
+  useEffect(() => {
+    const ctrl = L.control.zoom({ position });
+    ctrl.addTo(map);
+    return () => { ctrl.remove(); };
+  }, [map, position]);
   return null;
 }
 
@@ -1077,6 +1105,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [showNews, setShowNews] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
+  const [riderTrackKey, setRiderTrackKey] = useState(0);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
   const pickupGpsNeedsResolve = useRef(true);
@@ -1776,6 +1805,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           )}
           <MapAutoSize />
           <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
+          <MapSmoothFollow position={step === 'matched' ? riderLocation : null} resetKey={riderTrackKey} />
+          <MapZoomControl position="bottomright" />
         </MapContainer>
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -1783,6 +1814,15 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
               Drag pin to adjust {(step === 'select' || (step === 'home' && endLoc)) ? 'pickup or destination' : 'pickup location'}
             </div>
           </div>
+        )}
+        {step === 'matched' && (
+          <button
+            onClick={() => setRiderTrackKey(k => k + 1)}
+            className="absolute bottom-20 right-4 z-[999] bg-white rounded-full shadow-lg p-3 text-blue-600 hover:bg-blue-50 transition-colors"
+            title="Re-center on rider"
+          >
+            <Navigation size={18} />
+          </button>
         )}
       </div>
     </div>
@@ -2137,12 +2177,34 @@ const RiderProfileScreen = ({ profile, onBack, onUpdate }: { profile: Profile, o
 
 
 
-function RiderMapFit({ riderCoords, targetCoords }: { riderCoords: [number, number], targetCoords: [number, number] }) {
+function RiderMapFit({ riderCoords, targetCoords, resetKey = 0 }: { riderCoords: [number, number]; targetCoords: [number, number]; resetKey?: number }) {
   const map = useMap();
+  const userInteracted = useRef(false);
+  // Blocks panTo while fitBounds animation is running (prevents conflict on mount/phase change)
+  const fitting = useRef(false);
+
+  useMapEvents({ dragstart: () => { userInteracted.current = true; } });
+
+  useEffect(() => { userInteracted.current = false; }, [resetKey]);
+
+  // Fit both rider + target on mount and on phase change (targetCoords changes)
   useEffect(() => {
+    userInteracted.current = false;
+    fitting.current = true;
     const bounds = L.latLngBounds([riderCoords, targetCoords]);
     map.fitBounds(bounds, { padding: [60, 60], animate: true });
-  }, [map, riderCoords, targetCoords]);
+    // Allow GPS-follow panTo after fitBounds animation completes (~1s)
+    const t = setTimeout(() => { fitting.current = false; }, 1200);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetCoords, map]);
+
+  // Smooth-pan to rider on each GPS tick (skipped during fitBounds animation)
+  useEffect(() => {
+    if (fitting.current || userInteracted.current) return;
+    map.panTo(riderCoords, { animate: true, duration: 0.5 });
+  }, [riderCoords, map]);
+
   return null;
 }
 
@@ -2160,6 +2222,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   }, [restored]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [riderFollowKey, setRiderFollowKey] = useState(0);
   const isChatOpenRef = React.useRef(false);
   isChatOpenRef.current = isChatOpen;
   const targetCoords = ridePhase === 'pickup' ? request.pickup.coords : request.dropoff.coords;
@@ -2262,7 +2325,8 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
             <Marker position={riderCoords} icon={riderIcon} />
             <Marker position={targetCoords} icon={ridePhase === 'pickup' ? pickupIcon : destinationIcon} />
             {routeCoords && <Polyline positions={routeCoords} color={ridePhase === 'pickup' ? "#f97316" : "#10b981"} weight={5} opacity={0.9} />}
-            <RiderMapFit riderCoords={riderCoords} targetCoords={targetCoords} />
+            <RiderMapFit riderCoords={riderCoords} targetCoords={targetCoords} resetKey={riderFollowKey} />
+            <MapZoomControl position="bottomright" />
           </MapContainer>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-800">
@@ -2280,6 +2344,14 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
             <span className="text-xs font-bold text-gray-700">{ridePhase === 'pickup' ? 'Pickup Point' : 'Destination'}</span>
           </div>
         </div>
+        {/* Re-center button */}
+        <button
+          onClick={() => setRiderFollowKey(k => k + 1)}
+          className="absolute bottom-4 right-4 z-[999] bg-white rounded-full shadow-lg p-3 text-emerald-600 hover:bg-emerald-50 transition-colors"
+          title="Re-center on my location"
+        >
+          <Navigation size={18} />
+        </button>
       </div>
 
       {/* Bottom Panel — collapsible */}
