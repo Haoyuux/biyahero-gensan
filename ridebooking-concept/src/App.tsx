@@ -2354,23 +2354,25 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Map */}
+      {/* Map — render immediately using pickup coords as fallback until GPS arrives */}
       <div className="flex-1 relative">
-        {riderCoords ? (
-          <RotatableMap ref={riderMapRef} center={riderCoords} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            />
-            <Marker position={riderCoords} icon={riderIcon} />
-            <Marker position={targetCoords} icon={ridePhase === 'pickup' ? pickupIcon : destinationIcon} />
-            {routeCoords && <Polyline positions={routeCoords} color={ridePhase === 'pickup' ? "#f97316" : "#10b981"} weight={5} opacity={0.9} />}
-            <RiderMapFit riderCoords={riderCoords} targetCoords={targetCoords} resetKey={riderFollowKey} />
-            <MapZoomControl position="bottomright" />
-          </RotatableMap>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-800">
-            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <RotatableMap ref={riderMapRef} center={riderCoords ?? targetCoords} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          />
+          {riderCoords && <Marker position={riderCoords} icon={riderIcon} />}
+          <Marker position={targetCoords} icon={ridePhase === 'pickup' ? pickupIcon : destinationIcon} />
+          {routeCoords && <Polyline positions={routeCoords} color={ridePhase === 'pickup' ? "#f97316" : "#10b981"} weight={5} opacity={0.9} />}
+          {riderCoords && <RiderMapFit riderCoords={riderCoords} targetCoords={targetCoords} resetKey={riderFollowKey} />}
+          <MapZoomControl position="bottomright" />
+        </RotatableMap>
+        {!riderCoords && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Getting your location…
+            </div>
           </div>
         )}
         {/* Legend */}
