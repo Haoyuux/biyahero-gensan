@@ -1113,26 +1113,50 @@ const ConnectionBanner = ({ state }: { state: 'online' | 'offline' | 'reconnecti
 
 // ─── User App (Ridebooking) ───────────────────────────────────────────────────
 
+// Read persisted user ride state synchronously at startup (before first render)
+function readPersistedUserRide() {
+  try {
+    const raw = localStorage.getItem(USER_RIDE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return s.currentRideId ? s : null;
+  } catch { return null; }
+}
+
 const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, settings: AppSettings | null }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
-  const [step, setStep] = useState<'home' | 'select' | 'searching' | 'matched' | 'review'>('home');
+
+  // ── Lazy-initialise ride state from localStorage so the first render already
+  // has the correct state — avoids the useEffect race that wiped the saved booking.
+  const _pr = React.useRef(readPersistedUserRide());
+  const [step, setStep] = useState<'home' | 'select' | 'searching' | 'matched' | 'review'>(
+    () => (_pr.current?.step as any) || 'home'
+  );
   const [completedRider, setCompletedRider] = useState<any>(null);
-  const [pickup, setPickup] = useState('Current Location');
-  const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
-  const [dropoff, setDropoff] = useState('');
-  const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(null);
-  const [selectedRide, setSelectedRide] = useState('eco');
+  const [pickup, setPickup] = useState(() => _pr.current?.pickup || 'Current Location');
+  const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(
+    () => _pr.current?.pickupCoords ?? null
+  );
+  const [dropoff, setDropoff] = useState(() => _pr.current?.dropoff || '');
+  const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(
+    () => _pr.current?.destinationCoords ?? null
+  );
+  const [selectedRide, setSelectedRide] = useState(() => _pr.current?.selectedRide || 'eco');
   const [deviceLocation, setDeviceLocation] = useState<[number, number] | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
-  const [currentRideId, setCurrentRideId] = useState<string | null>(null);
-  const [activeRider, setActiveRider] = useState<any>(null);
+  const [currentRideId, setCurrentRideId] = useState<string | null>(
+    () => _pr.current?.currentRideId ?? null
+  );
+  const [activeRider, setActiveRider] = useState<any>(() => _pr.current?.activeRider ?? null);
   const [pendingRider, setPendingRider] = useState<any>(null);
   const [pricingConfig] = useState<PricingConfig>(() => loadPricingConfig());
-  const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(null);
+  const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(
+    () => _pr.current?.fareBreakdown ?? null
+  );
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showRideHistory, setShowRideHistory] = useState(false);
   const [favorites, setFavorites] = useState<FavoritePlace[]>(() => {
@@ -1218,28 +1242,21 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   };
 
   // ── Active-ride persistence (survives refresh / internet loss) ──────────────
-  // Restore on mount — batched setState so there's no partial-render flash
-  const userSaveReady = useRef(false);
+  // State is already initialised from localStorage via lazy useState above.
+  // Show a notification once on mount if a ride was restored.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(USER_RIDE_KEY);
-      if (!raw) { userSaveReady.current = true; return; }
-      const s = JSON.parse(raw);
-      if (!s.currentRideId) { userSaveReady.current = true; return; }
-      setCurrentRideId(s.currentRideId);
-      setStep(s.step || 'searching');
-      if (s.pickup)             setPickup(s.pickup);
-      if (s.pickupCoords)       setPickupCoords(s.pickupCoords);
-      if (s.dropoff)            setDropoff(s.dropoff);
-      if (s.destinationCoords)  setDestinationCoords(s.destinationCoords);
-      if (s.selectedRide)       setSelectedRide(s.selectedRide);
-      if (s.fareBreakdown)      setFareBreakdown(s.fareBreakdown);
-      if (s.activeRider)        setActiveRider(s.activeRider);
+    if (_pr.current?.currentRideId) {
       showNotification('Resumed your active booking');
-    } catch { /* ignore malformed data */ }
-    userSaveReady.current = true;
+    }
+    // Clear ref so it's not accidentally reused
+    _pr.current = null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount only
+
+  // Guard: skip save on the very first render so we don't wipe localStorage
+  // before the lazy-init state has been committed to the DOM.
+  const userSaveReady = useRef(false);
+  useEffect(() => { userSaveReady.current = true; }, []);
 
   // Save whenever the active-ride state changes.
   // Guard: skip first run (before recovery setState has propagated) to avoid wiping localStorage.
@@ -2595,10 +2612,22 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [isOnline, setIsOnline] = useState(false);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
-  const [requestAccepted, setRequestAccepted] = useState(false);
+  // ── Lazy-initialise rider ride state from localStorage (avoids useEffect race) ──
+  const _rpr = React.useRef<any>(() => {
+    try {
+      const raw = localStorage.getItem(RIDER_RIDE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return (s.currentRequest && s.requestAccepted) ? s : null;
+    } catch { return null; }
+  });
+  // Evaluate the factory once
+  if (typeof _rpr.current === 'function') _rpr.current = _rpr.current();
+
+  const [requestAccepted, setRequestAccepted] = useState<boolean>(() => !!_rpr.current?.requestAccepted);
   const [waitingForUserConfirm, setWaitingForUserConfirm] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
-  const [currentRequest, setCurrentRequest] = useState<any>(null);
+  const [currentRequest, setCurrentRequest] = useState<any>(() => _rpr.current?.currentRequest ?? null);
 
   const [riderTab, setRiderTab] = useState<'home' | 'history' | 'remit' | 'team' | 'news'>('home');
   const [myTeam, setMyTeam] = useState<Team | null>(null);
@@ -2801,23 +2830,20 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   }, [riderTab, teamSubTab, myTeam, teamRemitDate]);
 
   // ── Active-ride persistence ────────────────────────────────────────────────
-  const [rideRestored, setRideRestored] = React.useState(false);
-  const [showActiveRide, setShowActiveRide] = React.useState(false);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RIDER_RIDE_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.currentRequest && s.requestAccepted) {
-        setCurrentRequest(s.currentRequest);
-        setRequestAccepted(true);
-        setRideRestored(true);
-        setShowActiveRide(true);
-      }
-    } catch { /* ignore */ }
-  }, []); // mount only
+  // State already initialised from localStorage via lazy useState above.
+  const [rideRestored, setRideRestored] = React.useState<boolean>(() => !!_rpr.current?.requestAccepted);
+  const [showActiveRide, setShowActiveRide] = React.useState<boolean>(() => !!_rpr.current?.requestAccepted);
+
+  // Clear the ref after first use
+  useEffect(() => { _rpr.current = null; }, []);
+
+  // Guard: skip save on the very first render to avoid wiping localStorage
+  // before the lazy-init state values are committed.
+  const riderSaveReady = React.useRef(false);
+  useEffect(() => { riderSaveReady.current = true; }, []);
 
   useEffect(() => {
+    if (!riderSaveReady.current) return;
     if (requestAccepted && currentRequest) {
       try {
         localStorage.setItem(RIDER_RIDE_KEY, JSON.stringify({ currentRequest, requestAccepted: true }));
