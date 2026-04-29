@@ -1379,6 +1379,15 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       }
     });
 
+    channel.on('broadcast', { event: 'RIDE_CANCELLED' }, (payload) => {
+      if (payload.payload.rideId === currentRideId) {
+        showNotification('Your rider cancelled the booking.');
+        pushNotification('Ride cancelled 😔', 'Your rider cancelled. Please book again.');
+        pushAppNotification('Ride cancelled 😔', 'Your rider cancelled the booking.');
+        handleCancelBooking();
+      }
+    });
+
     channel.on('broadcast', { event: 'RIDE_COMPLETED' }, async (payload) => {
       if (payload.payload.rideId === currentRideId) {
         const d = completionDataRef.current;
@@ -2266,7 +2275,18 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [riderFollowKey, setRiderFollowKey] = useState(0);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const riderMapRef = useRef<any>(null);
+
+  const handleRiderCancel = async () => {
+    await supabase.channel('rides').send({
+      type: 'broadcast', event: 'RIDE_CANCELLED',
+      payload: { rideId: request.rideId },
+    });
+    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', request.rideId);
+    localStorage.removeItem('fetch_rider_ride');
+    if (onBack) onBack();
+  };
   const isChatOpenRef = React.useRef(false);
   isChatOpenRef.current = isChatOpen;
   const targetCoords = ridePhase === 'pickup' ? request.pickup.coords : request.dropoff.coords;
@@ -2312,28 +2332,32 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     };
   }, [request.rideId]);
 
-  // Track last position where route was fetched to throttle OSRM calls
+  // Route fetching — throttled by 50m, generation counter prevents stale updates
   const lastRouteFetchPos = useRef<[number, number] | null>(null);
+  const routeGen = useRef(0);
+  const routeMounted = useRef(true);
+  useEffect(() => { return () => { routeMounted.current = false; }; }, []);
+
+  // Reset threshold on phase change so new target always triggers a fresh fetch
+  useEffect(() => { lastRouteFetchPos.current = null; }, [targetCoords]);
 
   useEffect(() => {
     if (!riderCoords) return;
-    const dist = lastRouteFetchPos.current ? haversineMeters(lastRouteFetchPos.current, riderCoords) : Infinity;
-    // Refetch only when target changes (always) or rider moved > 50 m
+    const dist = lastRouteFetchPos.current
+      ? haversineMeters(lastRouteFetchPos.current, riderCoords)
+      : Infinity;
     if (lastRouteFetchPos.current && dist < 50) return;
     lastRouteFetchPos.current = riderCoords;
 
-    const ctrl = new AbortController();
-    fetchOsrmRoute(riderCoords, targetCoords, ctrl.signal).then(coords => {
-      if (ctrl.signal.aborted) return;
-      setRouteCoords(coords ?? [riderCoords, targetCoords]);
+    const gen = ++routeGen.current;
+    const from: [number, number] = [riderCoords[0], riderCoords[1]];
+    const to: [number, number] = [targetCoords[0], targetCoords[1]];
+    // No AbortController — let fetch complete; generation check drops stale results
+    fetchOsrmRoute(from, to).then(coords => {
+      if (routeGen.current !== gen || !routeMounted.current) return;
+      setRouteCoords(coords ?? [from, to]);
     });
-    return () => ctrl.abort();
   }, [riderCoords, targetCoords]);
-
-  // Force refetch when target changes (phase switch)
-  useEffect(() => {
-    lastRouteFetchPos.current = null;
-  }, [targetCoords]);
 
   const distanceLabel = routeInfo ? (routeInfo.distance / 1000).toFixed(1) + ' km' : '—';
   const durationLabel = routeInfo ? Math.ceil(routeInfo.duration / 60) + ' min' : '—';
@@ -2483,37 +2507,63 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         </AnimatePresence>
 
         {/* Action buttons — always visible */}
-        <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-2 flex gap-3">
-          <div className="relative shrink-0">
+        <div className="px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-2 space-y-2">
+          <div className="flex gap-3">
+            <div className="relative shrink-0">
+              <button
+                onClick={() => { setUnreadCount(0); setIsChatOpen(true); }}
+                className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                <MessageSquare size={22} />
+              </button>
+              {unreadCount > 0 && (
+                <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </div>
+              )}
+            </div>
             <button
-              onClick={() => { setUnreadCount(0); setIsChatOpen(true); }}
-              className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-700 hover:bg-gray-200 transition-colors"
+              onClick={() => {
+                if (ridePhase === 'pickup') {
+                  setRidePhase('dropoff');
+                  if (onArrive) onArrive();
+                } else {
+                  onComplete();
+                }
+              }}
+              className={`flex-1 py-4 text-white font-black text-base rounded-2xl transition-all shadow-lg ${
+                ridePhase === 'pickup'
+                  ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30'
+                  : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'
+              }`}
             >
-              <MessageSquare size={22} />
+              {ridePhase === 'pickup' ? 'Arrive at Pickup' : 'Complete Ride'}
             </button>
-            {unreadCount > 0 && (
-              <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </div>
-            )}
           </div>
-          <button
-            onClick={() => {
-              if (ridePhase === 'pickup') {
-                setRidePhase('dropoff');
-                if (onArrive) onArrive();
-              } else {
-                onComplete();
-              }
-            }}
-            className={`flex-1 py-4 text-white font-black text-base rounded-2xl transition-all shadow-lg ${
-              ridePhase === 'pickup'
-                ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30'
-                : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'
-            }`}
-          >
-            {ridePhase === 'pickup' ? 'Arrive at Pickup' : 'Complete Ride'}
-          </button>
+          {/* Cancel booking */}
+          {showCancelConfirm ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                Keep Ride
+              </button>
+              <button
+                onClick={handleRiderCancel}
+                className="flex-1 py-3 bg-red-500 rounded-2xl text-sm font-bold text-white hover:bg-red-600 transition-colors"
+              >
+                Yes, Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="w-full py-2.5 text-red-500 text-sm font-bold rounded-2xl hover:bg-red-50 transition-colors"
+            >
+              Cancel Booking
+            </button>
+          )}
         </div>
       </div>
     </div>
