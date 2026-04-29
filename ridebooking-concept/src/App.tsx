@@ -3152,14 +3152,33 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         .eq('status', 'pending')
         .order('id', { ascending: true });
       if (pending?.length) {
-        pending.map((r: any) => r.request_data).filter(Boolean).forEach(scheduleRequest);
+        pending.map((r: any) => r.request_data).filter(Boolean).forEach((req: any) => {
+          if (req.targetRiderId && req.targetRiderId !== riderId) return;
+          lastSeenRef.current.set(req.rideId, Date.now());
+          scheduleRequest(req);
+        });
       }
     });
 
+    // Self-cleaning loop: drop requests that UserApp stopped broadcasting to us (e.g. timed out)
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      const isStale = (rid: string) => now - (lastSeenRef.current.get(rid) || 0) > 8000;
+      
+      setIncomingRequests(prev => prev.filter(req => !isStale(req.rideId)));
+      
+      setCurrentRequest((curr: any) => {
+        if (curr && !requestAcceptedRef.current && isStale(curr.rideId)) {
+          setHasRequest(false);
+          return null; // Timed out, moved to next rider
+        }
+        return curr;
+      });
+    }, 3000);
+
     return () => {
+      clearInterval(cleanupInterval);
       supabase.removeChannel(channel);
-      timers.forEach(t => clearTimeout(t));
-      timers.clear();
     };
   }, [isOnline, riderReconnectTick]);
 
