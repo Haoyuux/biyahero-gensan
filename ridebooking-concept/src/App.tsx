@@ -7,10 +7,14 @@ import {
   BarChart, TrendingUp, CheckCircle, LogOut, MapPin, Navigation,
   DollarSign, Settings, Camera, Calendar, Phone as PhoneIcon, Edit3,
   FileText, Upload, AlertCircle, Eye, Plus, Check, Ban, ShieldOff, Receipt, Cog, Download,
-  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag, Archive, ArchiveRestore
+  Users2, UserPlus, Trash2, Crown, Newspaper, ImagePlus, Tag, Archive, ArchiveRestore,
+  RotateCcw, RotateCw
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet-rotate';
+import biyaScooterImg from './assets/images/mapimages/biyascooter.webp';
+const RotatableMap = MapContainer as React.ComponentType<React.ComponentProps<typeof MapContainer> & { rotate?: boolean; touchRotate?: boolean; bearingSnap?: number }>;
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseAdmin, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, blockUser, unblockUser, getBlockableProfiles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
 import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
@@ -66,8 +70,8 @@ const destinationIcon = new L.DivIcon({
 
 const riderIcon = new L.DivIcon({
   className: 'bg-transparent',
-  html: `<div style="background:#2563eb;border:3px solid white;border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.4)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="22" height="22"><path d="M19 7c0-1.1-.9-2-2-2h-3l2 4H4c-1.1 0-2 .9-2 2v3h2c0 1.66 1.34 3 3 3s3-1.34 3-3h4c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-3c0-1.1-.9-2-2-2h-1l-2-4zM7 14c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm10 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg></div>`,
-  iconSize: [38, 38], iconAnchor: [19, 19],
+  html: `<div style="width:48px;height:48px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.45))"><img src="${biyaScooterImg}" style="width:100%;height:100%;object-fit:contain" /></div>`,
+  iconSize: [48, 48], iconAnchor: [24, 24],
 });
 
 const pickupIcon = new L.DivIcon({
@@ -1106,6 +1110,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [showMenu, setShowMenu] = useState(false);
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
   const [riderTrackKey, setRiderTrackKey] = useState(0);
+  const userMapRef = useRef<any>(null);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
   const pickupGpsNeedsResolve = useRef(true);
@@ -1762,7 +1767,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
       {/* Map — full screen on mobile (behind panels), fills right on desktop */}
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
-        <MapContainer center={startLoc} zoom={15} zoomControl={false} className="absolute inset-0 w-full h-full">
+        <RotatableMap ref={userMapRef} center={startLoc} zoom={15} zoomControl={false} rotate touchRotate bearingSnap={10} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -1807,7 +1812,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
           <MapSmoothFollow position={step === 'matched' ? riderLocation : null} resetKey={riderTrackKey} />
           <MapZoomControl position="bottomright" />
-        </MapContainer>
+        </RotatableMap>
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
             <div className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
@@ -1824,6 +1829,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             <Navigation size={18} />
           </button>
         )}
+        {/* Rotate controls */}
+        <div className="absolute bottom-4 left-4 z-[999] flex flex-col gap-1">
+          <button onClick={() => userMapRef.current?.setBearing((userMapRef.current.getBearing() - 45 + 360) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate left"><RotateCcw size={16} /></button>
+          <button onClick={() => userMapRef.current?.setBearing(0)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-xs font-bold" title="North up">N</button>
+          <button onClick={() => userMapRef.current?.setBearing((userMapRef.current.getBearing() + 45) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate right"><RotateCw size={16} /></button>
+        </div>
       </div>
     </div>
   );
@@ -2223,6 +2234,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [riderFollowKey, setRiderFollowKey] = useState(0);
+  const riderMapRef = useRef<any>(null);
   const isChatOpenRef = React.useRef(false);
   isChatOpenRef.current = isChatOpen;
   const targetCoords = ridePhase === 'pickup' ? request.pickup.coords : request.dropoff.coords;
@@ -2317,7 +2329,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
       {/* Map */}
       <div className="flex-1 relative">
         {riderCoords ? (
-          <MapContainer center={riderCoords} zoom={14} zoomControl={false} className="w-full h-full">
+          <RotatableMap ref={riderMapRef} center={riderCoords} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
@@ -2327,7 +2339,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
             {routeCoords && <Polyline positions={routeCoords} color={ridePhase === 'pickup' ? "#f97316" : "#10b981"} weight={5} opacity={0.9} />}
             <RiderMapFit riderCoords={riderCoords} targetCoords={targetCoords} resetKey={riderFollowKey} />
             <MapZoomControl position="bottomright" />
-          </MapContainer>
+          </RotatableMap>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-800">
             <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -2352,6 +2364,12 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         >
           <Navigation size={18} />
         </button>
+        {/* Rotate controls */}
+        <div className="absolute top-4 right-4 z-[999] flex flex-col gap-1">
+          <button onClick={() => riderMapRef.current?.setBearing((riderMapRef.current.getBearing() - 45 + 360) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate left"><RotateCcw size={16} /></button>
+          <button onClick={() => riderMapRef.current?.setBearing(0)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors text-xs font-bold" title="North up">N</button>
+          <button onClick={() => riderMapRef.current?.setBearing((riderMapRef.current.getBearing() + 45) % 360)} className="bg-white rounded-full shadow-lg p-2.5 text-gray-700 hover:bg-gray-50 transition-colors" title="Rotate right"><RotateCw size={16} /></button>
+        </div>
       </div>
 
       {/* Bottom Panel — collapsible */}
