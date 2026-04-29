@@ -6,6 +6,7 @@ export interface Team {
   name: string;
   capacity: number;
   schedule_days: number[]; // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  is_active: boolean;
   leader_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -21,7 +22,7 @@ export interface TeamMember {
   rider?: Pick<Profile, 'id' | 'full_name' | 'first_name' | 'last_name' | 'avatar_url'>;
 }
 
-const TEAM_SELECT = 'id, name, capacity, schedule_days, leader_id, created_by, created_at, leader:profiles!teams_leader_id_fkey(id, full_name, first_name, last_name, avatar_url)';
+const TEAM_SELECT = 'id, name, capacity, schedule_days, is_active, leader_id, created_by, created_at, leader:profiles!teams_leader_id_fkey(id, full_name, first_name, last_name, avatar_url)';
 const MEMBER_SELECT = 'id, team_id, rider_id, joined_at, rider:profiles!team_members_rider_id_fkey(id, full_name, first_name, last_name, avatar_url)';
 
 export async function fetchTeams(): Promise<Team[]> {
@@ -89,5 +90,11 @@ export async function addTeamMember(teamId: string, riderId: string): Promise<bo
 
 export async function removeTeamMember(teamId: string, riderId: string): Promise<boolean> {
   const { error } = await supabase.from('team_members').delete().eq('team_id', teamId).eq('rider_id', riderId);
+  return !error;
+}
+
+export async function toggleTeamActive(teamId: string, isActive: boolean): Promise<boolean> {
+  const { error } = await supabaseAdmin.from('teams').update({ is_active: isActive }).eq('id', teamId);
+  if (error) console.error('toggleTeamActive:', error);
   return !error;
 }
