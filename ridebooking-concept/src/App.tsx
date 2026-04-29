@@ -1207,20 +1207,73 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
   useEffect(() => { requestNotificationPermission(); }, []);
 
-  // While searching, re-broadcast REQUEST_RIDE every 4 s so riders who come online
-  // mid-search receive the request (they miss the one-shot initial broadcast).
+  // ── Waterfall Dispatch Orchestration ──────────────
+  const declinedRidersRef = React.useRef<Set<string>>(new Set());
+  const attemptedRidersRef = React.useRef<Set<string>>(new Set());
+  const currentTargetRef = React.useRef<string | null>(null);
+  const targetStartTimeRef = React.useRef<number>(0);
+
+  // Listen for RIDE_DECLINED to instantly skip to the next rider
+  useEffect(() => {
+    if (step !== 'searching' || !currentRideId) return;
+    const ch = supabase.channel('user-rides-dispatch');
+    ch.on('broadcast', { event: 'RIDE_DECLINED' }, (p) => {
+      if (p.payload.rideId === currentRideId) {
+        declinedRidersRef.current.add(p.payload.riderId);
+        // Force advance on next interval tick
+        targetStartTimeRef.current = 0; 
+      }
+    });
+    ch.subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [step, currentRideId]);
+
+  // Orchestration loop: broadcasts to one target at a time (15s each)
   useEffect(() => {
     if (step !== 'searching') {
       pendingRequestRef.current = null;
+      declinedRidersRef.current.clear();
+      attemptedRidersRef.current.clear();
+      currentTargetRef.current = null;
       return;
     }
-    const interval = setInterval(() => {
+
+    const broadcastCycle = () => {
       const payload = pendingRequestRef.current;
       if (!payload) return;
-      supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload });
-    }, 4000);
+      const priorities = payload.priorityRiderIds || [];
+      
+      const isDeclined = currentTargetRef.current && declinedRidersRef.current.has(currentTargetRef.current);
+      const isExpired = Date.now() - targetStartTimeRef.current >= 15000;
+
+      if (!currentTargetRef.current || isDeclined || isExpired) {
+        // Find next rider not attempted and not declined
+        const nextRider = priorities.find((id: string) => 
+          !attemptedRidersRef.current.has(id) && !declinedRidersRef.current.has(id)
+        );
+        
+        if (nextRider) {
+          currentTargetRef.current = nextRider;
+          targetStartTimeRef.current = Date.now();
+          attemptedRidersRef.current.add(nextRider);
+        } else {
+          // Exhausted priority list, fallback to broadcast to all
+          currentTargetRef.current = null;
+        }
+      }
+
+      supabase.channel('rides').send({ 
+        type: 'broadcast', 
+        event: 'REQUEST_RIDE', 
+        payload: { ...payload, targetRiderId: currentTargetRef.current } 
+      });
+    };
+
+    // Initial broadcast and interval
+    broadcastCycle();
+    const interval = setInterval(broadcastCycle, 4000);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, currentRideId]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -3013,45 +3066,36 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       }
       return;
     }
-    const PRIORITY_DELAY_MS = 15_000; // 15 s per priority rank
-    const riderId = currentProfile.id;
-    const timers = pendingTimersRef.current;
+    const requestAcceptedRef = React.useRef(requestAccepted);
+    requestAcceptedRef.current = requestAccepted;
+    const lastSeenRef = React.useRef<Map<string, number>>(new Map());
 
-    // Schedule a request to appear in the queue after a priority-based delay.
-    // Closest rider (index 0) gets delay = 0; every subsequent rank adds 15 s.
+    // Schedule request immediately (UserApp orchestrates the sequence delay now)
     const scheduleRequest = (req: any) => {
-      if (timers.has(req.rideId)) return; // already scheduled
-      if (usedRideIdsRef.current.has(req.rideId)) return; // already accepted/completed
-      const priority: string[] = req.priorityRiderIds ?? [];
-      const pos = priority.indexOf(riderId);
-      const delay = pos >= 0 ? pos * PRIORITY_DELAY_MS : priority.length * PRIORITY_DELAY_MS;
-
-      const enqueue = () => {
-        timers.delete(req.rideId);
-        setIncomingRequests(prev => {
-          if (prev.some((r: any) => r.rideId === req.rideId)) return prev;
-          return [...prev, req];
-        });
+      if (usedRideIdsRef.current.has(req.rideId)) return;
+      
+      setIncomingRequests(prev => {
+        if (prev.some((r: any) => r.rideId === req.rideId)) return prev;
         const pName = `${req.user?.first_name || ''} ${req.user?.last_name || ''}`.trim() || 'Passenger';
-        setAppNotifications(prev => [{ id: genId(), title: 'New ride request 🛵', body: `${pName} is requesting a ride.`, time: Date.now(), read: false }, ...prev]);
-        if (delay === 0) pushNotification('New ride request 🛵', `${pName} is requesting a ride.`);
-      };
-
-      if (delay === 0) { enqueue(); }
-      else { timers.set(req.rideId, setTimeout(enqueue, delay)); }
+        setAppNotifications(n => [{ id: genId(), title: 'New ride request 🛵', body: `${pName} is requesting a ride.`, time: Date.now(), read: false }, ...n]);
+        pushNotification('New ride request 🛵', `${pName} is requesting a ride.`);
+        return [...prev, req];
+      });
     };
-
     const channel = supabase.channel('rides');
 
     channel.on('broadcast', { event: 'REQUEST_RIDE' }, (payload) => {
-      scheduleRequest(payload.payload);
+      const req = payload.payload;
+      // If targeted to someone else, ignore completely
+      if (req.targetRiderId && req.targetRiderId !== riderId) return;
+      
+      lastSeenRef.current.set(req.rideId, Date.now());
+      scheduleRequest(req);
     });
 
     channel.on('broadcast', { event: 'CANCEL_RIDE' }, (payload) => {
       const { rideId } = payload.payload;
-      usedRideIdsRef.current.add(rideId); // prevent delayed enqueue from showing cancelled ride
-      const t = timers.get(rideId);
-      if (t) { clearTimeout(t); timers.delete(rideId); }
+      usedRideIdsRef.current.add(rideId);
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
       const isMyRide = myAcceptedRideIdRef.current === rideId;
       setCurrentRequest((current: any) => {
@@ -3084,9 +3128,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     // Remove rides accepted by ANOTHER rider from this rider's queue
     channel.on('broadcast', { event: 'RIDE_ACCEPTED' }, (payload) => {
       const { rideId } = payload.payload;
-      usedRideIdsRef.current.add(rideId); // prevent re-scheduling from re-broadcasts
-      const t = timers.get(rideId);
-      if (t) { clearTimeout(t); timers.delete(rideId); }
+      usedRideIdsRef.current.add(rideId);
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
       // Use ref (not state) to avoid stale closure — myAcceptedRideIdRef is set synchronously on accept
       if (myAcceptedRideIdRef.current !== rideId) {
@@ -3648,9 +3690,16 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
               </div>
               <div className="flex gap-2.5">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    const rid = currentRequest.rideId;
                     setHasRequest(false);
                     setCurrentRequest(null);
+                    usedRideIdsRef.current.add(rid);
+                    await supabase.channel('user-rides-dispatch').send({ 
+                      type: 'broadcast', 
+                      event: 'RIDE_DECLINED', 
+                      payload: { rideId: rid, riderId: currentProfile.id } 
+                    });
                   }}
                   className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
                 >
