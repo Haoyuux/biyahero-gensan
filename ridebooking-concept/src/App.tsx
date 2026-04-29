@@ -2310,7 +2310,6 @@ function RiderMapFit({ riderCoords, targetCoords, resetKey = 0 }: { riderCoords:
 
 const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, restored = false }: { request: any, profile: Profile, onComplete: () => void, onArrive: () => void, onBack?: () => void, restored?: boolean }) => {
   const [riderCoords, setRiderCoords] = useState<[number, number] | null>(null);
-  const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
   const [ridePhase, setRidePhase] = useState<'pickup' | 'dropoff'>('pickup');
   const [isPanelExpanded, setIsPanelExpanded] = useState(false);
@@ -2382,45 +2381,51 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     };
   }, [request.rideId]);
 
-  // Route fetching: straight-line shown immediately on GPS fix, replaced by
-  // road-snapped OSRM route. OSRM fetches throttled to every 50m of movement.
-  const lastRouteFetchPos = useRef<[number, number] | null>(null);
-  const routeGen = useRef(0);
-  const routeMounted = useRef(true);
-  useEffect(() => { return () => { routeMounted.current = false; }; }, []);
+  // ── Route display: two-layer approach ────────────────────────────────────────────────
+  // Layer 1: "direct line" — computed purely from state, always visible when GPS ready.
+  // No async, no state, no race conditions. Shows the moment riderCoords is set.
+  const directLine: [number, number][] | null = riderCoords
+    ? [riderCoords, targetCoords as [number, number]]
+    : null;
 
-  // Reset fetch threshold on phase change so a new target always gets a fresh route
+  // Layer 2: road-snapped OSRM route — fetched in the background and overlaid
+  // when available. Falls back gracefully to the direct line if OSRM fails.
+  const [snapRoute, setSnapRoute] = useState<[number, number][] | null>(null);
+  const lastSnapPos = useRef<[number, number] | null>(null);
+  const snapGen = useRef(0);
+  const snapMounted = useRef(true);
+  useEffect(() => { return () => { snapMounted.current = false; }; }, []);
+
+  // Clear snap route on phase change so the old route doesn't flicker
   useEffect(() => {
-    lastRouteFetchPos.current = null;
-    setRouteCoords(null);
-    setRouteInfo(null);
+    setSnapRoute(null);
+    lastSnapPos.current = null;
   }, [targetCoords]);
 
+  // Fetch OSRM road-snapped route whenever rider moves ≥50 m (or on first GPS fix)
   useEffect(() => {
     if (!riderCoords) return;
-    const from: [number, number] = [riderCoords[0], riderCoords[1]];
-    const to: [number, number] = [targetCoords[0], targetCoords[1]];
-
-    // Always draw a straight-line immediately so the user sees something right away
-    setRouteCoords([from, to]);
-
-    // Only hit OSRM when rider has moved ≥50 m (or on first GPS fix)
-    const dist = lastRouteFetchPos.current
-      ? haversineMeters(lastRouteFetchPos.current, riderCoords)
+    const dist = lastSnapPos.current
+      ? haversineMeters(lastSnapPos.current, riderCoords)
       : Infinity;
-    if (lastRouteFetchPos.current && dist < 50) return;
-    lastRouteFetchPos.current = riderCoords;
+    if (lastSnapPos.current && dist < 50) return;
+    lastSnapPos.current = riderCoords;
 
-    const gen = ++routeGen.current;
+    const gen = ++snapGen.current;
+    const from: [number, number] = [riderCoords[0], riderCoords[1]];
+    const to: [number, number] = [(targetCoords as [number, number])[0], (targetCoords as [number, number])[1]];
     fetchOsrmRouteWithInfo(from, to).then(result => {
-      if (routeGen.current !== gen || !routeMounted.current) return;
+      if (snapGen.current !== gen || !snapMounted.current) return;
       if (result) {
-        setRouteCoords(result.coords);
+        setSnapRoute(result.coords);
         setRouteInfo({ distance: result.distance, duration: result.duration });
       }
-      // On failure keep the straight-line already set above
+      // If OSRM fails, snapRoute stays null — directLine remains the fallback
     });
   }, [riderCoords, targetCoords]);
+
+  // Keep routeCoords in sync so RiderMapFit and other consumers still work
+  const routeCoords = snapRoute ?? directLine;
 
   const distanceLabel = routeInfo ? (routeInfo.distance / 1000).toFixed(1) + ' km' : '—';
   const durationLabel = routeInfo ? Math.ceil(routeInfo.duration / 60) + ' min' : '—';
@@ -2467,7 +2472,25 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
           />
           {riderCoords && <Marker position={riderCoords} icon={riderIcon} />}
           <Marker position={targetCoords} icon={ridePhase === 'pickup' ? pickupIcon : destinationIcon} />
-          {routeCoords && <Polyline positions={routeCoords} color={ridePhase === 'pickup' ? "#f97316" : "#10b981"} weight={5} opacity={0.9} />}
+          {/* Layer 1: direct straight line — always visible as soon as GPS fires */}
+          {directLine && (
+            <Polyline
+              positions={directLine}
+              color={ridePhase === 'pickup' ? '#f97316' : '#10b981'}
+              weight={3}
+              opacity={0.5}
+              dashArray="10 6"
+            />
+          )}
+          {/* Layer 2: road-snapped OSRM route — overlaid when available */}
+          {snapRoute && (
+            <Polyline
+              positions={snapRoute}
+              color={ridePhase === 'pickup' ? '#f97316' : '#10b981'}
+              weight={5}
+              opacity={0.9}
+            />
+          )}
           {riderCoords && <RiderMapFit riderCoords={riderCoords} targetCoords={targetCoords} resetKey={riderFollowKey} />}
           <MapZoomControl position="bottomright" />
         </RotatableMap>
