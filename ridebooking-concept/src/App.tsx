@@ -7646,7 +7646,7 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
   const dragControls = useDragControls();
 
   const dynamicRides = RIDE_OPTIONS.map(ride => {
-    const breakdown = calculateFare(ride.id as keyof PricingConfig, distanceM, durationS, pricingConfig ?? DEFAULT_PRICING);
+    const breakdown = calculateFare(ride.id as 'moto' | 'eco' | 'premium', distanceM, durationS, pricingConfig ?? DEFAULT_PRICING);
     return { ...ride, breakdown, time: durationMin > 0 ? `${durationMin} min` : ride.time };
   });
 
@@ -7996,7 +7996,7 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
   }, [activeRider?.id]);
 
   const activeFare: FareBreakdown = fareBreakdown ?? calculateFare(
-    selectedRide as keyof PricingConfig,
+    selectedRide as 'moto' | 'eco' | 'premium',
     routeInfo?.distance ?? 0,
     routeInfo?.duration ?? 0,
     pricingConfig ?? DEFAULT_PRICING,

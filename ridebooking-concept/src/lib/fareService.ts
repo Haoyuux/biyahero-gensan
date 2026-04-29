@@ -14,6 +14,7 @@ export interface PricingConfig {
   moto: TierPricing;
   eco: TierPricing;
   premium: TierPricing;
+  teamBookingFeeDiscount: number; // percentage 0-100, applied at remittance time
 }
 
 export interface FareBreakdown {
@@ -27,6 +28,7 @@ export interface FareBreakdown {
 const STORAGE_KEY = 'fetch_pricing_config';
 
 export const DEFAULT_PRICING: PricingConfig = {
+  teamBookingFeeDiscount: 0,
   moto: {
     baseFare: 40,
     perKmRate: 12,        // ₱10 revenue + ₱2 maintenance
@@ -63,7 +65,7 @@ export const DEFAULT_PRICING: PricingConfig = {
  * Total Fare = baseFare + (distanceKm × perKmRate) + (durationMin × perMinuteRate) + computedBookingFee
  */
 export function calculateFare(
-  tierId: keyof PricingConfig,
+  tierId: 'moto' | 'eco' | 'premium',
   distanceM: number,
   durationS: number,
   config: PricingConfig = DEFAULT_PRICING,
@@ -95,6 +97,7 @@ export function loadPricingConfig(): PricingConfig {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PricingConfig>;
       return {
+        teamBookingFeeDiscount: parsed.teamBookingFeeDiscount ?? DEFAULT_PRICING.teamBookingFeeDiscount,
         moto:    { ...DEFAULT_PRICING.moto,    ...parsed.moto },
         eco:     { ...DEFAULT_PRICING.eco,     ...parsed.eco },
         premium: { ...DEFAULT_PRICING.premium, ...parsed.premium },
