@@ -4008,6 +4008,7 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
     if (!editingTeam) return;
     setSaving(true);
     const isActive = editingTeam.is_active ?? false;
+    console.log('[handleSaveEdit] id:', editingTeam.id, 'is_active (raw):', editingTeam.is_active, 'isActive:', isActive);
     const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: isActive });
     if (ok) {
       setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: isActive } : t));
