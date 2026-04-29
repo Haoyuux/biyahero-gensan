@@ -2445,7 +2445,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
   const [remitDate, setRemitDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [remitStats, setRemitStats] = useState<{ ridesCount: number; earnings: number; bookingFee: number }>({ ridesCount: 0, earnings: 0, bookingFee: 0 });
-  const [pricingCfg] = useState<PricingConfig>(() => loadPricingConfig());
+  const [pricingCfg, setPricingCfg] = useState<PricingConfig>(() => loadPricingConfig());
+  useEffect(() => {
+    const handler = () => setPricingCfg(loadPricingConfig());
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
   const isDiscountEligible = (() => {
     const team = riderTeam ?? myTeam;
     if (!team || !team.is_active) return false;
@@ -4039,7 +4044,8 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   const handleToggleActive = async (teamId: string, current: boolean) => {
     const next = !current;
     setTeams(prev => prev.map(t => t.id === teamId ? { ...t, is_active: next } : t));
-    await toggleTeamActive(teamId, next);
+    const ok = await toggleTeamActive(teamId, next);
+    if (!ok) setTeams(prev => prev.map(t => t.id === teamId ? { ...t, is_active: current } : t));
   };
 
   if (loading) return (
