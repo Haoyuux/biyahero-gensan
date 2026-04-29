@@ -158,11 +158,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (globalSettings?.document_title) {
-      document.title = globalSettings.document_title;
-    } else if (globalSettings?.app_name) {
-      document.title = globalSettings.app_name;
-    }
+
 
     if (globalSettings?.app_logo_url) {
       let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
@@ -255,7 +251,7 @@ const LoginScreen = ({ settings }: { settings: AppSettings | null }) => {
           <div className="w-20 h-20 md:w-32 md:h-32 flex items-center justify-center mb-8 mx-auto overflow-hidden">
             {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={28} className="text-white" />}
           </div>
-          <h1 className="text-[3.25rem] font-black text-white tracking-tighter leading-none mb-3">{settings?.app_name || 'Fetch'}</h1>
+          <h1 className="text-[3.25rem] font-black text-white tracking-tighter leading-none mb-3">{settings?.app_name || 'BiyaHero'}</h1>
           <p className="text-gray-500 text-sm font-medium tracking-wide">Your ride, on demand</p>
         </div>
 
@@ -315,7 +311,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
           Account Suspended
         </h1>
         <p className="text-gray-500 text-sm font-medium text-center mb-8">
-          Your account has been temporarily restricted from accessing Fetch.
+          Your account has been temporarily restricted from accessing BiyaHero.
         </p>
 
         {/* Block Details Card */}
@@ -382,7 +378,7 @@ const OnboardingScreen = ({ profile, settings, onComplete }: { profile: Profile,
         className="w-full max-w-[360px]"
       >
         <div className="mb-10">
-          <p className="text-xs font-semibold text-emerald-600 tracking-widest uppercase mb-4">Welcome to {settings?.app_name || 'Fetch'}</p>
+          <p className="text-xs font-semibold text-emerald-600 tracking-widest uppercase mb-4">Welcome to {settings?.app_name || 'BiyaHero'}</p>
           <h1 className="text-[2rem] font-black text-gray-950 tracking-tight leading-tight mb-2">
             Hey {profile.full_name?.split(' ')[0] || 'there'} 👋
           </h1>
@@ -1480,7 +1476,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
               {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={18} className="text-gray-950" />}
             </div>
             <div className="min-w-0">
-              <h1 className="font-black text-[15px] text-gray-950 leading-tight truncate">{settings?.app_name || 'Fetch'}</h1>
+              <h1 className="font-black text-[15px] text-gray-950 leading-tight truncate">{settings?.app_name || 'BiyaHero'}</h1>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Premium Service</span>
@@ -2799,7 +2795,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
             {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Car size={18} className="text-gray-950" />}
           </div>
           <div className="min-w-0">
-            <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">{settings?.app_name || 'Fetch'} Driver</h1>
+            <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">{settings?.app_name || 'BiyaHero'} Driver</h1>
             <p className="text-[10px] md:text-[11px] text-gray-400 mt-0.5 truncate max-w-[120px] md:max-w-none">{currentProfile.full_name || currentProfile.email}</p>
           </div>
         </div>
@@ -2838,20 +2834,41 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         </div>
       </div>
 
-      {/* Tab Bar */}
-      <div className="bg-white border-b border-gray-100 px-4 md:px-5 flex gap-1">
+      {/* Tab Bar — desktop only */}
+      <div className="hidden md:flex bg-white border-b border-gray-100 px-5 gap-1">
         {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
-            className={`py-3 px-4 text-[13px] font-bold border-b-2 transition-colors capitalize ${riderTab === tab ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            className={`py-3 px-4 text-[13px] font-bold border-b-2 transition-colors ${riderTab === tab ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
             {tab === 'home' ? 'Dashboard' : tab === 'history' ? 'Trip History' : tab === 'remit' ? 'Remittance' : tab === 'team' ? 'My Team' : 'News'}
           </button>
         ))}
       </div>
 
-      <div className="max-w-xl mx-auto p-4 md:p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4">
+      {/* Bottom Nav — mobile only */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+        {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => {
+          const active = riderTab === tab;
+          const Icon = tab === 'home' ? Home : tab === 'history' ? Clock : tab === 'remit' ? Receipt : tab === 'team' ? Users : Newspaper;
+          const label = tab === 'home' ? 'Home' : tab === 'history' ? 'Trips' : tab === 'remit' ? 'Remit' : tab === 'team' ? 'Team' : 'News';
+          return (
+            <button
+              key={tab}
+              onClick={() => setRiderTab(tab)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${active ? 'text-gray-950' : 'text-gray-400'}`}
+            >
+              <div className={`w-8 h-8 flex items-center justify-center rounded-xl transition-colors ${active ? 'bg-gray-950 text-white' : 'text-gray-400'}`}>
+                <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
+              </div>
+              <span className={`text-[10px] font-bold tracking-wide ${active ? 'text-gray-950' : 'text-gray-400'}`}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="max-w-xl mx-auto p-4 md:p-5 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4">
 
         {/* Ongoing ride banner — shown when rider backed out to dashboard */}
         <AnimatePresence>
@@ -6852,7 +6869,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                       type="text" 
                       value={appSettings?.app_name || ''} 
                       onChange={e => setAppSettings(prev => prev ? {...prev, app_name: e.target.value} : null)}
-                      placeholder="e.g. Fetch Gensan"
+                      placeholder="e.g. BiyaHero"
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
                     />
                   </div>
@@ -6862,7 +6879,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                       type="text" 
                       value={appSettings?.document_title || ''} 
                       onChange={e => setAppSettings(prev => prev ? {...prev, document_title: e.target.value} : null)}
-                      placeholder="e.g. Fetch — Ride Booking & Delivery"
+                      placeholder="e.g. BiyaHero – Your Ride, Your Hero!"
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
                     />
                     <p className="text-[10px] text-gray-400 mt-1.5 ml-1">This text appears in the browser tab. Leave blank to use app name.</p>
