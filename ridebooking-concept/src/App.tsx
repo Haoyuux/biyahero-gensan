@@ -2382,49 +2382,43 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     };
   }, [request.rideId]);
 
-  // Route fetching — throttled by 50m, generation counter prevents stale updates
+  // Route fetching: straight-line shown immediately on GPS fix, replaced by
+  // road-snapped OSRM route. OSRM fetches throttled to every 50m of movement.
   const lastRouteFetchPos = useRef<[number, number] | null>(null);
   const routeGen = useRef(0);
   const routeMounted = useRef(true);
   useEffect(() => { return () => { routeMounted.current = false; }; }, []);
 
-  // ── Show a placeholder polyline immediately (before GPS arrives) ─────────────
-  // Seeds routeCoords with a degenerate point at the target so the Polyline
-  // component renders right away. The GPS-triggered effect below replaces it
-  // with the real road-snapped route on first GPS fix.
+  // Reset fetch threshold on phase change so a new target always gets a fresh route
   useEffect(() => {
-    const to: [number, number] = [targetCoords[0], targetCoords[1]];
-    setRouteCoords(prev => prev ?? [to, to]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount only
-
-  // Reset threshold on phase change so new target always triggers a fresh fetch
-  useEffect(() => { lastRouteFetchPos.current = null; }, [targetCoords]);
+    lastRouteFetchPos.current = null;
+    setRouteCoords(null);
+    setRouteInfo(null);
+  }, [targetCoords]);
 
   useEffect(() => {
     if (!riderCoords) return;
+    const from: [number, number] = [riderCoords[0], riderCoords[1]];
+    const to: [number, number] = [targetCoords[0], targetCoords[1]];
+
+    // Always draw a straight-line immediately so the user sees something right away
+    setRouteCoords([from, to]);
+
+    // Only hit OSRM when rider has moved ≥50 m (or on first GPS fix)
     const dist = lastRouteFetchPos.current
       ? haversineMeters(lastRouteFetchPos.current, riderCoords)
       : Infinity;
-    // First GPS fix always fetches (dist === Infinity); subsequent only if moved 50m+
     if (lastRouteFetchPos.current && dist < 50) return;
     lastRouteFetchPos.current = riderCoords;
 
     const gen = ++routeGen.current;
-    const from: [number, number] = [riderCoords[0], riderCoords[1]];
-    const to: [number, number] = [targetCoords[0], targetCoords[1]];
-
-    // Show straight-line immediately so something is visible while OSRM responds
-    setRouteCoords(prev => prev ?? [from, to]);
-
     fetchOsrmRouteWithInfo(from, to).then(result => {
       if (routeGen.current !== gen || !routeMounted.current) return;
       if (result) {
         setRouteCoords(result.coords);
         setRouteInfo({ distance: result.distance, duration: result.duration });
-      } else {
-        setRouteCoords([from, to]);
       }
+      // On failure keep the straight-line already set above
     });
   }, [riderCoords, targetCoords]);
 
