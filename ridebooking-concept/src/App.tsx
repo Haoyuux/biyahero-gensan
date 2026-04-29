@@ -3055,6 +3055,10 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [isOnline, currentProfile.id]);
 
+  const requestAcceptedRef = React.useRef(requestAccepted);
+  requestAcceptedRef.current = requestAccepted;
+  const lastSeenRef = React.useRef<Map<string, number>>(new Map());
+
   useEffect(() => {
     if (!isOnline) {
       setHasRequest(false);
@@ -3066,9 +3070,6 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       }
       return;
     }
-    const requestAcceptedRef = React.useRef(requestAccepted);
-    requestAcceptedRef.current = requestAccepted;
-    const lastSeenRef = React.useRef<Map<string, number>>(new Map());
 
     // Schedule request immediately (UserApp orchestrates the sequence delay now)
     const scheduleRequest = (req: any) => {
