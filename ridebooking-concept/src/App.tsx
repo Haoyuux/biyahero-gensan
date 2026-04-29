@@ -91,6 +91,32 @@ const draggableDestIcon = new L.DivIcon({
   iconSize: [28, 28], iconAnchor: [14, 14],
 });
 
+function haversineMeters(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const dLat = (b[0] - a[0]) * Math.PI / 180;
+  const dLon = (b[1] - a[1]) * Math.PI / 180;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(s));
+}
+
+async function fetchOsrmRoute(
+  from: [number, number],
+  to: [number, number],
+  signal?: AbortSignal,
+): Promise<[number, number][] | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const r = await fetch(url, { signal });
+    const data = await r.json();
+    if (data.routes?.length > 0) {
+      return data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
@@ -1375,29 +1401,28 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   }, [currentRideId, reconnectTick]);
 
   useEffect(() => {
-    if (startLoc && endLoc) {
-      fetch(`https://router.project-osrm.org/route/v1/driving/${startLoc[1]},${startLoc[0]};${endLoc[1]},${endLoc[0]}?overview=full&geometries=geojson`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.routes?.length > 0) {
-            setRouteCoords(data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]));
-            setRouteInfo({ distance: data.routes[0].distance, duration: data.routes[0].duration });
-          } else {
-            setRouteCoords([startLoc, endLoc]);
-            setRouteInfo(null);
-          }
-          // Fit both pins into view whenever route (re)loads
-          setMapFocus({ coords: 'route', key: Date.now() });
-        })
-        .catch(() => {
-          setRouteCoords([startLoc, endLoc]);
-          setRouteInfo(null);
-          setMapFocus({ coords: 'route', key: Date.now() });
-        });
-    } else {
-      setRouteCoords(null);
-      setRouteInfo(null);
-    }
+    if (!startLoc || !endLoc) { setRouteCoords(null); setRouteInfo(null); return; }
+    const ctrl = new AbortController();
+    let retried = false;
+    const tryFetch = async () => {
+      let coords = await fetchOsrmRoute(startLoc, endLoc, ctrl.signal);
+      if (!coords && !retried && !ctrl.signal.aborted) {
+        // one retry after short delay
+        retried = true;
+        await new Promise(r => setTimeout(r, 2000));
+        coords = await fetchOsrmRoute(startLoc, endLoc, ctrl.signal);
+      }
+      if (ctrl.signal.aborted) return;
+      if (coords) {
+        // pull distance/duration from second fetch attempt too
+        setRouteCoords(coords);
+      } else {
+        setRouteCoords([startLoc, endLoc]); // straight-line fallback
+      }
+      setMapFocus({ coords: 'route', key: Date.now() });
+    };
+    tryFetch();
+    return () => ctrl.abort();
   }, [startLoc, endLoc, step]);
 
   if (!startLoc) return <SplashScreen settings={settings} />;
@@ -2270,20 +2295,28 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     };
   }, [request.rideId]);
 
+  // Track last position where route was fetched to throttle OSRM calls
+  const lastRouteFetchPos = useRef<[number, number] | null>(null);
+
   useEffect(() => {
     if (!riderCoords) return;
-    fetch(
-      `https://router.project-osrm.org/route/v1/driving/${riderCoords[1]},${riderCoords[0]};${targetCoords[1]},${targetCoords[0]}?overview=full&geometries=geojson`
-    )
-      .then(r => r.json())
-      .then(data => {
-        if (data.routes?.length > 0) {
-          setRouteCoords(data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]));
-          setRouteInfo({ distance: data.routes[0].distance, duration: data.routes[0].duration });
-        }
-      })
-      .catch(() => {});
+    const dist = lastRouteFetchPos.current ? haversineMeters(lastRouteFetchPos.current, riderCoords) : Infinity;
+    // Refetch only when target changes (always) or rider moved > 50 m
+    if (lastRouteFetchPos.current && dist < 50) return;
+    lastRouteFetchPos.current = riderCoords;
+
+    const ctrl = new AbortController();
+    fetchOsrmRoute(riderCoords, targetCoords, ctrl.signal).then(coords => {
+      if (ctrl.signal.aborted) return;
+      setRouteCoords(coords ?? [riderCoords, targetCoords]);
+    });
+    return () => ctrl.abort();
   }, [riderCoords, targetCoords]);
+
+  // Force refetch when target changes (phase switch)
+  useEffect(() => {
+    lastRouteFetchPos.current = null;
+  }, [targetCoords]);
 
   const distanceLabel = routeInfo ? (routeInfo.distance / 1000).toFixed(1) + ' km' : '—';
   const durationLabel = routeInfo ? Math.ceil(routeInfo.duration / 60) + ' min' : '—';
