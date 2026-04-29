@@ -1277,7 +1277,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     if (broadcast && currentRideId) {
        supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
        // Mark ride as cancelled in DB so riders coming online don't see it
-       supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId).eq('status', 'pending');
+       supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
     }
     localStorage.removeItem(USER_RIDE_KEY);
     setStep('home');
@@ -2960,7 +2960,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
     channel.on('broadcast', { event: 'CANCEL_RIDE' }, (payload) => {
       const { rideId } = payload.payload;
-      // Cancel pending timer if not yet shown
+      usedRideIdsRef.current.add(rideId); // prevent delayed enqueue from showing cancelled ride
       const t = timers.get(rideId);
       if (t) { clearTimeout(t); timers.delete(rideId); }
       setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
