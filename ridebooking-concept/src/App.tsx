@@ -4011,10 +4011,16 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
     if (!current) return;
     setSaving(true);
     const isActive = current.is_active ?? false;
-    console.log('[save] current.is_active:', current.is_active, 'isActive:', isActive);
-    const ok = await updateTeam(current.id, { name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive });
+    const payload = { name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive };
+    console.log('[save] payload:', JSON.stringify(payload));
+    const ok = await updateTeam(current.id, payload);
+    console.log('[save] ok:', ok);
     if (ok) {
-      setTeams(prev => prev.map(t => t.id === current.id ? { ...t, name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive } : t));
+      setTeams(prev => {
+        const next = prev.map(t => t.id === current.id ? { ...t, ...payload } : t);
+        console.log('[save] updated team in state:', JSON.stringify(next.find(t => t.id === current.id)));
+        return next;
+      });
       setEditingTeam(null);
     } else {
       alert('Failed to save team. Please try again.');
