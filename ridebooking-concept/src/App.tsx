@@ -3971,6 +3971,8 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   const [newCapacity, setNewCapacity] = useState(10);
   const [saving, setSaving] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const editingTeamRef = useRef<Team | null>(null);
+  editingTeamRef.current = editingTeam;
   const [addMemberTeamId, setAddMemberTeamId] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -4005,13 +4007,13 @@ const TeamManagementPanel = ({ currentProfile }: { currentProfile: Profile }) =>
   };
 
   const handleSaveEdit = async () => {
-    if (!editingTeam) return;
+    const current = editingTeamRef.current;
+    if (!current) return;
     setSaving(true);
-    const isActive = editingTeam.is_active ?? false;
-    console.log('[handleSaveEdit] id:', editingTeam.id, 'is_active (raw):', editingTeam.is_active, 'isActive:', isActive);
-    const ok = await updateTeam(editingTeam.id, { name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: isActive });
+    const isActive = current.is_active ?? false;
+    const ok = await updateTeam(current.id, { name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive });
     if (ok) {
-      setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, name: editingTeam.name, capacity: editingTeam.capacity, schedule_days: editingTeam.schedule_days ?? [], is_active: isActive } : t));
+      setTeams(prev => prev.map(t => t.id === current.id ? { ...t, name: current.name, capacity: current.capacity, schedule_days: current.schedule_days ?? [], is_active: isActive } : t));
       setEditingTeam(null);
     } else {
       alert('Failed to save team. Please try again.');
