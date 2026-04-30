@@ -1874,7 +1874,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   // Store payload so the re-broadcast interval can keep sending it
                   pendingRequestRef.current = requestPayload;
                   // Persist pending ride so riders coming online later can see it via DB
-                  supabase.from('rides').insert({
+                  const { error: insertError } = await supabase.from('rides').insert({
                     id: rideId,
                     user_id: currentProfile.id,
                     user_name: `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || currentProfile.full_name || null,
@@ -1887,6 +1887,13 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     ride_type: selectedRide,
                     request_data: requestPayload,
                   });
+
+                  if (insertError) {
+                    showNotification('Error creating booking. Please try again.');
+                    console.error('Booking insert error:', insertError);
+                    return;
+                  }
+
                   // Initial broadcast for riders already online
                   supabase.channel('rides').send({
                     type: 'broadcast',
@@ -8292,10 +8299,12 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
         {/* Book button — always visible, never scrolled away */}
         <div className="shrink-0 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-8">
           <button
-            onClick={() => {
+            onClick={async () => {
               const bd = dynamicRides.find(r => r.id === selectedRide)?.breakdown;
-              if (onBook) onBook(Date.now().toString(), bd);
-              else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
+              if (bd) {
+                if (onBook) await onBook(Date.now().toString(), bd);
+                else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
+              }
             }}
             className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20"
           >
