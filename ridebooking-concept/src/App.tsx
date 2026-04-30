@@ -263,7 +263,7 @@ type MapLegendItem = {
 
 const MapLegend = React.memo(function MapLegend({ items, className = '' }: { items: MapLegendItem[]; className?: string }) {
   return (
-    <div className={`absolute z-[25] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 px-3 py-2.5 flex flex-col gap-2 ${className}`}>
+    <div className={`absolute z-[5] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 px-3 py-2.5 flex flex-col gap-2 ${className}`}>
       {items.map((item) => (
         <div key={item.label} className="flex items-center gap-2 min-w-0">
           {item.type === 'rider' ? (
@@ -1875,7 +1875,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             {step === 'home' && (
               <>
                 {/* Ongoing-ride banner — blocks new booking and lets user jump back */}
-                {currentRideId && (
+                {false && currentRideId && (
                   <motion.div
                     key="ongoing-banner"
                     initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
@@ -1898,7 +1898,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     </div>
                   </motion.div>
                 )}
-                {locationDenied && (
+                {!currentRideId && locationDenied && (
                   <div className="mx-3 mb-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
                     <MapPin size={18} className="text-amber-500 shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -1907,6 +1907,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     </div>
                   </div>
                 )}
+                {currentRideId ? (
+                  <OngoingRidePanel
+                    activeRider={activeRider}
+                    onView={() => setStep(activeRider ? 'matched' : 'searching')}
+                  />
+                ) : (
                 <HomePanel key="home" setStep={(s) => {
                   if (s === 'select' && locationDenied) {
                     showNotification('Please enable location access to book a ride.');
@@ -1923,6 +1929,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   favorites={favorites} onSaveFavorite={saveFavorite} onRemoveFavorite={removeFavorite}
                   onPickupFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })}
                   onDropoffFocus={(coords: [number,number]) => setMapFocus({ coords, key: Date.now() })} />
+                )}
               </>
             )}
             {step === 'select' && (
@@ -2113,14 +2120,14 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         {step === 'matched' && (
           <button
             onClick={() => setRiderTrackKey(k => k + 1)}
-            className="absolute bottom-20 right-4 z-[999] bg-white rounded-full shadow-lg p-3 text-blue-600 hover:bg-blue-50 transition-colors"
+            className="absolute bottom-20 right-4 z-[5] bg-white rounded-full shadow-lg p-3 text-blue-600 hover:bg-blue-50 transition-colors"
             title="Re-center on rider"
           >
             <Navigation size={18} />
           </button>
         )}
         {/* North-up reset — tap after rotating by gesture */}
-        <button onClick={() => userMapRef.current?.setBearing(0)} className="absolute bottom-4 left-4 z-[999] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
+        <button onClick={() => userMapRef.current?.setBearing(0)} className="absolute bottom-4 left-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
       </div>
     </div>
   );
@@ -2730,13 +2737,13 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         {/* Re-center button */}
         <button
           onClick={() => setRiderFollowKey(k => k + 1)}
-          className="absolute bottom-4 right-4 z-[999] bg-white rounded-full shadow-lg p-3 text-emerald-600 hover:bg-emerald-50 transition-colors"
+          className="absolute bottom-4 right-4 z-[5] bg-white rounded-full shadow-lg p-3 text-emerald-600 hover:bg-emerald-50 transition-colors"
           title="Re-center on my location"
         >
           <Navigation size={18} />
         </button>
         {/* North-up reset — tap after rotating by gesture */}
-        <button onClick={() => riderMapRef.current?.setBearing(0)} className="absolute top-4 right-4 z-[999] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
+        <button onClick={() => riderMapRef.current?.setBearing(0)} className="absolute top-4 right-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
       </div>
 
       {/* Bottom Panel — collapsible */}
@@ -7878,37 +7885,39 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const isDisconnected = subStatus === 'CHANNEL_ERROR' || subStatus === 'TIMED_OUT' || subStatus === 'CLOSED';
+  const isConnecting = subStatus === 'CONNECTING';
+  const otherInitial = (otherName || '?').trim()[0]?.toUpperCase() || '?';
 
   return (
     <motion.div
       initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col w-full h-[85vh] md:h-full"
+      className="relative z-[40] bg-white rounded-t-[24px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-18px_48px_rgba(15,23,42,0.14)] md:shadow-none pointer-events-auto flex flex-col w-full h-[88dvh] md:h-full overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center p-5 bg-emerald-600 text-white shadow-md shrink-0 md:rounded-none rounded-t-[2.5rem]">
-        <button onClick={onBack} className="p-2 -ml-2 hover:bg-emerald-700 rounded-full transition-colors">
-          <ChevronLeft size={24} />
+      <div className="flex items-center gap-3 px-4 py-3.5 bg-white border-b border-gray-100 shrink-0">
+        <button onClick={onBack} className="w-10 h-10 -ml-1 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors text-gray-700">
+          <ChevronLeft size={22} />
         </button>
-        <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden border-2 border-emerald-400 ml-2 shrink-0">
+        <div className="w-11 h-11 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shrink-0">
           {otherAvatar
             ? <img src={otherAvatar} alt="" className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-lg">{otherName[0]}</div>}
+            : <div className="w-full h-full flex items-center justify-center text-gray-600 font-black text-base">{otherInitial}</div>}
         </div>
-        <div className="ml-3 flex-1 min-w-0">
-          <h4 className="font-bold leading-tight">{otherName}</h4>
-          <p className="text-xs text-emerald-200 font-medium">
+        <div className="flex-1 min-w-0">
+          <h4 className="font-black leading-tight text-gray-950 truncate">{otherName}</h4>
+          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wide">
             {senderRole === 'user' ? 'Rider' : 'Passenger'}
           </p>
         </div>
         {isDisconnected && (
-          <div className="flex items-center gap-1.5 bg-red-500/20 px-2.5 py-1 rounded-full shrink-0">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-300" />
-            <span className="text-[10px] font-bold text-red-200">Offline</span>
+          <div className="flex items-center gap-1.5 bg-red-50 px-2.5 py-1 rounded-full shrink-0">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <span className="text-[10px] font-black text-red-600">Offline</span>
           </div>
         )}
-        {subStatus === 'CONNECTING' && (
-          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
+        {isConnecting && (
+          <div className="w-4 h-4 border-2 border-gray-200 border-t-emerald-500 rounded-full animate-spin shrink-0" />
         )}
       </div>
 
@@ -7920,27 +7929,29 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50 flex flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-3 bg-[#f6f7f9] flex flex-col">
         {loading && (
-          <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-7 h-7 border-2 border-gray-300 border-t-emerald-500 rounded-full animate-spin" />
           </div>
         )}
         {!loading && messages.length === 0 && !fetchError && (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-            <MessageSquare size={40} className="mb-3 opacity-30" />
-            <p className="text-sm font-medium">No messages yet</p>
-            <p className="text-xs mt-1">Send a message to start the conversation</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 px-6 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 flex items-center justify-center mb-3 shadow-sm">
+              <MessageSquare size={24} className="opacity-50" />
+            </div>
+            <p className="text-sm font-black text-gray-600">No messages yet</p>
+            <p className="text-xs mt-1 font-medium">Coordinate pickup details here.</p>
           </div>
         )}
         {messages.map((m) => {
           const isMe = m.sender_id === senderId;
           return (
-            <div key={m.id} className={`flex flex-col max-w-[80%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
-              <div className={`px-4 py-3 rounded-2xl ${isMe ? 'bg-gray-900 text-white rounded-br-sm' : 'bg-white border border-gray-200 text-gray-800 shadow-sm rounded-bl-sm'}`}>
-                <p className="text-sm font-medium leading-relaxed">{m.content}</p>
+            <div key={m.id} className={`flex flex-col max-w-[82%] sm:max-w-[70%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
+              <div className={`px-4 py-2.5 rounded-[20px] shadow-sm ${isMe ? 'bg-emerald-500 text-white rounded-br-md' : 'bg-white border border-gray-100 text-gray-900 rounded-bl-md'}`}>
+                <p className="text-[14px] font-medium leading-relaxed whitespace-pre-wrap break-words">{m.content}</p>
               </div>
-              <span className="text-[10px] uppercase font-bold text-gray-400 mt-1 px-1">{fmtTime(m.created_at)}</span>
+              <span className="text-[10px] font-bold text-gray-400 mt-1 px-1">{fmtTime(m.created_at)}</span>
             </div>
           );
         })}
@@ -7955,22 +7966,24 @@ const RealtimeChat = ({ rideId, senderId, senderRole, senderName, otherName, oth
       )}
 
       {/* Input */}
-      <div className="p-4 bg-white border-t border-gray-100 flex gap-3 shrink-0">
+      <form
+        onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+        className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white border-t border-gray-100 flex items-end gap-2 shrink-0"
+      >
         <input
           type="text" value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Type a message..."
-          className="flex-1 bg-gray-100 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm font-medium"
+          className="flex-1 min-w-0 bg-gray-100 rounded-full px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm font-semibold placeholder:text-gray-400"
         />
         <button
-          onClick={handleSend}
+          type="submit"
           disabled={!newMessage.trim()}
-          className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center hover:bg-emerald-600 shrink-0 shadow-md disabled:opacity-40 transition-all"
+          className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center hover:bg-emerald-600 shrink-0 shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:shadow-none transition-all active:scale-95"
         >
           <Send size={20} className="-ml-0.5" />
         </button>
-      </div>
+      </form>
     </motion.div>
   );
 };
@@ -8114,6 +8127,34 @@ const ChatHistoryScreen = ({ userId, userName, role = 'user', onBack }: { userId
 
 // ─── Panel Components ─────────────────────────────────────────────────────────
 
+const OngoingRidePanel = ({ activeRider, onView }: { activeRider: any; onView: () => void }) => (
+  <motion.div
+    initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
+    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+    className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto px-5 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-6 md:py-6 md:flex-1"
+  >
+    <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mb-5 md:hidden" />
+    <div className="bg-gray-950 text-white rounded-2xl px-4 py-4 flex items-center gap-3.5 shadow-xl shadow-black/20">
+      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-[15px] leading-tight">Ongoing ride</p>
+        <p className="text-gray-400 text-[12px] font-medium truncate mt-1">
+          {activeRider ? `Driver: ${activeRider.first_name || 'Your rider'}` : 'Searching for a driver...'}
+        </p>
+      </div>
+      <button
+        onClick={onView}
+        className="shrink-0 bg-white text-gray-950 hover:bg-gray-100 font-black text-[12px] px-4 py-2.5 rounded-xl transition-colors"
+      >
+        View
+      </button>
+    </div>
+    <p className="text-[12px] text-gray-400 font-semibold leading-relaxed mt-4 px-1">
+      Finish or cancel this ride before starting another booking.
+    </p>
+  </motion.div>
+);
+
 const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDropoff, setDestinationCoords, deviceLocation, favorites = [], onSaveFavorite, onRemoveFavorite, onPickupFocus, onDropoffFocus }: any) => {
   const [activeField, setActiveField] = useState<'pickup' | 'dropoff'>('dropoff');
   const [query, setQuery] = useState(dropoff);
@@ -8181,7 +8222,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     >
       {/* Handle — tap to expand/collapse, drag up/down on mobile */}
       <div
-        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-none"
+        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-pan-y"
         onPointerDown={e => { dragControls.start(e); }}
         onClick={() => setIsExpanded(e => !e)}
       >
@@ -8191,7 +8232,14 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
       <div className="px-5 pb-2 md:px-6 md:pt-6">
         <div className="flex items-center justify-between mb-3 md:mb-5">
           <h2 className="text-[1.35rem] md:text-[1.75rem] font-black tracking-tight leading-tight">Where to?</h2>
-          <ChevronLeft size={20} className={`text-gray-300 md:hidden transition-transform duration-200 ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+          <button
+            type="button"
+            onClick={() => setIsExpanded(e => !e)}
+            className="md:hidden -mr-2 w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+          >
+            <ChevronLeft size={20} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+          </button>
         </div>
 
       {/* Location Inputs */}
