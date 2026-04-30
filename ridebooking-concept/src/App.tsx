@@ -1226,73 +1226,67 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
   useEffect(() => { requestNotificationPermission(); }, []);
 
-  // ── Waterfall Dispatch Orchestration ──────────────
+  // ── Dispatch Orchestration ──────────────
   const declinedRidersRef = React.useRef<Set<string>>(new Set());
-  const attemptedRidersRef = React.useRef<Set<string>>(new Set());
-  const currentTargetRef = React.useRef<string | null>(null);
-  const targetStartTimeRef = React.useRef<number>(0);
+  const [targetLimit, setTargetLimit] = useState(5);
+  const lastExpandTimeRef = useRef(0);
 
-  // Listen for RIDE_DECLINED to instantly skip to the next rider
+  // Reset search state when starting a new booking
+  useEffect(() => {
+    if (step === 'searching') {
+      declinedRidersRef.current.clear();
+      setTargetLimit(5);
+      lastExpandTimeRef.current = Date.now();
+    }
+  }, [step]);
+
+  // Listen for RIDE_DECLINED to instantly expand/shift to the next available rider
   useEffect(() => {
     if (step !== 'searching' || !currentRideId) return;
     const ch = supabase.channel('user-rides-dispatch');
     ch.on('broadcast', { event: 'RIDE_DECLINED' }, (p) => {
       if (p.payload.rideId === currentRideId) {
         declinedRidersRef.current.add(p.payload.riderId);
-        // Force advance on next interval tick
-        targetStartTimeRef.current = 0; 
       }
     });
     ch.subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [step, currentRideId]);
 
-  // Orchestration loop: broadcasts to one target at a time (15s each)
+  // Orchestration loop: broadcasts to top 5 (or more) nearest riders simultaneously
   useEffect(() => {
     if (step !== 'searching') {
       pendingRequestRef.current = null;
-      declinedRidersRef.current.clear();
-      attemptedRidersRef.current.clear();
-      currentTargetRef.current = null;
       return;
     }
 
     const broadcastCycle = () => {
       const payload = pendingRequestRef.current;
       if (!payload) return;
-      const priorities = payload.priorityRiderIds || [];
       
-      const isDeclined = currentTargetRef.current && declinedRidersRef.current.has(currentTargetRef.current);
-      const isExpired = Date.now() - targetStartTimeRef.current >= 15000;
-
-      if (!currentTargetRef.current || isDeclined || isExpired) {
-        // Find next rider not attempted and not declined
-        const nextRider = priorities.find((id: string) => 
-          !attemptedRidersRef.current.has(id) && !declinedRidersRef.current.has(id)
-        );
-        
-        if (nextRider) {
-          currentTargetRef.current = nextRider;
-          targetStartTimeRef.current = Date.now();
-          attemptedRidersRef.current.add(nextRider);
-        } else {
-          // Exhausted priority list, fallback to broadcast to all
-          currentTargetRef.current = null;
-        }
+      // Expand candidate pool by 5 every 15s if no one accepts
+      if (Date.now() - lastExpandTimeRef.current > 15000) {
+        setTargetLimit(prev => prev + 5);
+        lastExpandTimeRef.current = Date.now();
       }
+
+      const priorities = payload.priorityRiderIds || [];
+      // Filter out those who declined or already attempted (if tracked)
+      const targets = priorities
+        .filter((id: string) => !declinedRidersRef.current.has(id))
+        .slice(0, targetLimit);
 
       supabase.channel('rides').send({ 
         type: 'broadcast', 
         event: 'REQUEST_RIDE', 
-        payload: { ...payload, targetRiderId: currentTargetRef.current } 
+        payload: { ...payload, targetRiderIds: targets } 
       });
     };
 
-    // Initial broadcast and interval
     broadcastCycle();
     const interval = setInterval(broadcastCycle, 4000);
     return () => clearInterval(interval);
-  }, [step, currentRideId]);
+  }, [step, currentRideId, targetLimit]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -1489,9 +1483,20 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     channel.on('broadcast', { event: 'RIDE_CANCELLED' }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
         showNotification('Your rider cancelled the booking.');
-        pushNotification('Ride cancelled 😔', 'Your rider cancelled. Please book again.');
-        pushAppNotification('Ride cancelled 😔', 'Your rider cancelled the booking.');
-        handleCancelBooking();
+        pushAppNotification('Ride cancelled 🛵', 'The rider cancelled. Searching for a new ride...');
+        
+        // Add the rider to temporarily declined list so we don't dispatch to them immediately
+        if (payload.payload.riderId) {
+          declinedRidersRef.current.add(payload.payload.riderId);
+        }
+
+        // Return to searching to pick up the next available rider!
+        setActiveRider(null);
+        setPendingRider(null);
+        setStep('searching');
+        
+        // Update DB back to pending so other prospective riders can see it
+        supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', currentRideId);
       }
     });
 
@@ -2401,10 +2406,17 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const rideChannelRef = useRef<any>(null);
 
   const handleRiderCancel = async () => {
-    // Send cancel on 'rides' channel — user listens there for RIDE_CANCELLED
-    await supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_CANCELLED', payload: { rideId: request.rideId } });
-    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', request.rideId);
-    localStorage.removeItem('fetch_rider_ride');
+    // Send cancel on 'rides' channel — include riderId so user can skip us in re-dispatch
+    await supabase.channel('rides').send({ 
+      type: 'broadcast', 
+      event: 'RIDE_CANCELLED', 
+      payload: { rideId: request.rideId, riderId: profile.id } 
+    });
+    // Mark as pending again in DB instead of cancelled, so other riders can see it
+    await supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', request.rideId);
+    
+    // Clear local state
+    localStorage.removeItem(RIDER_RIDE_KEY); // Correct key for rider
     if (onBack) onBack();
   };
   const isChatOpenRef = React.useRef(false);
@@ -3107,8 +3119,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
     channel.on('broadcast', { event: 'REQUEST_RIDE' }, (payload) => {
       const req = payload.payload;
-      // If targeted to someone else, ignore completely
-      if (req.targetRiderId && req.targetRiderId !== riderId) return;
+      // If targeted specifically, ensure we are in the target list
+      if (req.targetRiderIds) {
+        if (!req.targetRiderIds.includes(currentProfile.id)) return;
+      } else if (req.targetRiderId && req.targetRiderId !== currentProfile.id) {
+        return;
+      }
       
       lastSeenRef.current.set(req.rideId, Date.now());
       scheduleRequest(req);
@@ -3173,7 +3189,11 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         .order('id', { ascending: true });
       if (pending?.length) {
         pending.map((r: any) => r.request_data).filter(Boolean).forEach((req: any) => {
-          if (req.targetRiderId && req.targetRiderId !== riderId) return;
+          if (req.targetRiderIds) {
+            if (!req.targetRiderIds.includes(currentProfile.id)) return;
+          } else if (req.targetRiderId && req.targetRiderId !== currentProfile.id) {
+            return;
+          }
           lastSeenRef.current.set(req.rideId, Date.now());
           scheduleRequest(req);
         });
