@@ -2828,8 +2828,12 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
             </div>
           </div>
         )}
+        <MapLegend
+          className="top-4 left-4 max-w-[calc(100vw-5rem)]"
+          items={riderMapLegendItems}
+        />
         {offlineMapStatus !== 'idle' && (
-          <div className={`absolute top-16 left-4 z-[6] rounded-full px-3 py-1.5 text-[11px] font-black shadow-lg border ${
+          <div className={`absolute top-36 left-4 z-[5] rounded-full px-3 py-1.5 text-[11px] font-black shadow-lg border ${
             offlineMapStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
             offlineMapStatus === 'saving' ? 'bg-white text-gray-700 border-gray-100' :
             offlineMapStatus === 'offline' ? 'bg-amber-50 text-amber-700 border-amber-100' :
@@ -2841,10 +2845,6 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
             {offlineMapStatus === 'error' && 'Offline map unavailable'}
           </div>
         )}
-        <MapLegend
-          className="top-4 left-4 max-w-[calc(100vw-5rem)]"
-          items={riderMapLegendItems}
-        />
         {/* Re-center button */}
         <button
           onClick={() => setRiderFollowKey(k => k + 1)}
