@@ -252,6 +252,43 @@ function MapZoomControl({ position = 'bottomright' }: { position?: 'topright' | 
 
 // ─── Root Auth Shell ──────────────────────────────────────────────────────────
 
+type MapLegendItem = {
+  label: string;
+  type: 'rider' | 'dot' | 'line';
+  color?: string;
+  dashed?: boolean;
+};
+
+function MapLegend({ items, className = '' }: { items: MapLegendItem[]; className?: string }) {
+  return (
+    <div className={`absolute z-[999] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 px-3 py-2.5 flex flex-col gap-2 ${className}`}>
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-2 min-w-0">
+          {item.type === 'rider' ? (
+            <div className="w-6 h-6 shrink-0 flex items-center justify-center">
+              <img src={biyaScooterImg} alt="" className="w-full h-full object-contain drop-shadow" />
+            </div>
+          ) : item.type === 'line' ? (
+            <div
+              className="w-8 h-0 shrink-0 border-t-[4px] rounded-full"
+              style={{
+                borderColor: item.color,
+                borderStyle: item.dashed ? 'dashed' : 'solid',
+              }}
+            />
+          ) : (
+            <div
+              className="w-3 h-3 rounded-full border-2 border-white shadow shrink-0"
+              style={{ backgroundColor: item.color }}
+            />
+          )}
+          <span className="text-[11px] font-bold text-gray-700 leading-tight whitespace-nowrap">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -2034,6 +2071,16 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           {step === 'matched' && <FlyToFirstRiderLocation riderLocation={riderLocation} />}
           <MapZoomControl position="topright" />
         </RotatableMap>
+        <MapLegend
+          className="top-[4.75rem] left-4 md:top-4"
+          items={[
+            { label: 'Pickup point', type: 'dot', color: '#3b82f6' },
+            ...(endLoc ? [{ label: 'Dropoff point', type: 'dot' as const, color: '#10b981' }] : []),
+            ...(routeCoords ? [{ label: 'Pickup to dropoff', type: 'line' as const, color: '#10b981' }] : []),
+            ...(step === 'matched' ? [{ label: 'Rider', type: 'rider' as const }] : []),
+            ...(riderPickupRouteCoords ? [{ label: 'Rider to pickup', type: 'line' as const, color: '#2563eb', dashed: true }] : []),
+          ]}
+        />
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
             <div className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
@@ -2637,17 +2684,15 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
             </div>
           </div>
         )}
-        {/* Legend */}
-        <div className="absolute top-4 left-4 bg-white rounded-2xl shadow-lg px-4 py-3 flex flex-col gap-2 z-[999]">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-600 border-2 border-white shadow" />
-            <span className="text-xs font-bold text-gray-700">Your Location</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full border-2 border-white shadow ${ridePhase === 'pickup' ? 'bg-orange-500' : 'bg-emerald-500'}`} />
-            <span className="text-xs font-bold text-gray-700">{ridePhase === 'pickup' ? 'Pickup Point' : 'Destination'}</span>
-          </div>
-        </div>
+        <MapLegend
+          className="top-4 left-4"
+          items={[
+            { label: 'You', type: 'rider', color: '#2563eb' },
+            { label: ridePhase === 'pickup' ? 'Pickup point' : 'Dropoff point', type: 'dot', color: ridePhase === 'pickup' ? '#f97316' : '#10b981' },
+            ...(directLine ? [{ label: 'Direct guide', type: 'line' as const, color: ridePhase === 'pickup' ? '#f97316' : '#10b981', dashed: true }] : []),
+            ...(snapRoute ? [{ label: ridePhase === 'pickup' ? 'Road to pickup' : 'Road to dropoff', type: 'line' as const, color: ridePhase === 'pickup' ? '#f97316' : '#10b981' }] : []),
+          ]}
+        />
         {/* Re-center button */}
         <button
           onClick={() => setRiderFollowKey(k => k + 1)}
