@@ -3826,9 +3826,9 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                       .update({ 
                         status: 'accepted', 
                         rider_id: (await supabase.auth.getUser()).data.user?.id,
-                        rider_name: `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || currentProfile.full_name || null,
-                        rider_avatar: currentProfile.avatar_url ?? null,
-                        vehicle_info: `${currentProfile.vehicle_make || ''} ${currentProfile.vehicle_model || ''} • ${currentProfile.vehicle_plate || ''}`.trim() || null
+                        rider_name: (`${currentProfile?.first_name || ''} ${currentProfile?.last_name || ''}`.trim() || currentProfile?.full_name || 'Rider').substring(0, 100),
+                        rider_avatar: currentProfile?.avatar_url || null,
+                        vehicle_info: (`${currentProfile?.vehicle_make || ''} ${currentProfile?.vehicle_model || ''} • ${currentProfile?.vehicle_plate || ''}`.trim() || 'Vehicle Info').substring(0, 150)
                       })
                       .eq('id', rid)
                       .eq('status', 'pending')
