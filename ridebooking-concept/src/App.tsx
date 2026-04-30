@@ -100,6 +100,10 @@ document.head.appendChild(_riderMarkerStyle);
 // Shared GPS options — high accuracy, short timeout, no cached positions
 const GPS_OPTS: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
 
+// Default center — General Santos City, Philippines
+// Used as fallback when GPS/coordinates are not yet available to avoid maps rendering at [0,0]
+const DEFAULT_CENTER: [number, number] = [6.1164, 125.1716];
+
 function haversineMeters(a: [number, number], b: [number, number]): number {
   const R = 6371000;
   const dLat = (b[0] - a[0]) * Math.PI / 180;
@@ -216,6 +220,21 @@ function MapSmoothFollow({ position, resetKey = 0 }: { position: [number, number
     if (!position || userInteracted.current) return;
     map.panTo(position, { animate: true, duration: 0.6 });
   }, [position, map]);
+
+  return null;
+}
+
+// Fly the map to the rider's first broadcast location so the passenger immediately
+// sees where the rider actually is, instead of staying centered on the pickup point.
+function FlyToFirstRiderLocation({ riderLocation }: { riderLocation: [number, number] | null }) {
+  const map = useMap();
+  const hasFlewRef = useRef(false);
+
+  useEffect(() => {
+    if (!riderLocation || hasFlewRef.current) return;
+    hasFlewRef.current = true;
+    map.flyTo(riderLocation, 15, { animate: true, duration: 1.2 });
+  }, [riderLocation, map]);
 
   return null;
 }
@@ -1417,7 +1436,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         },
         () => {
           setLocationDenied(true);
-          const fallback: [number, number] = [6.1164, 125.1716];
+          const fallback: [number, number] = DEFAULT_CENTER;
           setDeviceLocation(fallback);
           if (!initialFocusDone.current) {
             initialFocusDone.current = true;
@@ -1428,7 +1447,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       );
       return () => navigator.geolocation.clearWatch(watchId);
     } else {
-      const fallback: [number, number] = [6.1164, 125.1716];
+      const fallback: [number, number] = DEFAULT_CENTER;
       setDeviceLocation(fallback);
       setMapFocus({ coords: fallback, key: Date.now() });
       initialFocusDone.current = true;
@@ -1444,7 +1463,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     });
   }, [deviceLocation]);
 
-  const startLoc = pickupCoords || deviceLocation;
+  const startLoc = pickupCoords || deviceLocation || DEFAULT_CENTER;
   const endLoc = destinationCoords;
 
   useEffect(() => {
@@ -1913,7 +1932,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
       {/* Map — full screen on mobile (behind panels), fills right on desktop */}
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
-        <RotatableMap ref={userMapRef} center={startLoc} zoom={15} zoomControl={false} rotate bearingSnap={10} className="absolute inset-0 w-full h-full">
+        <RotatableMap ref={userMapRef} center={startLoc ?? DEFAULT_CENTER} zoom={15} zoomControl={false} rotate bearingSnap={10} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -1957,6 +1976,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           <MapAutoSize />
           <MapBounds mapFocus={mapFocus} routeCoords={routeCoords} />
           <MapSmoothFollow position={step === 'matched' ? riderLocation : null} resetKey={riderTrackKey} />
+          {step === 'matched' && <FlyToFirstRiderLocation riderLocation={riderLocation} />}
           <MapZoomControl position="topright" />
         </RotatableMap>
         {(step === 'home' || step === 'select') && (
@@ -2423,7 +2443,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
           ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: { rideId: request.rideId, lat: coords[0], lng: coords[1] } });
         }
       },
-      () => setRiderCoords([6.1164, 125.1716]),
+      () => setRiderCoords(DEFAULT_CENTER),
       GPS_OPTS,
     );
 
@@ -2518,7 +2538,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
       </AnimatePresence>
       {/* Map — render immediately using pickup coords as fallback until GPS arrives */}
       <div className="flex-1 relative">
-        <RotatableMap ref={riderMapRef} center={riderCoords ?? targetCoords} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
+        <RotatableMap ref={riderMapRef} center={riderCoords ?? targetCoords ?? DEFAULT_CENTER} zoom={14} zoomControl={false} rotate touchRotate bearingSnap={10} className="w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
