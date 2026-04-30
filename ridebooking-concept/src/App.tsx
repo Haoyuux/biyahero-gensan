@@ -3766,16 +3766,34 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                   Decline
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const rid = currentRequest.rideId;
+                    
+                    // Atomically attempt to claim the ride in the database.
+                    // The .eq('status', 'pending') ensures only the first rider to reach the DB wins.
+                    const { data, error } = await supabase
+                      .from('rides')
+                      .update({ status: 'accepted', rider_id: currentProfile.id })
+                      .eq('id', rid)
+                      .eq('status', 'pending')
+                      .select();
+
+                    if (error || !data || data.length === 0) {
+                      // Race condition: Someone else was faster!
+                      showRiderNotification('Ride already taken by another rider.');
+                      setHasRequest(false);
+                      setCurrentRequest(null);
+                      usedRideIdsRef.current.add(rid);
+                      return;
+                    }
+
+                    // Success! We won the race.
                     usedRideIdsRef.current.add(rid);
                     myAcceptedRideIdRef.current = rid;
                     setRequestAccepted(true);
                     setWaitingForUserConfirm(true);
                     setHasRequest(false);
                     supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_ACCEPTED', payload: { rideId: rid, rider: currentProfile } });
-                    // Mark as accepted in DB so other riders don't pick it up
-                    supabase.from('rides').update({ status: 'accepted', rider_id: currentProfile.id }).eq('id', rid).eq('status', 'pending');
                   }}
                   className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
                 >
