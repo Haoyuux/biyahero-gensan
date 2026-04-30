@@ -1187,6 +1187,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [deviceLocation, setDeviceLocation] = useState<[number, number] | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
+  const [riderPickupRouteCoords, setRiderPickupRouteCoords] = useState<[number, number][] | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
   const [currentRideId, setCurrentRideId] = useState<string | null>(
     () => _pr.current?.currentRideId ?? null
@@ -1585,6 +1586,23 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     tryFetch();
     return () => ctrl.abort();
   }, [startLoc, endLoc, step]);
+
+  useEffect(() => {
+    if (step !== 'matched' || !riderLocation || !startLoc) {
+      setRiderPickupRouteCoords(null);
+      return;
+    }
+
+    const ctrl = new AbortController();
+    const fetchRiderPickupRoute = async () => {
+      const coords = await fetchOsrmRoute(riderLocation, startLoc, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      setRiderPickupRouteCoords(coords ?? [riderLocation, startLoc]);
+    };
+
+    fetchRiderPickupRoute();
+    return () => ctrl.abort();
+  }, [step, riderLocation, startLoc]);
 
   if (!startLoc) return <SplashScreen settings={settings} />;
 
@@ -1999,6 +2017,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                 }}
               />
               {routeCoords && <Polyline positions={routeCoords} color="#10b981" weight={5} />}
+            </>
+          )}
+          {step === 'matched' && riderPickupRouteCoords && (
+            <>
+              <Polyline positions={riderPickupRouteCoords} color="#ffffff" weight={9} opacity={0.9} />
+              <Polyline positions={riderPickupRouteCoords} color="#2563eb" weight={5} opacity={0.95} dashArray="10 8" />
             </>
           )}
           {riderLocation && step === 'matched' && (
@@ -3851,6 +3875,15 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                     }
 
                     if (error) {
+                      if (error.code === '42501') {
+                        // 42501 in a race condition simply means the status is no longer 'pending' 
+                        // so the RLS policy 'USING (status = 'pending')' filtered the row out.
+                        showRiderNotification('Someone else already took this ride!');
+                        setHasRequest(false);
+                        setCurrentRequest(null);
+                        usedRideIdsRef.current.add(rid);
+                        return;
+                      }
                       showRiderNotification(`Database error: ${error.message} (${error.code})`);
                       return;
                     }
