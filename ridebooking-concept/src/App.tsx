@@ -1457,6 +1457,18 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     });
   }, [deviceLocation]);
 
+  // Sync ride status on mount/recovery to prevent zombie broadcasts
+  useEffect(() => {
+    if (!currentRideId || step === 'home') return;
+    
+    supabase.from('rides').select('status').eq('id', currentRideId).maybeSingle()
+      .then(({ data }) => {
+        if (data && (data.status === 'completed' || data.status === 'cancelled')) {
+          handleCancelBooking(); // Resets everything to home
+        }
+      });
+  }, []); // Only run on mount
+
   const startLoc = pickupCoords || deviceLocation || DEFAULT_CENTER;
   const endLoc = destinationCoords;
 
