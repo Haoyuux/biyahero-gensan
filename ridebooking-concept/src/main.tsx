@@ -8,3 +8,11 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/offline-map-sw.js').catch(() => {
+      // Offline map support is best-effort; the app still works without it.
+    });
+  });
+}

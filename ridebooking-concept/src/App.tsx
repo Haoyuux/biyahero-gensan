@@ -101,6 +101,10 @@ document.head.appendChild(_riderMarkerStyle);
 const GPS_OPTS: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
 const ROUTE_REFRESH_METERS = 75;
 const ROUTE_REFRESH_MS = 5000;
+const OFFLINE_MAP_CACHE = 'fetch-offline-map-v1';
+const OFFLINE_RIDER_ROUTE_KEY_PREFIX = 'fetch_offline_rider_route_';
+const OFFLINE_TILE_ZOOMS = [15, 16, 17];
+const OFFLINE_TILE_LIMIT = 260;
 
 // Default center — General Santos City, Philippines
 // Used as fallback when GPS/coordinates are not yet available to avoid maps rendering at [0,0]
@@ -112,6 +116,61 @@ function haversineMeters(a: [number, number], b: [number, number]): number {
   const dLon = (b[1] - a[1]) * Math.PI / 180;
   const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.asin(Math.sqrt(s));
+}
+
+function latLngToTile(lat: number, lng: number, zoom: number) {
+  const latRad = lat * Math.PI / 180;
+  const n = 2 ** zoom;
+  const x = Math.floor((lng + 180) / 360 * n);
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+  return { x, y };
+}
+
+function sampleRoutePoints(coords: [number, number][], maxPoints = 28): [number, number][] {
+  if (coords.length <= maxPoints) return coords;
+  const step = Math.max(1, Math.floor(coords.length / maxPoints));
+  const sampled = coords.filter((_, index) => index % step === 0);
+  const last = coords[coords.length - 1];
+  if (last && sampled[sampled.length - 1] !== last) sampled.push(last);
+  return sampled;
+}
+
+async function cacheOfflineRouteTiles(coords: [number, number][]): Promise<number> {
+  if (!('caches' in window) || coords.length === 0) return 0;
+
+  const cache = await caches.open(OFFLINE_MAP_CACHE);
+  const urls = new Set<string>();
+  const points = sampleRoutePoints(coords);
+
+  for (const zoom of OFFLINE_TILE_ZOOMS) {
+    for (const [lat, lng] of points) {
+      const center = latLngToTile(lat, lng, zoom);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          urls.add(`https://a.tile.openstreetmap.org/${zoom}/${center.x + dx}/${center.y + dy}.png`);
+          if (urls.size >= OFFLINE_TILE_LIMIT) break;
+        }
+        if (urls.size >= OFFLINE_TILE_LIMIT) break;
+      }
+      if (urls.size >= OFFLINE_TILE_LIMIT) break;
+    }
+    if (urls.size >= OFFLINE_TILE_LIMIT) break;
+  }
+
+  const requests = [...urls];
+  let cached = 0;
+  await Promise.all(requests.map(async (url) => {
+    try {
+      const match = await cache.match(url);
+      if (match) { cached += 1; return; }
+      const response = await fetch(url, { mode: 'no-cors', cache: 'force-cache' });
+      await cache.put(url, response);
+      cached += 1;
+    } catch {
+      // Individual tile failures should not block the rest of the offline pack.
+    }
+  }));
+  return cached;
 }
 
 async function fetchOsrmRoute(
@@ -2527,9 +2586,12 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   const [unreadCount, setUnreadCount] = useState(0);
   const [riderFollowKey, setRiderFollowKey] = useState(0);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [offlineMapStatus, setOfflineMapStatus] = useState<'idle' | 'saving' | 'ready' | 'offline' | 'error'>('idle');
   const riderMapRef = useRef<any>(null);
 
   const rideChannelRef = useRef<any>(null);
+  const offlineCacheKeyRef = useRef('');
+  const { connectionState } = useConnectionStatus();
 
   const handleRiderCancel = async () => {
     // Send cancel on 'rides' channel — include riderId so user can skip us in re-dispatch
@@ -2649,6 +2711,42 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   // Keep routeCoords in sync so RiderMapFit and other consumers still work
   const routeCoords = snapRoute ?? directLine;
 
+  useEffect(() => {
+    const saved = localStorage.getItem(`${OFFLINE_RIDER_ROUTE_KEY_PREFIX}${request.rideId}`);
+    if (saved && connectionState === 'offline') setOfflineMapStatus('offline');
+  }, [connectionState, request.rideId]);
+
+  useEffect(() => {
+    if (!routeCoords || routeCoords.length < 2) return;
+
+    const routeForOffline = snapRoute ?? routeCoords;
+    const targetKey = `${ridePhase}:${Math.round(targetCoords[0] * 10000)}:${Math.round(targetCoords[1] * 10000)}:${routeForOffline.length}`;
+    if (offlineCacheKeyRef.current === targetKey) return;
+    offlineCacheKeyRef.current = targetKey;
+
+    try {
+      localStorage.setItem(`${OFFLINE_RIDER_ROUTE_KEY_PREFIX}${request.rideId}`, JSON.stringify({
+        rideId: request.rideId,
+        ridePhase,
+        targetCoords,
+        routeCoords: routeForOffline,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // Route cache is best-effort; tile cache can still proceed.
+    }
+
+    if (!navigator.onLine) {
+      setOfflineMapStatus('offline');
+      return;
+    }
+
+    setOfflineMapStatus('saving');
+    cacheOfflineRouteTiles(routeForOffline)
+      .then(count => setOfflineMapStatus(count > 0 ? 'ready' : 'idle'))
+      .catch(() => setOfflineMapStatus('error'));
+  }, [routeCoords, snapRoute, ridePhase, targetCoords, request.rideId]);
+
   const distanceLabel = routeInfo ? (routeInfo.distance / 1000).toFixed(1) + ' km' : '—';
   const durationLabel = routeInfo ? Math.ceil(routeInfo.duration / 60) + ' min' : '—';
 
@@ -2728,6 +2826,19 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
               <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Getting your location…
             </div>
+          </div>
+        )}
+        {offlineMapStatus !== 'idle' && (
+          <div className={`absolute top-16 left-4 z-[6] rounded-full px-3 py-1.5 text-[11px] font-black shadow-lg border ${
+            offlineMapStatus === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+            offlineMapStatus === 'saving' ? 'bg-white text-gray-700 border-gray-100' :
+            offlineMapStatus === 'offline' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+            'bg-red-50 text-red-600 border-red-100'
+          }`}>
+            {offlineMapStatus === 'ready' && 'Offline map ready'}
+            {offlineMapStatus === 'saving' && 'Saving offline map...'}
+            {offlineMapStatus === 'offline' && 'Offline map active'}
+            {offlineMapStatus === 'error' && 'Offline map unavailable'}
           </div>
         )}
         <MapLegend
