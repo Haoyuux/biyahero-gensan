@@ -3823,7 +3823,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                     // The .eq('status', 'pending') ensures only the first rider to reach the DB wins.
                     const { data, error } = await supabase
                       .from('rides')
-                      .update({ status: 'accepted', rider_id: currentProfile.id })
+                      .update({ 
+                        status: 'accepted', 
+                        rider_id: (await supabase.auth.getUser()).data.user?.id,
+                        rider_name: `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || currentProfile.full_name || null,
+                        rider_avatar: currentProfile.avatar_url ?? null,
+                        vehicle_info: `${currentProfile.vehicle_make || ''} ${currentProfile.vehicle_model || ''} • ${currentProfile.vehicle_plate || ''}`.trim() || null
+                      })
                       .eq('id', rid)
                       .eq('status', 'pending')
                       .select();
@@ -3839,21 +3845,28 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                         .eq('id', rid)
                         .maybeSingle();
                       
-                      if (verified?.status === 'accepted' && verified?.rider_id === currentProfile.id) {
+                      if (verified?.status === 'accepted' && verified?.rider_id === (await supabase.auth.getUser()).data.user?.id) {
                         isSuccess = true;
                       }
                     }
 
                     if (error) {
-                      showRiderNotification(`Database error: ${error.message}`);
+                      showRiderNotification(`Database error: ${error.message} (${error.code})`);
                       return;
                     }
 
                     if (!isSuccess) {
-                      // Fetch who actually took it to be helpful
-                      const { data: winner } = await supabase.from('rides').select('user_name, profiles(full_name, first_name)').eq('id', rid).single();
-                      const winnerName = (winner as any)?.profiles?.full_name || (winner as any)?.profiles?.first_name || 'another rider';
-                      showRiderNotification(`Ride already taken by ${winnerName}.`);
+                      // Fetch who actually took it to be extremely clear
+                      const { data: winnerData } = await supabase.from('rides').select('status, rider_id, rider_name').eq('id', rid).maybeSingle();
+                      const winnerName = (winnerData as any)?.rider_name || 'Another Rider';
+                      const currentStatus = (winnerData as any)?.status || 'Unknown';
+                      
+                      if (currentStatus === 'pending') {
+                        showRiderNotification('Ride is still pending but update failed. Check RLS policies.');
+                      } else {
+                        showRiderNotification(`Ride was already taken by ${winnerName}. Status: ${currentStatus}`);
+                      }
+                      
                       setHasRequest(false);
                       setCurrentRequest(null);
                       usedRideIdsRef.current.add(rid);
