@@ -3187,6 +3187,18 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       }
     });
 
+    // Cleanup if another rider completes or cancels a ride we were tracking
+    channel.on('broadcast', { event: 'RIDE_COMPLETED' }, (p) => {
+      const { rideId } = p.payload;
+      usedRideIdsRef.current.add(rideId);
+      setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
+    });
+
+    channel.on('broadcast', { event: 'RIDE_CANCELLED' }, (p) => {
+      const { rideId } = p.payload;
+      setIncomingRequests(prev => prev.filter(req => req.rideId !== rideId));
+    });
+
     channel.subscribe(async (status) => {
       if (status !== 'SUBSCRIBED') return;
       // Fetch rides booked before this rider came online
