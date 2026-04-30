@@ -3778,7 +3778,23 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                       .eq('status', 'pending')
                       .select();
 
-                    if (error || !data || data.length === 0) {
+                    let isSuccess = data && data.length > 0;
+                    
+                    // If update returned no rows, it might be heavily restricted RLS or someone else won.
+                    // Verification step: check who currently owns the ride.
+                    if (!isSuccess && !error) {
+                      const { data: verified } = await supabase
+                        .from('rides')
+                        .select('status, rider_id')
+                        .eq('id', rid)
+                        .maybeSingle();
+                      
+                      if (verified?.status === 'accepted' && verified?.rider_id === currentProfile.id) {
+                        isSuccess = true;
+                      }
+                    }
+
+                    if (error || !isSuccess) {
                       // Race condition: Someone else was faster!
                       showRiderNotification('Ride already taken by another rider.');
                       setHasRequest(false);
