@@ -5747,6 +5747,20 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col md:flex-row font-sans text-gray-900">
       {/* Sidebar */}
+      {/* Mobile Backdrop */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar */}
       <div className={`fixed md:relative inset-y-0 left-0 w-64 md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0 z-[70] shadow-2xl md:shadow-none transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Mobile close button inside header */}
         <button onClick={() => setIsSidebarOpen(false)} className="md:hidden absolute top-4 right-4 text-white/40 hover:text-white p-2">
@@ -5766,7 +5780,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
           {tabs.map(({ id, label, icon: Icon }) => (
             <div
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => { setActiveTab(id); setIsSidebarOpen(false); }}
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl cursor-pointer transition-colors ${activeTab === id ? 'bg-white text-gray-950' : 'hover:bg-white/[0.06] text-white/50 hover:text-white/80'}`}
             >
               <Icon size={15} />
@@ -5787,6 +5801,24 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
 
       {/* Main Content */}
       <div className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
+        {/* Mobile Navigation Header */}
+        <div className="md:hidden flex items-center justify-between mb-8 bg-white/80 backdrop-blur-md sticky top-0 z-50 -mx-6 px-6 py-3 border-b border-gray-100">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2.5 -ml-2.5 bg-gray-50 text-gray-950 rounded-xl hover:bg-gray-100 transition-all active:scale-95 shadow-sm border border-gray-200/50"
+          >
+            <Menu size={20} />
+          </button>
+
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 flex items-center justify-center shrink-0">
+              {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={14} className="text-gray-950" />}
+            </div>
+            <span className="font-black text-[13px] uppercase tracking-wider text-gray-950">{settings?.app_name || 'Admin'}</span>
+          </div>
+
+          <div className="w-9" />
+        </div>
         <div className="max-w-6xl mx-auto">
 
           {/* Live Operations */}
