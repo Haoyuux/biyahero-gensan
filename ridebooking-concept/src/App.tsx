@@ -1874,9 +1874,10 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   // Store payload so the re-broadcast interval can keep sending it
                   pendingRequestRef.current = requestPayload;
                   // Persist pending ride so riders coming online later can see it via DB
+                  const { data: { user } } = await supabase.auth.getUser();
                   const { error: insertError } = await supabase.from('rides').insert({
                     id: rideId,
-                    user_id: currentProfile.id,
+                    user_id: user?.id,
                     user_name: `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || currentProfile.full_name || null,
                     user_avatar: currentProfile.avatar_url ?? null,
                     status: 'pending',
@@ -8302,7 +8303,7 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
             onClick={async () => {
               const bd = dynamicRides.find(r => r.id === selectedRide)?.breakdown;
               if (bd) {
-                if (onBook) await onBook(Date.now().toString(), bd);
+                if (onBook) await onBook(genId(), bd);
                 else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
               }
             }}
