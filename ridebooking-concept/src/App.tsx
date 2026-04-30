@@ -3213,11 +3213,13 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
     channel.subscribe(async (status) => {
       if (status !== 'SUBSCRIBED') return;
-      // Fetch rides booked before this rider came online
+      // Fetch rides booked before this rider came online (within last 10 mins)
+      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: pending } = await supabase
         .from('rides')
         .select('request_data')
         .eq('status', 'pending')
+        .gte('created_at', tenMinsAgo)
         .order('id', { ascending: true });
       if (pending?.length) {
         pending.map((r: any) => r.request_data).filter(Boolean).forEach((req: any) => {
