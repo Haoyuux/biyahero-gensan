@@ -5462,6 +5462,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [financePage, setFinancePage] = useState(1);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // App Settings state
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -5746,7 +5747,11 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   return (
     <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col md:flex-row font-sans text-gray-900">
       {/* Sidebar */}
-      <div className="w-full md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0">
+      <div className={`fixed md:relative inset-y-0 left-0 w-64 md:w-60 bg-[#0a0a0a] text-white flex flex-col shrink-0 z-[70] shadow-2xl md:shadow-none transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Mobile close button inside header */}
+        <button onClick={() => setIsSidebarOpen(false)} className="md:hidden absolute top-4 right-4 text-white/40 hover:text-white p-2">
+          <X size={20} />
+        </button>
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/[0.06]">
           <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center shrink-0 overflow-hidden">
             {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={18} className="text-white" />}
