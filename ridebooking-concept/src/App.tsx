@@ -3292,10 +3292,20 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
           setHasRequest(false);
           setShowActiveRide(false);
         }}
-        onComplete={() => {
+        onComplete={async () => {
           const doneId = currentRequest.rideId;
           usedRideIdsRef.current.add(doneId);
+          
+          // 1. Instantly mark as completed in the database so no one else sees it as pending
+          await supabase.from('rides').update({ 
+            status: 'completed', 
+            completed_at: new Date().toISOString() 
+          }).eq('id', doneId);
+
+          // 2. Broadcast to passenger so they see the review screen
           supabase.channel('rides').send({ type: 'broadcast', event: 'RIDE_COMPLETED', payload: { rideId: doneId } });
+          
+          // 3. Clean up local state
           localStorage.removeItem(RIDER_RIDE_KEY);
           setIncomingRequests(prev => prev.filter(r => r.rideId !== doneId));
           myAcceptedRideIdRef.current = null;
