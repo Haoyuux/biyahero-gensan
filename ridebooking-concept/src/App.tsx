@@ -1399,9 +1399,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     setCompletedRider(null);
     setFareBreakdown(null);
     setRiderLocation(null);
+    setIsBooking(false);
     // Re-center on user's current position after cancelling
     setDeviceLocation(loc => { if (loc) setMapFocus({ coords: loc, key: Date.now() }); return loc; });
   };
+
+  const [isBooking, setIsBooking] = useState(false);
 
   // Check location permission on mount
   useEffect(() => {
@@ -1842,6 +1845,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
             {step === 'select' && (
               <SelectPanel key="select" setStep={setStep} selectedRide={selectedRide}
                 setSelectedRide={setSelectedRide} routeInfo={routeInfo} pricingConfig={pricingConfig}
+                isBooking={isBooking}
                 onBook={async (rideId: string, breakdown: FareBreakdown) => {
                   if (currentRideId) {
                     showNotification('You have an ongoing ride. Finish it before booking another.');
@@ -1850,6 +1854,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   setStep('searching');
                   setCurrentRideId(rideId);
                   setFareBreakdown(breakdown);
+                  setIsBooking(true);
 
                   // Fetch online approved riders and sort by distance to pickup
                   const pickupLL = pickupCoords || deviceLocation;
@@ -1902,6 +1907,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   });
 
                   if (insertError) {
+                    setIsBooking(false);
                     showNotification('Error creating booking. Please try again.');
                     console.error('Booking insert error:', insertError);
                     return;
@@ -3838,9 +3844,16 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                       }
                     }
 
-                    if (error || !isSuccess) {
-                      // Race condition: Someone else was faster!
-                      showRiderNotification('Ride already taken by another rider.');
+                    if (error) {
+                      showRiderNotification(`Database error: ${error.message}`);
+                      return;
+                    }
+
+                    if (!isSuccess) {
+                      // Fetch who actually took it to be helpful
+                      const { data: winner } = await supabase.from('rides').select('user_name, profiles(full_name, first_name)').eq('id', rid).single();
+                      const winnerName = (winner as any)?.profiles?.full_name || (winner as any)?.profiles?.first_name || 'another rider';
+                      showRiderNotification(`Ride already taken by ${winnerName}.`);
                       setHasRequest(false);
                       setCurrentRequest(null);
                       usedRideIdsRef.current.add(rid);
@@ -8205,7 +8218,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
   );
 };
 
-const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook, pricingConfig }: any) => {
+const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook, pricingConfig, isBooking }: any) => {
   const distanceM = routeInfo?.distance ?? 0;
   const durationS = routeInfo?.duration ?? 0;
   const durationMin = Math.round(durationS / 60);
@@ -8343,9 +8356,10 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
                 else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
               }
             }}
-            className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20"
+            disabled={isBooking}
+            className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-wait"
           >
-            Book {dynamicRides.find(r => r.id === selectedRide)?.name}
+            {isBooking ? 'Booking...' : 'Book Ride'}
           </button>
         </div>
       </div>
