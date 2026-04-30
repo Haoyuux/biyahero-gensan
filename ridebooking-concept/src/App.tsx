@@ -99,6 +99,8 @@ document.head.appendChild(_riderMarkerStyle);
 
 // Shared GPS options — high accuracy, short timeout, no cached positions
 const GPS_OPTS: PositionOptions = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
+const ROUTE_REFRESH_METERS = 75;
+const ROUTE_REFRESH_MS = 5000;
 
 // Default center — General Santos City, Philippines
 // Used as fallback when GPS/coordinates are not yet available to avoid maps rendering at [0,0]
@@ -259,9 +261,9 @@ type MapLegendItem = {
   dashed?: boolean;
 };
 
-function MapLegend({ items, className = '' }: { items: MapLegendItem[]; className?: string }) {
+const MapLegend = React.memo(function MapLegend({ items, className = '' }: { items: MapLegendItem[]; className?: string }) {
   return (
-    <div className={`absolute z-[999] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 px-3 py-2.5 flex flex-col gap-2 ${className}`}>
+    <div className={`absolute z-[25] bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 px-3 py-2.5 flex flex-col gap-2 ${className}`}>
       {items.map((item) => (
         <div key={item.label} className="flex items-center gap-2 min-w-0">
           {item.type === 'rider' ? (
@@ -287,7 +289,7 @@ function MapLegend({ items, className = '' }: { items: MapLegendItem[]; classNam
       ))}
     </div>
   );
-}
+});
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -1246,6 +1248,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [showMenu, setShowMenu] = useState(false);
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(null);
   const [riderTrackKey, setRiderTrackKey] = useState(0);
+  const riderPickupRouteStartRef = useRef<[number, number] | null>(null);
+  const riderPickupRouteFetchedAtRef = useRef(0);
   const userMapRef = useRef<any>(null);
   const [mapFocus, setMapFocus] = useState<MapFocus>(null);
   const initialFocusDone = useRef(false);
@@ -1627,10 +1631,23 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   useEffect(() => {
     if (step !== 'matched' || !riderLocation || !startLoc) {
       setRiderPickupRouteCoords(null);
+      riderPickupRouteStartRef.current = null;
+      riderPickupRouteFetchedAtRef.current = 0;
       return;
     }
 
+    const now = Date.now();
+    const lastStart = riderPickupRouteStartRef.current;
+    const movedMeters = lastStart ? haversineMeters(lastStart, riderLocation) : Infinity;
+    const fetchedRecently = now - riderPickupRouteFetchedAtRef.current < ROUTE_REFRESH_MS;
+    if (lastStart && movedMeters < ROUTE_REFRESH_METERS && fetchedRecently) return;
+
+    setRiderPickupRouteCoords(prev => prev ?? [riderLocation, startLoc]);
+    riderPickupRouteStartRef.current = riderLocation;
+    riderPickupRouteFetchedAtRef.current = now;
+
     const ctrl = new AbortController();
+    const timeout = window.setTimeout(() => ctrl.abort(), 8000);
     const fetchRiderPickupRoute = async () => {
       const coords = await fetchOsrmRoute(riderLocation, startLoc, ctrl.signal);
       if (ctrl.signal.aborted) return;
@@ -1638,8 +1655,19 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     };
 
     fetchRiderPickupRoute();
-    return () => ctrl.abort();
+    return () => {
+      window.clearTimeout(timeout);
+      ctrl.abort();
+    };
   }, [step, riderLocation, startLoc]);
+
+  const userMapLegendItems = React.useMemo<MapLegendItem[]>(() => [
+    { label: 'Pickup point', type: 'dot', color: '#3b82f6' },
+    ...(endLoc ? [{ label: 'Dropoff point', type: 'dot' as const, color: '#10b981' }] : []),
+    ...(routeCoords ? [{ label: 'Pickup to dropoff', type: 'line' as const, color: '#10b981' }] : []),
+    ...(step === 'matched' ? [{ label: 'Rider', type: 'rider' as const }] : []),
+    ...(riderPickupRouteCoords ? [{ label: 'Rider to pickup', type: 'line' as const, color: '#2563eb', dashed: true }] : []),
+  ], [endLoc, routeCoords, step, riderPickupRouteCoords]);
 
   if (!startLoc) return <SplashScreen settings={settings} />;
 
@@ -2072,14 +2100,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
           <MapZoomControl position="topright" />
         </RotatableMap>
         <MapLegend
-          className="top-[4.75rem] left-4 md:top-4"
-          items={[
-            { label: 'Pickup point', type: 'dot', color: '#3b82f6' },
-            ...(endLoc ? [{ label: 'Dropoff point', type: 'dot' as const, color: '#10b981' }] : []),
-            ...(routeCoords ? [{ label: 'Pickup to dropoff', type: 'line' as const, color: '#10b981' }] : []),
-            ...(step === 'matched' ? [{ label: 'Rider', type: 'rider' as const }] : []),
-            ...(riderPickupRouteCoords ? [{ label: 'Rider to pickup', type: 'line' as const, color: '#2563eb', dashed: true }] : []),
-          ]}
+          className="top-[4.75rem] left-4 max-w-[calc(100vw-2rem)] md:top-4"
+          items={userMapLegendItems}
         />
         {(step === 'home' || step === 'select') && (
           <div className="absolute bottom-4 inset-x-0 flex justify-center z-10 pointer-events-none">
@@ -2574,6 +2596,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   // when available. Falls back gracefully to the direct line if OSRM fails.
   const [snapRoute, setSnapRoute] = useState<[number, number][] | null>(null);
   const lastSnapPos = useRef<[number, number] | null>(null);
+  const lastSnapFetchAt = useRef(0);
   const snapGen = useRef(0);
   const snapMounted = useRef(true);
   useEffect(() => { return () => { snapMounted.current = false; }; }, []);
@@ -2582,6 +2605,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
   useEffect(() => {
     setSnapRoute(null);
     lastSnapPos.current = null;
+    lastSnapFetchAt.current = 0;
   }, [targetCoords]);
 
   // Fetch OSRM road-snapped route whenever rider moves ≥50 m (or on first GPS fix)
@@ -2590,20 +2614,29 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
     const dist = lastSnapPos.current
       ? haversineMeters(lastSnapPos.current, riderCoords)
       : Infinity;
-    if (lastSnapPos.current && dist < 50) return;
+    const fetchedRecently = Date.now() - lastSnapFetchAt.current < ROUTE_REFRESH_MS;
+    if (lastSnapPos.current && dist < ROUTE_REFRESH_METERS && fetchedRecently) return;
     lastSnapPos.current = riderCoords;
+    lastSnapFetchAt.current = Date.now();
 
     const gen = ++snapGen.current;
+    const ctrl = new AbortController();
+    const timeout = window.setTimeout(() => ctrl.abort(), 8000);
     const from: [number, number] = [riderCoords[0], riderCoords[1]];
     const to: [number, number] = [(targetCoords as [number, number])[0], (targetCoords as [number, number])[1]];
-    fetchOsrmRouteWithInfo(from, to).then(result => {
-      if (snapGen.current !== gen || !snapMounted.current) return;
+    fetchOsrmRouteWithInfo(from, to, ctrl.signal).then(result => {
+      window.clearTimeout(timeout);
+      if (ctrl.signal.aborted || snapGen.current !== gen || !snapMounted.current) return;
       if (result) {
         setSnapRoute(result.coords);
         setRouteInfo({ distance: result.distance, duration: result.duration });
       }
       // If OSRM fails, snapRoute stays null — directLine remains the fallback
     });
+    return () => {
+      window.clearTimeout(timeout);
+      ctrl.abort();
+    };
   }, [riderCoords, targetCoords]);
 
   // Keep routeCoords in sync so RiderMapFit and other consumers still work
@@ -2614,6 +2647,12 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
 
   const passengerName = `${request.user?.first_name || ''} ${request.user?.last_name || ''}`.trim() || 'Passenger';
   const riderName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Rider';
+  const riderMapLegendItems = React.useMemo<MapLegendItem[]>(() => [
+    { label: 'You', type: 'rider', color: '#2563eb' },
+    { label: ridePhase === 'pickup' ? 'Pickup point' : 'Dropoff point', type: 'dot', color: ridePhase === 'pickup' ? '#f97316' : '#10b981' },
+    ...(directLine ? [{ label: 'Direct guide', type: 'line' as const, color: ridePhase === 'pickup' ? '#f97316' : '#10b981', dashed: true }] : []),
+    ...(snapRoute ? [{ label: ridePhase === 'pickup' ? 'Road to pickup' : 'Road to dropoff', type: 'line' as const, color: ridePhase === 'pickup' ? '#f97316' : '#10b981' }] : []),
+  ], [ridePhase, !!directLine, !!snapRoute]);
 
   if (isChatOpen) {
     return (
@@ -2685,13 +2724,8 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
           </div>
         )}
         <MapLegend
-          className="top-4 left-4"
-          items={[
-            { label: 'You', type: 'rider', color: '#2563eb' },
-            { label: ridePhase === 'pickup' ? 'Pickup point' : 'Dropoff point', type: 'dot', color: ridePhase === 'pickup' ? '#f97316' : '#10b981' },
-            ...(directLine ? [{ label: 'Direct guide', type: 'line' as const, color: ridePhase === 'pickup' ? '#f97316' : '#10b981', dashed: true }] : []),
-            ...(snapRoute ? [{ label: ridePhase === 'pickup' ? 'Road to pickup' : 'Road to dropoff', type: 'line' as const, color: ridePhase === 'pickup' ? '#f97316' : '#10b981' }] : []),
-          ]}
+          className="top-4 left-4 max-w-[calc(100vw-5rem)]"
+          items={riderMapLegendItems}
         />
         {/* Re-center button */}
         <button
