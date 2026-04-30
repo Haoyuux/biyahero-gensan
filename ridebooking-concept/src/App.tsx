@@ -1255,8 +1255,8 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
   // Orchestration loop: broadcasts to top 5 (or more) nearest riders simultaneously
   useEffect(() => {
-    if (step !== 'searching') {
-      pendingRequestRef.current = null;
+    if (step !== 'searching' || pendingRider) {
+      if (step !== 'searching') pendingRequestRef.current = null;
       return;
     }
 
@@ -1286,7 +1286,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     broadcastCycle();
     const interval = setInterval(broadcastCycle, 4000);
     return () => clearInterval(interval);
-  }, [step, currentRideId, targetLimit]);
+  }, [step, currentRideId, targetLimit, pendingRider]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
