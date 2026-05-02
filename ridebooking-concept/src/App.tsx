@@ -2125,7 +2125,6 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
               dragend: async (e) => {
                 const { lat, lng } = e.target.getLatLng();
                 setPickupCoords([lat, lng]);
-                setMapFocus({ coords: [lat, lng], key: Date.now() });
                 const name = await reverseGeocode(lat, lng);
                 setPickup(name);
               }
@@ -2141,7 +2140,6 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                   dragend: async (e) => {
                     const { lat, lng } = e.target.getLatLng();
                     setDestinationCoords([lat, lng]);
-                    setMapFocus({ coords: [lat, lng], key: Date.now() });
                     const name = await reverseGeocode(lat, lng);
                     setDropoff(name);
                   }
