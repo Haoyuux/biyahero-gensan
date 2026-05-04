@@ -8,6 +8,8 @@ export interface TierPricing {
   bookingFee: number;
   bookingFeeType: 'static' | 'per_km';  // 'static' = fixed amount, 'per_km' = multiplied by distance
   maintenanceCostPerKm: number; // internal operating cost, not billed to the user
+  perKmThresholdEnabled: boolean; // if true, per-km rate only applies beyond perKmThreshold km
+  perKmThreshold: number;         // km below this are free of per-km charge
 }
 
 export interface PricingConfig {
@@ -36,6 +38,8 @@ export const DEFAULT_PRICING: PricingConfig = {
     bookingFee: 5,
     bookingFeeType: 'static',
     maintenanceCostPerKm: 2,
+    perKmThresholdEnabled: false,
+    perKmThreshold: 0,
   },
   eco: {
     baseFare: 60,
@@ -44,6 +48,8 @@ export const DEFAULT_PRICING: PricingConfig = {
     bookingFee: 8,
     bookingFeeType: 'static',
     maintenanceCostPerKm: 3,
+    perKmThresholdEnabled: false,
+    perKmThreshold: 0,
   },
   premium: {
     baseFare: 100,
@@ -52,6 +58,8 @@ export const DEFAULT_PRICING: PricingConfig = {
     bookingFee: 12,
     bookingFeeType: 'static',
     maintenanceCostPerKm: 5,
+    perKmThresholdEnabled: false,
+    perKmThreshold: 0,
   },
 };
 
@@ -74,7 +82,10 @@ export function calculateFare(
   const distanceKm = distanceM / 1000;
   const durationMin = durationS / 60;
 
-  const distanceFee = Math.round(distanceKm * p.perKmRate * 10) / 10;
+  const billableKm = p.perKmThresholdEnabled
+    ? Math.max(0, distanceKm - (p.perKmThreshold ?? 0))
+    : distanceKm;
+  const distanceFee = Math.round(billableKm * p.perKmRate * 10) / 10;
   const timeFee     = Math.round(durationMin * p.perMinuteRate * 10) / 10;
   const bookingFee  = p.bookingFeeType === 'per_km'
     ? Math.round(distanceKm * p.bookingFee * 10) / 10

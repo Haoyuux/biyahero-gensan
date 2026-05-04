@@ -6692,6 +6692,51 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                         {field('perKmRate', 'Per KM Rate', '(incl. maint.)')}
                         {field('perMinuteRate', 'Per Minute Rate')}
 
+                        {/* Per KM threshold toggle */}
+                        <div className="col-span-2 md:col-span-3">
+                          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Per KM Free Distance</label>
+                                <p className="text-[11px] text-gray-500 mt-0.5">
+                                  {p.perKmThresholdEnabled
+                                    ? `Per KM rate only applies beyond ${p.perKmThreshold} km`
+                                    : 'Per KM rate starts from 0 km'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPricingCfg(prev => ({ ...prev, [tier]: { ...prev[tier], perKmThresholdEnabled: !p.perKmThresholdEnabled } }));
+                                  setPricingSaved(false);
+                                }}
+                                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${p.perKmThresholdEnabled ? 'bg-gray-900' : 'bg-gray-200'}`}
+                              >
+                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${p.perKmThresholdEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                              </button>
+                            </div>
+                            {p.perKmThresholdEnabled && (
+                              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <input
+                                  type="number" min={0} step={0.5}
+                                  value={p.perKmThreshold}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setPricingCfg(prev => ({ ...prev, [tier]: { ...prev[tier], perKmThreshold: val } }));
+                                    setPricingSaved(false);
+                                  }}
+                                  className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                                />
+                                <span className="text-[11px] text-gray-400 font-medium">km free</span>
+                                <span className="text-[11px] text-gray-400">·</span>
+                                <span className="text-[11px] text-gray-500">
+                                  e.g. 5 km ride → ₱{(Math.max(0, 5 - p.perKmThreshold) * p.perKmRate).toFixed(0)} distance fee
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Booking Fee — with type toggle */}
                         <div className="col-span-2 md:col-span-3">
                           <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
@@ -6761,6 +6806,13 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                           {p.bookingFeeType === 'per_km'
                             ? `₱${p.bookingFee}/km`
                             : `₱${p.bookingFee} flat`}
+                          {p.perKmThresholdEnabled && p.perKmThreshold > 0 && (
+                            <>
+                              <span className="mx-2 text-gray-300">·</span>
+                              <span className="font-bold text-gray-700">Free first: </span>
+                              {p.perKmThreshold} km
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
