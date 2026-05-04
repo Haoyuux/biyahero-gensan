@@ -6862,7 +6862,13 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
               </div>
               <div className="mt-5 flex items-center gap-3">
                 <button
-                  onClick={async () => { savePricingConfig(pricingCfg); await savePricingConfigToDB(pricingCfg); setPricingSaved(true); }}
+                  onClick={async () => {
+                    setPricingSaved(false);
+                    savePricingConfig(pricingCfg);
+                    const ok = await savePricingConfigToDB(pricingCfg);
+                    setPricingSaved(ok ? true : false);
+                    if (!ok) alert('Pricing saved locally but failed to sync to database. Check console for details.');
+                  }}
                   className="px-6 py-2.5 bg-gray-950 text-white font-bold text-sm rounded-xl hover:bg-gray-800 transition-colors"
                 >
                   Save Pricing
@@ -6875,7 +6881,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                 </button>
                 {pricingSaved && (
                   <span className="flex items-center gap-1.5 text-emerald-600 font-bold text-[13px]">
-                    <CheckCircle size={14} /> Saved
+                    <CheckCircle size={14} /> Saved to database
                   </span>
                 )}
               </div>
