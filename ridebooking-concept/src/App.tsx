@@ -8328,7 +8328,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     setActiveField(field);
     setQuery(field === 'pickup' ? (pickup === 'Current Location' ? '' : pickup) : dropoff);
     setSuggestions([]);
-    setIsExpanded(false);
+    setIsExpanded(true);
   };
 
   const handleSelect = (place: any) => {
@@ -8391,55 +8391,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
           </button>
         </div>
 
-      {/* Location Inputs */}
-      <div className="rounded-2xl overflow-hidden mb-4 border border-gray-100">
-        <div
-          className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors ${activeField === 'pickup' ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100/70'}`}
-          onClick={() => handleFocus('pickup')}
-        >
-          <div className="w-2 h-2 rounded-full bg-gray-900 shrink-0" />
-          {activeField === 'pickup' ? (
-            <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Search pickup..." className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-900 placeholder-gray-400" />
-          ) : (
-            <span className={`text-sm font-medium flex-1 truncate ${pickup ? 'text-gray-900' : 'text-gray-400'}`}>{pickup || 'Set pickup location'}</span>
-          )}
-        </div>
-        <div className="flex items-center px-[19px] bg-gray-50">
-          <div className="flex flex-col gap-[3px] py-[3px]">
-            <div className="w-px h-1.5 bg-gray-200 mx-auto" />
-            <div className="w-px h-1.5 bg-gray-200 mx-auto" />
-          </div>
-          <div className="flex-1 h-px bg-gray-100 ml-3" />
-        </div>
-        <div
-          className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors ${activeField === 'dropoff' ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100/70'}`}
-          onClick={() => handleFocus('dropoff')}
-        >
-          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-          {activeField === 'dropoff' ? (
-            <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Where to?" className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-900 placeholder-gray-400" />
-          ) : (
-            <span className={`text-sm font-medium flex-1 truncate ${dropoff ? 'text-gray-900' : 'text-gray-400'}`}>{dropoff || 'Choose destination'}</span>
-          )}
-        </div>
-      </div>
-
-      {/* Find a Rider button — always visible, active only when destination is set */}
-      <button
-        onClick={() => dropoff ? setStep('select') : handleFocus('dropoff')}
-        className={`w-full py-4 font-black text-[15px] rounded-2xl mb-3 transition-all active:scale-[0.98] ${
-          dropoff
-            ? 'bg-gray-950 text-white hover:bg-gray-800 shadow-[0_4px_24px_rgba(0,0,0,0.18)]'
-            : 'bg-gray-100 text-gray-400 cursor-default'
-        }`}
-      >
-        {dropoff ? 'Find a Rider' : 'Where are you going?'}
-      </button>
-
-      {/* Suggestions */}
-      {/* Collapsible content — hidden on mobile when collapsed */}
+      {/* Suggestions — rendered above inputs so they appear above keyboard on mobile */}
       <AnimatePresence initial={false}>
         {(isExpanded || suggestions.length > 0) && (
           <motion.div
@@ -8450,9 +8402,9 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="overflow-hidden md:overflow-visible"
           >
-            <div className="max-h-[55vh] overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))] md:max-h-none md:pb-10">
+            <div className="max-h-[40vh] overflow-y-auto mb-3 md:max-h-none md:mb-0 md:pb-6">
               {suggestions.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-2 overflow-hidden">
                   {loading && <div className="p-4 text-center text-xs text-gray-400 tracking-wide">Searching...</div>}
                   {suggestions.map((place, i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
@@ -8535,6 +8487,53 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Location Inputs */}
+      <div className="rounded-2xl overflow-hidden mb-4 border border-gray-100">
+        <div
+          className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors ${activeField === 'pickup' ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100/70'}`}
+          onClick={() => handleFocus('pickup')}
+        >
+          <div className="w-2 h-2 rounded-full bg-gray-900 shrink-0" />
+          {activeField === 'pickup' ? (
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Search pickup..." className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-900 placeholder-gray-400" />
+          ) : (
+            <span className={`text-sm font-medium flex-1 truncate ${pickup ? 'text-gray-900' : 'text-gray-400'}`}>{pickup || 'Set pickup location'}</span>
+          )}
+        </div>
+        <div className="flex items-center px-[19px] bg-gray-50">
+          <div className="flex flex-col gap-[3px] py-[3px]">
+            <div className="w-px h-1.5 bg-gray-200 mx-auto" />
+            <div className="w-px h-1.5 bg-gray-200 mx-auto" />
+          </div>
+          <div className="flex-1 h-px bg-gray-100 ml-3" />
+        </div>
+        <div
+          className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors ${activeField === 'dropoff' ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100/70'}`}
+          onClick={() => handleFocus('dropoff')}
+        >
+          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          {activeField === 'dropoff' ? (
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Where to?" className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-900 placeholder-gray-400" />
+          ) : (
+            <span className={`text-sm font-medium flex-1 truncate ${dropoff ? 'text-gray-900' : 'text-gray-400'}`}>{dropoff || 'Choose destination'}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Find a Rider button — always visible, active only when destination is set */}
+      <button
+        onClick={() => dropoff ? setStep('select') : handleFocus('dropoff')}
+        className={`w-full py-4 font-black text-[15px] rounded-2xl mb-3 transition-all active:scale-[0.98] ${
+          dropoff
+            ? 'bg-gray-950 text-white hover:bg-gray-800 shadow-[0_4px_24px_rgba(0,0,0,0.18)]'
+            : 'bg-gray-100 text-gray-400 cursor-default'
+        }`}
+      >
+        {dropoff ? 'Find a Rider' : 'Where are you going?'}
+      </button>
       </div>
     </motion.div>
   );
