@@ -1389,15 +1389,19 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       }
 
       const priorities = payload.priorityRiderIds || [];
-      // Filter out those who declined or already attempted (if tracked)
       const targets = priorities
         .filter((id: string) => !declinedRidersRef.current.has(id))
         .slice(0, targetLimit);
 
-      supabase.channel('rides').send({ 
-        type: 'broadcast', 
-        event: 'REQUEST_RIDE', 
-        payload: { ...payload, targetRiderIds: targets } 
+      // When priority list is exhausted, broadcast with no filter so any online rider sees it
+      const broadcastPayload = targets.length > 0
+        ? { ...payload, targetRiderIds: targets }
+        : { ...payload, targetRiderIds: null };
+
+      supabase.channel('rides').send({
+        type: 'broadcast',
+        event: 'REQUEST_RIDE',
+        payload: broadcastPayload,
       });
     };
 
@@ -3505,7 +3509,8 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
       if (status !== 'SUBSCRIBED') return;
       // Fetch rides booked before this rider came online (within last 10 mins)
       const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      const { data: pending } = await supabase
+      // Use admin client to bypass RLS — anon key can't read rides it isn't assigned to yet
+      const { data: pending } = await supabaseAdmin
         .from('rides')
         .select('request_data')
         .eq('status', 'pending')
