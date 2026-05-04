@@ -57,7 +57,7 @@ jobs:
     steps:
       - name: Pull & restart
         run: |
-          cd ~/biyahero
+          cd /biyahero
           docker compose pull
           docker compose up -d
 
