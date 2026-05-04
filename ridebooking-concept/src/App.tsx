@@ -5519,7 +5519,14 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
 ];
 
 const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, onImpersonate }: { profile: Profile, isSuperAdmin: boolean, settings: AppSettings | null, onRefreshSettings: () => void, onImpersonate?: (p: Profile) => void }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('live');
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    const saved = sessionStorage.getItem('admin_active_tab') as AdminTab | null;
+    return saved ?? 'live';
+  });
+  const setActiveTabPersisted = (tab: AdminTab) => {
+    sessionStorage.setItem('admin_active_tab', tab);
+    setActiveTab(tab);
+  };
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
@@ -5601,7 +5608,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
       // After roles load, if current tab isn't allowed, jump to first allowed tab
       if (!isSuperAdmin && profile.admin_role_ids?.length) {
         const allowed = new Set(data.filter(r => profile.admin_role_ids?.includes(r.id)).flatMap(r => r.modules));
-        setActiveTab(prev => allowed.has(prev) ? prev : (allowed.values().next().value as AdminTab ?? 'live'));
+        setActiveTab(prev => { const next = allowed.has(prev) ? prev : (allowed.values().next().value as AdminTab ?? 'live'); sessionStorage.setItem('admin_active_tab', next); return next; });
       }
     });
   }, []);
@@ -5920,7 +5927,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
           {tabs.map(({ id, label, icon: Icon }) => (
             <div
               key={id}
-              onClick={() => { setActiveTab(id); setIsSidebarOpen(false); }}
+              onClick={() => { setActiveTabPersisted(id); setIsSidebarOpen(false); }}
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl cursor-pointer transition-colors ${activeTab === id ? 'bg-white text-gray-950' : 'hover:bg-white/[0.06] text-white/50 hover:text-white/80'}`}
             >
               <Icon size={15} />
