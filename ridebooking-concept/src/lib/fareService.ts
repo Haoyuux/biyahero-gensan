@@ -121,4 +121,6 @@ export function loadPricingConfig(): PricingConfig {
 /** Persist config to localStorage (called from super-admin panel). */
 export function savePricingConfig(config: PricingConfig): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  // Notify same-tab listeners (storage event only fires in other tabs)
+  window.dispatchEvent(new Event('pricingConfigUpdated'));
 }

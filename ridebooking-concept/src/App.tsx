@@ -1295,7 +1295,16 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   );
   const [activeRider, setActiveRider] = useState<any>(() => _pr.current?.activeRider ?? null);
   const [pendingRider, setPendingRider] = useState<any>(null);
-  const [pricingConfig] = useState<PricingConfig>(() => loadPricingConfig());
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(() => loadPricingConfig());
+  useEffect(() => {
+    const refresh = () => setPricingConfig(loadPricingConfig());
+    window.addEventListener('pricingConfigUpdated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('pricingConfigUpdated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
   const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(
     () => _pr.current?.fareBreakdown ?? null
   );
@@ -3451,12 +3460,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         .order('id', { ascending: true });
       if (pending?.length) {
         pending.map((r: any) => r.request_data).filter(Boolean).forEach((req: any) => {
-          if (req.targetRiderIds) {
-            if (!req.targetRiderIds.includes(currentProfile.id)) return;
-          } else if (req.targetRiderId && req.targetRiderId !== currentProfile.id) {
-            return;
-          }
-          lastSeenRef.current.set(req.rideId, Date.now());
+          // No targetRiderIds filter here — rider came online after the booking was made,
+          // so they were never in the original broadcast list. Any pending ride in the DB
+          // is fair game for a newly-online rider to accept.
+          // Set lastSeen 5 min into the future so the stale-cleanup loop doesn't evict
+          // this ride before a real-time broadcast cycle can refresh it.
+          lastSeenRef.current.set(req.rideId, Date.now() + 5 * 60 * 1000);
           scheduleRequest(req);
         });
       }
