@@ -7014,7 +7014,84 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                     </div>
                   ) : (
                     <>
-                    <div>
+                    {/* Mobile cards */}
+                    <div className="md:hidden divide-y divide-gray-50">
+                      {paginatedUsers.length === 0 && (
+                        <p className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</p>
+                      )}
+                      {paginatedUsers.map(u => (
+                        <div key={u.id} className="px-4 py-4 space-y-3">
+                          {/* Row 1: avatar + name + email + badges */}
+                          <div className="flex items-center gap-3">
+                            {u.avatar_url
+                              ? <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full shrink-0 object-cover" />
+                              : <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-black text-gray-400 shrink-0">{u.full_name?.[0] || '?'}</div>}
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-gray-900 text-sm truncate">{u.full_name || '—'}</p>
+                              <p className="text-[12px] text-gray-400 truncate">{u.email}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                                  u.role === 'super_admin' ? 'bg-purple-50 text-purple-700' :
+                                  u.role === 'admin' ? 'bg-blue-50 text-blue-700' :
+                                  u.role === 'team_leader' ? 'bg-amber-50 text-amber-700' :
+                                  u.role === 'rider' ? 'bg-emerald-50 text-emerald-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>{u.role}</span>
+                                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${u.is_blocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                  {u.is_blocked ? 'Inactive' : 'Active'}
+                                </span>
+                                <span className="text-[11px] text-gray-400">{new Date(u.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Row 2: Change Role */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider w-24 shrink-0">Change Role</span>
+                            {roleUpdating === u.id
+                              ? <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                              : <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
+                                  className="text-[12px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white flex-1">
+                                  <option value="user">user</option>
+                                  <option value="rider">rider</option>
+                                  <option value="team_leader">team_leader</option>
+                                  <option value="admin">admin</option>
+                                  <option value="super_admin">super_admin</option>
+                                </select>}
+                          </div>
+                          {/* Row 3: Actions */}
+                          <div className="flex flex-wrap gap-2">
+                            <button onClick={() => setUserDetailModal(u)}
+                              className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors">
+                              <Eye size={12} /> Details
+                            </button>
+                            {u.id !== profile.id && u.role !== 'super_admin' && (
+                              userStatusToggling === u.id
+                                ? <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin self-center" />
+                                : <button onClick={async () => {
+                                    setUserStatusToggling(u.id);
+                                    const updated = u.is_blocked ? await unblockUser(u.id) : await blockUser(u.id, 'Deactivated by admin', profile.full_name || 'Admin');
+                                    if (updated) setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
+                                    setUserStatusToggling(null);
+                                  }}
+                                  className={`flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border rounded-lg transition-colors ${
+                                    u.is_blocked ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                                    : 'border-red-200 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500'}`}>
+                                  {u.is_blocked ? <><CheckCircle size={12} /> Activate</> : <><Ban size={12} /> Deactivate</>}
+                                </button>
+                            )}
+                            {onImpersonate && u.id !== profile.id && (
+                              <button onClick={() => onImpersonate(u)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors">
+                                <Eye size={12} /> View As
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop table */}
+                    <div className="hidden md:block">
                       <table className="w-full text-left table-fixed">
                         <colgroup>
                           <col style={{width:'12%'}} />
@@ -7197,6 +7274,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                         </tbody>
                       </table>
                     </div>
+                    </div>{/* end desktop table wrapper */}
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
                         <p className="text-[12px] text-gray-500 font-medium">
