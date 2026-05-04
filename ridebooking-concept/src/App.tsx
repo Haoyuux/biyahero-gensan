@@ -1497,10 +1497,16 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
   const handleCancelBooking = (broadcast = false) => {
     if (broadcast && currentRideId) {
-       supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
-       // Mark ride as cancelled in DB so riders coming online don't see it
-       supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
+      supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
+      // Use admin client to guarantee the write bypasses RLS
+      supabaseAdmin.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
     }
+    // Stop re-broadcast loop immediately
+    pendingRequestRef.current = null;
+    // Reset dispatch state for next search
+    declinedRidersRef.current.clear();
+    setTargetLimit(5);
+    // Clear ride state
     localStorage.removeItem(USER_RIDE_KEY);
     setStep('home');
     setPendingRider(null);
@@ -1514,6 +1520,10 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     setCompletedRider(null);
     setFareBreakdown(null);
     setRiderLocation(null);
+    setRouteCoords(null);
+    setRouteInfo(null);
+    setRiderPickupRouteCoords(null);
+    riderPickupRouteStartRef.current = null;
     setIsBooking(false);
     // Re-center on user's current position after cancelling
     setDeviceLocation(loc => { if (loc) setMapFocus({ coords: loc, key: Date.now() }); return loc; });
