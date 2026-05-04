@@ -1685,6 +1685,27 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     return () => { supabase.removeChannel(locCh); };
   }, [currentRideId, reconnectTick]);
 
+  // Postgres-changes fallback: rider writes last_lat/last_lng to profiles during ride
+  useEffect(() => {
+    if (!activeRider?.id || step !== 'matched') return;
+    const riderId = activeRider.id;
+    const pgCh = supabase
+      .channel('rider-loc-pg-' + riderId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${riderId}`,
+      }, (payload: any) => {
+        const { last_lat, last_lng } = payload.new;
+        if (last_lat != null && last_lng != null) {
+          setRiderLocation([last_lat, last_lng]);
+        }
+      });
+    pgCh.subscribe();
+    return () => { supabase.removeChannel(pgCh); };
+  }, [activeRider?.id, step]);
+
   useEffect(() => {
     if (!startLoc || !endLoc) { setRouteCoords(null); setRouteInfo(null); return; }
     const ctrl = new AbortController();
@@ -2662,11 +2683,12 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         const locationPayload = { rideId: request.rideId, lat: coords[0], lng: coords[1] };
         if (now - lastBroadcast.time >= 2000) {
           lastBroadcast.time = now;
-          // Broadcast on both channels: rides (reliable, proven) + ride-loc (dedicated)
           supabase.channel('rides').send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: locationPayload });
           if (channelReady) {
             ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: locationPayload });
           }
+          // Write to DB — user subscribes via postgres_changes as reliable fallback
+          supabase.from('profiles').update({ last_lat: coords[0], last_lng: coords[1] }).eq('id', profile.id);
         }
       },
       () => setRiderCoords(DEFAULT_CENTER),
