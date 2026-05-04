@@ -5624,9 +5624,14 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
     setOngoingLoading(true);
     supabaseAdmin.from('rides')
       .select('*')
-      .in('status', ['pending', 'accepted', 'pickup'])
+      .neq('status', 'completed')
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
-      .then(({ data }) => { setOngoingRides(data || []); setOngoingLoading(false); });
+      .then(({ data, error }) => {
+        if (error) console.error('loadOngoingRides:', error.message);
+        setOngoingRides(data || []);
+        setOngoingLoading(false);
+      });
   };
 
   useEffect(() => {
