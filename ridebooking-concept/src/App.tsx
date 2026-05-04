@@ -1605,6 +1605,12 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
       }
     });
 
+    channel.on('broadcast', { event: 'RIDER_LOCATION' }, (payload) => {
+      if (payload.payload.rideId === currentRideId) {
+        setRiderLocation([payload.payload.lat, payload.payload.lng]);
+      }
+    });
+
     channel.on('broadcast', { event: 'RIDER_ARRIVED' }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
         showNotification('Your rider has arrived at the pickup location!');
@@ -2653,9 +2659,14 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
         const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setRiderCoords(coords);
         const now = Date.now();
-        if (channelReady && now - lastBroadcast.time >= 2000) {
+        const locationPayload = { rideId: request.rideId, lat: coords[0], lng: coords[1] };
+        if (now - lastBroadcast.time >= 2000) {
           lastBroadcast.time = now;
-          ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: { rideId: request.rideId, lat: coords[0], lng: coords[1] } });
+          // Broadcast on both channels: rides (reliable, proven) + ride-loc (dedicated)
+          supabase.channel('rides').send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: locationPayload });
+          if (channelReady) {
+            ch.send({ type: 'broadcast', event: 'RIDER_LOCATION', payload: locationPayload });
+          }
         }
       },
       () => setRiderCoords(DEFAULT_CENTER),
