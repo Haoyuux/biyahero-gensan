@@ -8,7 +8,8 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git -C \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\" diff HEAD -- ridebooking-concept/src/App.tsx)"
     ]
   }
 }

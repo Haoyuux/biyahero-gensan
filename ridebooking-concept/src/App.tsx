@@ -1388,20 +1388,13 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         lastExpandTimeRef.current = Date.now();
       }
 
-      const priorities = payload.priorityRiderIds || [];
-      const targets = priorities
-        .filter((id: string) => !declinedRidersRef.current.has(id))
-        .slice(0, targetLimit);
-
-      // When priority list is exhausted, broadcast with no filter so any online rider sees it
-      const broadcastPayload = targets.length > 0
-        ? { ...payload, targetRiderIds: targets }
-        : { ...payload, targetRiderIds: null };
-
+      // Broadcast to ALL online riders — no targetRiderIds filter.
+      // Any online rider can see and attempt to accept; DB race condition (.eq('status','pending'))
+      // ensures only one wins. This guarantees late-joining riders always receive the request.
       supabase.channel('rides').send({
         type: 'broadcast',
         event: 'REQUEST_RIDE',
-        payload: broadcastPayload,
+        payload: { ...payload, targetRiderIds: null },
       });
     };
 
@@ -3507,15 +3500,14 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
     channel.subscribe(async (status) => {
       if (status !== 'SUBSCRIBED') return;
-      // Fetch rides booked before this rider came online (within last 10 mins)
-      const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      // Use admin client to bypass RLS — anon key can't read rides it isn't assigned to yet
+      // Use admin client to bypass RLS — anon key can't read rides it isn't assigned to yet.
+      // No time filter: any pending ride is still looking for a rider.
       const { data: pending } = await supabaseAdmin
         .from('rides')
         .select('request_data')
         .eq('status', 'pending')
-        .gte('created_at', tenMinsAgo)
-        .order('id', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(10);
       if (pending?.length) {
         pending.map((r: any) => r.request_data).filter(Boolean).forEach((req: any) => {
           // No targetRiderIds filter here — rider came online after the booking was made,
