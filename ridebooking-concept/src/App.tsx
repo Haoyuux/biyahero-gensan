@@ -7274,7 +7274,6 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                         </tbody>
                       </table>
                     </div>
-                    </div>
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
                         <p className="text-[12px] text-gray-500 font-medium">
