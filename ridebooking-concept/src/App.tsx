@@ -5568,6 +5568,8 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [financePage, setFinancePage] = useState(1);
+  const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
+  const [userStatusToggling, setUserStatusToggling] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // App Settings state
@@ -7023,7 +7025,8 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Team Leader</th>
                             <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">View As</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -7132,19 +7135,55 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                               )}
                             </td>
                             <td className="px-5 py-4">
-                              {onImpersonate && u.id !== profile.id && (
+                              <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${u.is_blocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                {u.is_blocked ? 'Inactive' : 'Active'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => onImpersonate(u)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                  onClick={() => setUserDetailModal(u)}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                 >
-                                  <Eye size={12} /> View As
+                                  <Eye size={12} /> Details
                                 </button>
-                              )}
+                                {u.id !== profile.id && u.role !== 'super_admin' && (
+                                  userStatusToggling === u.id ? (
+                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <button
+                                      onClick={async () => {
+                                        setUserStatusToggling(u.id);
+                                        const updated = u.is_blocked
+                                          ? await unblockUser(u.id)
+                                          : await blockUser(u.id, 'Deactivated by admin', profile.full_name || 'Admin');
+                                        if (updated) setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
+                                        setUserStatusToggling(null);
+                                      }}
+                                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold border rounded-lg transition-colors ${
+                                        u.is_blocked
+                                          ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                                          : 'border-red-200 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500'
+                                      }`}
+                                    >
+                                      {u.is_blocked ? <><CheckCircle size={12} /> Activate</> : <><Ban size={12} /> Deactivate</>}
+                                    </button>
+                                  )
+                                )}
+                                {onImpersonate && u.id !== profile.id && (
+                                  <button
+                                    onClick={() => onImpersonate(u)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                  >
+                                    <Eye size={12} /> View As
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                           ))}
                           {filteredUsers.length === 0 && (
-                            <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
+                            <tr><td colSpan={9} className="px-5 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -7170,6 +7209,99 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
               })()}
             </>
           )}
+
+          {/* User Detail Modal */}
+          <AnimatePresence>
+            {userDetailModal && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4"
+                onClick={() => setUserDetailModal(null)}
+              >
+                <motion.div
+                  initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+                  className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+                    <h3 className="font-black text-gray-950 text-base">User Details</h3>
+                    <button onClick={() => setUserDetailModal(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {/* Body */}
+                  <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                    {/* Avatar + name */}
+                    <div className="flex items-center gap-4">
+                      {userDetailModal.avatar_url
+                        ? <img src={userDetailModal.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover" />
+                        : <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-black text-gray-400">{userDetailModal.full_name?.[0] || '?'}</div>}
+                      <div>
+                        <p className="font-black text-gray-950 text-base">{userDetailModal.full_name || '—'}</p>
+                        <p className="text-[12px] text-gray-400">{userDetailModal.email}</p>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${userDetailModal.is_blocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                          {userDetailModal.is_blocked ? 'Inactive' : 'Active'}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Info rows */}
+                    {[
+                      { label: 'Role', value: userDetailModal.role },
+                      { label: 'Phone', value: userDetailModal.phone || '—' },
+                      { label: 'Birthday', value: userDetailModal.birthday || '—' },
+                      { label: 'Sex', value: userDetailModal.sex || '—' },
+                      { label: 'Joined', value: new Date(userDetailModal.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) },
+                      { label: 'Last Seen', value: userDetailModal.last_seen_at ? new Date(userDetailModal.last_seen_at).toLocaleString('en-PH') : '—' },
+                      { label: 'Online', value: userDetailModal.is_online ? 'Yes' : 'No' },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between items-start border-b border-gray-50 pb-3 last:border-0">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                        <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                      </div>
+                    ))}
+                    {userDetailModal.is_blocked && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
+                        <p className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Block Info</p>
+                        <p className="text-[13px] text-red-700 font-semibold">{userDetailModal.block_reason || 'No reason given'}</p>
+                        {userDetailModal.blocked_at && <p className="text-[12px] text-red-400">{new Date(userDetailModal.blocked_at).toLocaleString('en-PH')}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {/* Footer action */}
+                  {userDetailModal.id !== profile.id && userDetailModal.role !== 'super_admin' && (
+                    <div className="px-6 pb-6 pt-3 border-t border-gray-100">
+                      <button
+                        disabled={userStatusToggling === userDetailModal.id}
+                        onClick={async () => {
+                          setUserStatusToggling(userDetailModal.id);
+                          const updated = userDetailModal.is_blocked
+                            ? await unblockUser(userDetailModal.id)
+                            : await blockUser(userDetailModal.id, 'Deactivated by admin', profile.full_name || 'Admin');
+                          if (updated) {
+                            setAllUsers(prev => prev.map(x => x.id === userDetailModal.id ? { ...x, ...updated } : x));
+                            setUserDetailModal(prev => prev ? { ...prev, ...updated } : null);
+                          }
+                          setUserStatusToggling(null);
+                        }}
+                        className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 ${
+                          userDetailModal.is_blocked
+                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                            : 'bg-red-500 hover:bg-red-600 text-white'
+                        }`}
+                      >
+                        {userStatusToggling === userDetailModal.id
+                          ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          : userDetailModal.is_blocked
+                            ? <><CheckCircle size={15} /> Activate User</>
+                            : <><Ban size={15} /> Deactivate User</>}
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Assign Admin Roles Modal */}
           <AnimatePresence>
