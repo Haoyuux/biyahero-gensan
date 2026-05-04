@@ -2275,19 +2275,30 @@ const RiderProfileScreen = ({ profile, onBack, onUpdate }: { profile: Profile, o
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
+    // Reset input so same file can be re-selected on retry
+    e.target.value = '';
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setError('File too large. Max 10 MB.'); return; }
+    setError('');
     setUploading(type);
-    const bucket = (type === 'avatar' ? 'avatars' : type === 'cover' ? 'covers' : 'documents') as 'avatars' | 'covers' | 'documents';
-    const url = await uploadImage(bucket, profile.id, file);
-    if (url) {
-      if (type === 'avatar') setAvatarUrl(url);
-      else if (type === 'cover') setCoverUrl(url);
-      else if (type === 'license') setLicenseUrl(url);
-      else if (type === 'or') setOrUrl(url);
-      else if (type === 'cr') setCrUrl(url);
-      else if (type === 'vehicle') setVehicleImageUrl(url);
+    try {
+      const bucket = (type === 'avatar' ? 'avatars' : type === 'cover' ? 'covers' : 'documents') as 'avatars' | 'covers' | 'documents';
+      const url = await uploadImage(bucket, profile.id, file);
+      if (url) {
+        if (type === 'avatar') setAvatarUrl(url);
+        else if (type === 'cover') setCoverUrl(url);
+        else if (type === 'license') setLicenseUrl(url);
+        else if (type === 'or') setOrUrl(url);
+        else if (type === 'cr') setCrUrl(url);
+        else if (type === 'vehicle') setVehicleImageUrl(url);
+      } else {
+        setError('Upload failed. Check connection and try again.');
+      }
+    } catch {
+      setError('Upload failed. Check connection and try again.');
+    } finally {
+      setUploading(null);
     }
-    setUploading(null);
   };
 
   const handleSave = async () => {
@@ -2343,13 +2354,15 @@ const RiderProfileScreen = ({ profile, onBack, onUpdate }: { profile: Profile, o
     <div className="border border-gray-200 rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
         <span className="text-xs font-black text-gray-500 uppercase tracking-wider">{label}</span>
-        <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 cursor-pointer hover:text-emerald-700">
-          <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => handleUpload(e, type)} />
-          {uploading === type
-            ? <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            : <Upload size={13} />}
-          {url ? 'Replace' : 'Upload'}
-        </label>
+        {editing && (
+          <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 cursor-pointer hover:text-emerald-700">
+            <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => handleUpload(e, type)} />
+            {uploading === type
+              ? <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              : <Upload size={13} />}
+            {url ? 'Replace' : 'Upload'}
+          </label>
+        )}
       </div>
       {url
         ? <a href={url} target="_blank" rel="noopener noreferrer">
@@ -2468,6 +2481,7 @@ const RiderProfileScreen = ({ profile, onBack, onUpdate }: { profile: Profile, o
                   <DocUpload label="CR (Certificate of Registration)" type="cr" url={crUrl} />
                   <DocUpload label="Vehicle Photo" type="vehicle" url={vehicleImageUrl} />
                 </div>
+                {error && <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm font-medium text-red-600 mt-3">{error}</div>}
               </div>
               {/* Submit */}
               {profile.rider_status === 'unsubmitted' || profile.rider_status === 'rejected' ? (
