@@ -17,7 +17,7 @@ import biyaScooterImg from './assets/images/mapimages/biyascooter.webp';
 const RotatableMap = MapContainer as React.ComponentType<React.ComponentProps<typeof MapContainer> & { rotate?: boolean; touchRotate?: boolean; bearingSnap?: number }>;
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseAdmin, signInWithGoogle, signOut, getProfile, updateProfile, uploadImage, getRiderProfiles, setRiderStatus, getAdminRoles, createAdminRole, updateAdminRole, deleteAdminRole, assignAdminRoles, blockUser, unblockUser, getBlockableProfiles, type Profile, type RiderStatus, type AdminRole } from '@/src/lib/supabase';
-import { calculateFare, loadPricingConfig, savePricingConfig, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
+import { calculateFare, loadPricingConfig, savePricingConfig, loadPricingConfigFromDB, savePricingConfigToDB, DEFAULT_PRICING, type PricingConfig, type FareBreakdown } from '@/src/lib/fareService';
 import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations, fetchRiderConversations, deleteConversation, type ChatMessage, type ConversationSummary } from '@/src/lib/chatService';
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, getTeamRemittances, type Remittance } from '@/src/lib/remittanceService';
@@ -1297,6 +1297,11 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   const [pendingRider, setPendingRider] = useState<any>(null);
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(() => loadPricingConfig());
   useEffect(() => {
+    // Load authoritative config from DB on mount; fall back to localStorage if offline
+    loadPricingConfigFromDB().then(cfg => { setPricingConfig(cfg); savePricingConfig(cfg); });
+  }, []);
+  useEffect(() => {
+    // Keep in sync when admin saves in the same tab or another tab
     const refresh = () => setPricingConfig(loadPricingConfig());
     window.addEventListener('pricingConfigUpdated', refresh);
     window.addEventListener('storage', refresh);
@@ -6857,7 +6862,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
               </div>
               <div className="mt-5 flex items-center gap-3">
                 <button
-                  onClick={() => { savePricingConfig(pricingCfg); setPricingSaved(true); }}
+                  onClick={async () => { savePricingConfig(pricingCfg); await savePricingConfigToDB(pricingCfg); setPricingSaved(true); }}
                   className="px-6 py-2.5 bg-gray-950 text-white font-bold text-sm rounded-xl hover:bg-gray-800 transition-colors"
                 >
                   Save Pricing

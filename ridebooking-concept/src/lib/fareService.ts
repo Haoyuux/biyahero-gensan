@@ -1,6 +1,8 @@
 // ─── Fare Service ─────────────────────────────────────────────────────────────
 // Central pricing logic. All fare calculations must go through calculateFare().
 
+import { supabase, supabaseAdmin } from './supabase';
+
 export interface TierPricing {
   baseFare: number;
   perKmRate: number;          // includes maintenance cost internally
@@ -118,9 +120,42 @@ export function loadPricingConfig(): PricingConfig {
   return DEFAULT_PRICING;
 }
 
-/** Persist config to localStorage (called from super-admin panel). */
+/** Persist config to localStorage and notify same-tab listeners. */
 export function savePricingConfig(config: PricingConfig): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  // Notify same-tab listeners (storage event only fires in other tabs)
   window.dispatchEvent(new Event('pricingConfigUpdated'));
+}
+
+/** Load pricing config from Supabase DB (app_settings row id=1). Falls back to defaults. */
+export async function loadPricingConfigFromDB(): Promise<PricingConfig> {
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('pricing_config')
+      .eq('id', 1)
+      .single();
+    if (error || !data?.pricing_config) return loadPricingConfig();
+    const saved = data.pricing_config as Partial<PricingConfig>;
+    return {
+      teamBookingFeeDiscount: saved.teamBookingFeeDiscount ?? DEFAULT_PRICING.teamBookingFeeDiscount,
+      moto:    { ...DEFAULT_PRICING.moto,    ...saved.moto },
+      eco:     { ...DEFAULT_PRICING.eco,     ...saved.eco },
+      premium: { ...DEFAULT_PRICING.premium, ...saved.premium },
+    };
+  } catch {
+    return loadPricingConfig();
+  }
+}
+
+/** Save pricing config to Supabase DB (super-admin only, uses service role key). */
+export async function savePricingConfigToDB(config: PricingConfig): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from('app_settings')
+    .update({ pricing_config: config })
+    .eq('id', 1);
+  if (error) {
+    console.error('Error saving pricing config to DB:', error);
+    return false;
+  }
+  return true;
 }
