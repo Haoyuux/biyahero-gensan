@@ -2133,6 +2133,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                 selectedRide={selectedRide} routeInfo={routeInfo} showNotification={showNotification}
                 fareBreakdown={fareBreakdown} pricingConfig={pricingConfig}
                 rideId={currentRideId}
+                dropoffLabel={dropoff}
                 userId={currentProfile.id}
                 userName={currentProfile.first_name || currentProfile.full_name || 'User'} />
             )}
@@ -9031,7 +9032,7 @@ const SearchingPanel = ({ onCancel }: { onCancel?: () => void; key?: string }) =
   </motion.div>
 );
 
-const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, activeRider, fareBreakdown, pricingConfig, rideId, userId, userName }: any) => {
+const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, activeRider, fareBreakdown, pricingConfig, rideId, userId, userName, dropoffLabel }: any) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -9087,6 +9088,11 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
     pricingConfig ?? DEFAULT_PRICING,
   );
 
+  const etaMin = routeInfo?.duration ? Math.max(1, Math.round(routeInfo.duration / 60)) : null;
+  const distKm = routeInfo?.distance ? (routeInfo.distance / 1000).toFixed(1) : null;
+  const etaLabel = etaMin ? `Arriving in ${etaMin} min` : 'On the way';
+  const subLabel = [distKm ? `${distKm} km` : null, dropoffLabel || null].filter(Boolean).join(' · ');
+
   if (isChatOpen) {
     const riderName = activeRider
       ? (`${activeRider.first_name || ''} ${activeRider.last_name || ''}`.trim()
@@ -9123,9 +9129,9 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">On the way</p>
-            <h3 className="text-xl font-black tracking-tight leading-tight">Arriving in 4 min</h3>
+            <h3 className="text-xl font-black tracking-tight leading-tight">{etaLabel}</h3>
             <p className="text-gray-400 text-xs font-medium mt-0.5">
-              {activeRider ? `${activeRider.vehicle_make || ''} ${activeRider.vehicle_model || ''}`.trim() || 'Vehicle' : 'Toyota Vios'} · {activeRider?.vehicle_plate || 'ABC 1234'}
+              {subLabel || `${activeRider ? `${activeRider.vehicle_make || ''} ${activeRider.vehicle_model || ''}`.trim() || 'Vehicle' : 'Toyota Vios'} · ${activeRider?.vehicle_plate || 'ABC 1234'}`}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -9151,9 +9157,9 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
               <div className="hidden md:flex items-start justify-between mb-6">
                 <div>
                   <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">On the way</p>
-                  <h3 className="text-[1.75rem] font-black tracking-tight leading-tight">Arriving in 4 min</h3>
+                  <h3 className="text-[1.75rem] font-black tracking-tight leading-tight">{etaLabel}</h3>
                   <p className="text-gray-400 text-sm font-medium mt-0.5">
-                    {activeRider ? `${activeRider.vehicle_make || ''} ${activeRider.vehicle_model || ''}`.trim() || 'Vehicle' : 'Toyota Vios'} · {activeRider?.vehicle_plate || 'ABC 1234'}
+                    {subLabel || `${activeRider ? `${activeRider.vehicle_make || ''} ${activeRider.vehicle_model || ''}`.trim() || 'Vehicle' : 'Toyota Vios'} · ${activeRider?.vehicle_plate || 'ABC 1234'}`}
                   </p>
                 </div>
                 <div className="bg-gray-950 text-white text-sm font-black px-4 py-2 rounded-xl shrink-0">₱{activeFare.totalFare}</div>
