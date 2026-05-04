@@ -8045,9 +8045,11 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                   <button
                     onClick={async () => {
                       if (!appSettings) return;
+                      const prev = appSettings;
                       const next = { ...appSettings, remittance_enabled: !appSettings.remittance_enabled };
                       setAppSettings(next);
-                      await updateAppSettings({ remittance_enabled: next.remittance_enabled });
+                      const ok = await updateAppSettings({ remittance_enabled: next.remittance_enabled });
+                      if (!ok) { setAppSettings(prev); return; }
                       onRefreshSettings();
                     }}
                     className={`relative shrink-0 ml-4 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${appSettings?.remittance_enabled ? 'bg-gray-950' : 'bg-gray-200'}`}
