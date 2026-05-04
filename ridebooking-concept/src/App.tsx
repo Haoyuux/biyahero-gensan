@@ -5581,6 +5581,12 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [ongoingRides, setOngoingRides] = useState<any[]>([]);
+  const [ongoingLoading, setOngoingLoading] = useState(false);
+  const [ongoingDetail, setOngoingDetail] = useState<any | null>(null);
+  const [ongoingUserProfile, setOngoingUserProfile] = useState<Profile | null>(null);
+  const [ongoingRiderProfile, setOngoingRiderProfile] = useState<Profile | null>(null);
+  const [ongoingDetailLoading, setOngoingDetailLoading] = useState(false);
 
   // App Settings state
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -5599,6 +5605,22 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
       }
     });
   }, []);
+
+  const loadOngoingRides = () => {
+    setOngoingLoading(true);
+    supabaseAdmin.from('rides')
+      .select('*')
+      .in('status', ['pending', 'accepted', 'pickup'])
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setOngoingRides(data || []); setOngoingLoading(false); });
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'live') return;
+    loadOngoingRides();
+    const interval = setInterval(loadOngoingRides, 10000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'users' && isSuperAdmin && allUsers.length === 0) {
@@ -6195,6 +6217,250 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                   </div>
                 )}
               </div>
+              {/* Ongoing Rides */}
+              <div className="mt-8">
+                <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight text-gray-950">Ongoing Rides</h3>
+                    <p className="text-gray-400 text-xs mt-0.5">Active bookings · auto-refreshes every 10s</p>
+                  </div>
+                  <button onClick={loadOngoingRides} disabled={ongoingLoading}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-950 text-white rounded-xl text-xs font-bold hover:bg-gray-800 transition-colors disabled:opacity-60">
+                    <Activity size={12} className={ongoingLoading ? 'animate-spin' : ''} /> Refresh
+                  </button>
+                </div>
+
+              {ongoingLoading && ongoingRides.length === 0 ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : ongoingRides.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-20 text-center">
+                  <Navigation size={36} className="text-gray-200 mb-3" />
+                  <p className="font-bold text-gray-400">No ongoing rides</p>
+                  <p className="text-gray-300 text-sm mt-1">Active bookings will appear here in real time</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary chips */}
+                  <div className="flex flex-wrap gap-3 mb-5">
+                    {(['pending','accepted','pickup'] as const).map(s => {
+                      const count = ongoingRides.filter(r => r.status === s).length;
+                      const colors: Record<string,string> = { pending: 'bg-amber-50 text-amber-700', accepted: 'bg-blue-50 text-blue-700', pickup: 'bg-emerald-50 text-emerald-700' };
+                      return <span key={s} className={`px-3 py-1.5 rounded-xl text-[12px] font-bold ${colors[s]}`}>{s} · {count}</span>;
+                    })}
+                    <span className="px-3 py-1.5 rounded-xl text-[12px] font-bold bg-gray-100 text-gray-600">Total · {ongoingRides.length}</span>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-3">
+                    {ongoingRides.map(ride => (
+                      <div key={ride.id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${ride.status === 'pending' ? 'bg-amber-50 text-amber-700' : ride.status === 'accepted' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>{ride.status}</span>
+                          <span className="text-[11px] text-gray-400">{new Date(ride.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {ride.user_avatar ? <img src={ride.user_avatar} className="w-7 h-7 rounded-full object-cover shrink-0" alt="" /> : <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-black text-gray-400 shrink-0">{(ride.user_name||'?')[0]}</div>}
+                          <span className="text-sm font-semibold text-gray-800 truncate">{ride.user_name || '—'}</span>
+                        </div>
+                        <div className="text-[12px] text-gray-500 space-y-0.5">
+                          <p className="truncate">📍 {ride.pickup_label || '—'}</p>
+                          <p className="truncate">🏁 {ride.dropoff_label || '—'}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-black text-gray-900">₱{ride.fare ?? '—'}</span>
+                          <button onClick={async () => {
+                            setOngoingDetail(ride); setOngoingUserProfile(null); setOngoingRiderProfile(null); setOngoingDetailLoading(true);
+                            const [u, r] = await Promise.all([
+                              ride.user_id ? supabaseAdmin.from('profiles').select('*').eq('id', ride.user_id).single().then(x => x.data) : null,
+                              ride.rider_id ? supabaseAdmin.from('profiles').select('*').eq('id', ride.rider_id).single().then(x => x.data) : null,
+                            ]);
+                            setOngoingUserProfile(u); setOngoingRiderProfile(r); setOngoingDetailLoading(false);
+                          }} className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors">
+                            <Eye size={12} /> Details
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop table */}
+                  <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50/50">
+                          {['Status','User','Rider','Pickup','Dropoff','Type','Fare','Started','Actions'].map(h => (
+                            <th key={h} className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ongoingRides.map(ride => (
+                          <tr key={ride.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/40 transition-colors">
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${ride.status === 'pending' ? 'bg-amber-50 text-amber-700' : ride.status === 'accepted' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>{ride.status}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {ride.user_avatar ? <img src={ride.user_avatar} className="w-6 h-6 rounded-full object-cover shrink-0" alt="" /> : <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 shrink-0">{(ride.user_name||'?')[0]}</div>}
+                                <span className="text-[12px] font-semibold text-gray-800 truncate max-w-[100px]">{ride.user_name || '—'}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {ride.rider_name ? (
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {ride.rider_avatar ? <img src={ride.rider_avatar} className="w-6 h-6 rounded-full object-cover shrink-0" alt="" /> : <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-black text-emerald-600 shrink-0">{ride.rider_name[0]}</div>}
+                                  <span className="text-[12px] font-semibold text-gray-800 truncate max-w-[100px]">{ride.rider_name}</span>
+                                </div>
+                              ) : <span className="text-[12px] text-gray-300 italic">Searching…</span>}
+                            </td>
+                            <td className="px-4 py-3 text-[12px] text-gray-500 max-w-[140px]"><span className="truncate block">{ride.pickup_label || '—'}</span></td>
+                            <td className="px-4 py-3 text-[12px] text-gray-500 max-w-[140px]"><span className="truncate block">{ride.dropoff_label || '—'}</span></td>
+                            <td className="px-4 py-3"><span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">{ride.ride_type || '—'}</span></td>
+                            <td className="px-4 py-3 text-[13px] font-black text-gray-900">₱{ride.fare ?? '—'}</td>
+                            <td className="px-4 py-3 text-[12px] text-gray-400 whitespace-nowrap">{new Date(ride.created_at).toLocaleTimeString()}</td>
+                            <td className="px-4 py-3">
+                              <button onClick={async () => {
+                                setOngoingDetail(ride); setOngoingUserProfile(null); setOngoingRiderProfile(null); setOngoingDetailLoading(true);
+                                const [u, r] = await Promise.all([
+                                  ride.user_id ? supabaseAdmin.from('profiles').select('*').eq('id', ride.user_id).single().then(x => x.data) : null,
+                                  ride.rider_id ? supabaseAdmin.from('profiles').select('*').eq('id', ride.rider_id).single().then(x => x.data) : null,
+                                ]);
+                                setOngoingUserProfile(u); setOngoingRiderProfile(r); setOngoingDetailLoading(false);
+                              }} className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors whitespace-nowrap">
+                                <Eye size={11} /> Details
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              {/* Detail Modal */}
+              <AnimatePresence>
+                {ongoingDetail && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4"
+                    onClick={() => setOngoingDetail(null)}>
+                    <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+                      className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl overflow-hidden"
+                      onClick={e => e.stopPropagation()}>
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+                        <div>
+                          <h3 className="font-black text-gray-950 text-base">Ride Details</h3>
+                          <p className="text-[11px] text-gray-400 mt-0.5 font-mono">{ongoingDetail.id}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${ongoingDetail.status === 'pending' ? 'bg-amber-50 text-amber-700' : ongoingDetail.status === 'accepted' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>{ongoingDetail.status}</span>
+                          <button onClick={() => setOngoingDetail(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+                        </div>
+                      </div>
+
+                      <div className="px-6 py-5 max-h-[75vh] overflow-y-auto space-y-5">
+                        {ongoingDetailLoading ? (
+                          <div className="flex items-center justify-center py-10"><div className="w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" /></div>
+                        ) : (
+                          <>
+                            {/* User + Rider side by side */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {/* User */}
+                              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Passenger</p>
+                                <div className="flex items-center gap-3 mb-4">
+                                  {ongoingUserProfile?.avatar_url
+                                    ? <img src={ongoingUserProfile.avatar_url} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow" alt="" />
+                                    : <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-xl font-black text-gray-400">{(ongoingDetail.user_name||'?')[0]}</div>}
+                                  <div className="min-w-0">
+                                    <p className="font-black text-gray-950 text-sm truncate">{ongoingUserProfile?.full_name || ongoingDetail.user_name || '—'}</p>
+                                    <p className="text-[12px] text-gray-400 truncate">{ongoingUserProfile?.email || '—'}</p>
+                                  </div>
+                                </div>
+                                {ongoingUserProfile && (
+                                  <div className="space-y-1.5 text-[12px]">
+                                    {[
+                                      { label: 'Phone', value: ongoingUserProfile.phone || '—' },
+                                      { label: 'Joined', value: new Date(ongoingUserProfile.created_at).toLocaleDateString() },
+                                      { label: 'Status', value: ongoingUserProfile.is_blocked ? 'Blocked' : 'Active' },
+                                    ].map(({ label, value }) => (
+                                      <div key={label} className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">{label}</span>
+                                        <span className="font-semibold text-gray-700">{value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              {/* Rider */}
+                              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Rider</p>
+                                {ongoingRiderProfile || ongoingDetail.rider_name ? (
+                                  <>
+                                    <div className="flex items-center gap-3 mb-4">
+                                      {ongoingRiderProfile?.avatar_url
+                                        ? <img src={ongoingRiderProfile.avatar_url} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow" alt="" />
+                                        : <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-xl font-black text-emerald-500">{(ongoingDetail.rider_name||'?')[0]}</div>}
+                                      <div className="min-w-0">
+                                        <p className="font-black text-gray-950 text-sm truncate">{ongoingRiderProfile?.full_name || ongoingDetail.rider_name || '—'}</p>
+                                        <p className="text-[12px] text-gray-400 truncate">{ongoingRiderProfile?.email || '—'}</p>
+                                      </div>
+                                    </div>
+                                    {ongoingRiderProfile?.vehicle_image_url && (
+                                      <img src={ongoingRiderProfile.vehicle_image_url} alt="Vehicle" className="w-full h-28 object-cover rounded-xl mb-3 border border-gray-100" />
+                                    )}
+                                    {ongoingRiderProfile && (
+                                      <div className="space-y-1.5 text-[12px]">
+                                        {[
+                                          { label: 'Phone', value: ongoingRiderProfile.phone || '—' },
+                                          { label: 'Vehicle', value: [ongoingRiderProfile.vehicle_make, ongoingRiderProfile.vehicle_model].filter(Boolean).join(' ') || '—' },
+                                          { label: 'Plate', value: ongoingRiderProfile.vehicle_plate || '—' },
+                                          { label: 'Color', value: ongoingRiderProfile.vehicle_color || '—' },
+                                        ].map(({ label, value }) => (
+                                          <div key={label} className="flex justify-between">
+                                            <span className="text-gray-400 font-medium">{label}</span>
+                                            <span className="font-semibold text-gray-700">{value}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center py-6 text-gray-300">
+                                    <Navigation size={28} />
+                                    <p className="text-[12px] mt-2 font-medium">Searching for rider…</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Ride info */}
+                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2.5 text-[13px]">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Trip Info</p>
+                              {[
+                                { label: 'Pickup', value: ongoingDetail.pickup_label || '—' },
+                                { label: 'Dropoff', value: ongoingDetail.dropoff_label || '—' },
+                                { label: 'Ride Type', value: ongoingDetail.ride_type || '—' },
+                                { label: 'Fare', value: `₱${ongoingDetail.fare ?? '—'}` },
+                                { label: 'Started', value: new Date(ongoingDetail.created_at).toLocaleString('en-PH') },
+                              ].map(({ label, value }) => (
+                                <div key={label} className="flex justify-between items-start gap-4 border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                                  <span className="text-gray-400 font-medium shrink-0">{label}</span>
+                                  <span className="font-semibold text-gray-800 text-right">{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              </div>{/* end Ongoing Rides wrapper */}
             </>
             );
           })()}
