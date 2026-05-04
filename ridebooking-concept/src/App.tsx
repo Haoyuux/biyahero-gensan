@@ -357,7 +357,14 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [impersonating, setImpersonating] = useState<Profile | null>(null);
+  const [impersonating, setImpersonatingRaw] = useState<Profile | null>(() => {
+    try { const s = sessionStorage.getItem('admin_impersonating'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const setImpersonating = (p: Profile | null) => {
+    if (p) sessionStorage.setItem('admin_impersonating', JSON.stringify(p));
+    else sessionStorage.removeItem('admin_impersonating');
+    setImpersonatingRaw(p);
+  };
   const [globalSettings, setGlobalSettings] = useState<AppSettings | null>(null);
   const [mapLoading, setMapLoading] = useState(false);
   const mapLoadShownRef = React.useRef(false);
