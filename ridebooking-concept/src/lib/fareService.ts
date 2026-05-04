@@ -126,33 +126,35 @@ export function savePricingConfig(config: PricingConfig): void {
   window.dispatchEvent(new Event('pricingConfigUpdated'));
 }
 
-/** Load pricing config from Supabase DB (app_settings row id=1). Falls back to defaults. */
+/** Load pricing config from the pricing_config table. Falls back to localStorage then defaults. */
 export async function loadPricingConfigFromDB(): Promise<PricingConfig> {
   try {
     const { data, error } = await supabase
-      .from('app_settings')
-      .select('pricing_config')
+      .from('pricing_config')
+      .select('config')
       .eq('id', 1)
       .single();
-    if (error || !data?.pricing_config) return loadPricingConfig();
-    const saved = data.pricing_config as Partial<PricingConfig>;
-    return {
+    if (error || !data?.config || Object.keys(data.config).length === 0) return loadPricingConfig();
+    const saved = data.config as Partial<PricingConfig>;
+    const merged: PricingConfig = {
       teamBookingFeeDiscount: saved.teamBookingFeeDiscount ?? DEFAULT_PRICING.teamBookingFeeDiscount,
       moto:    { ...DEFAULT_PRICING.moto,    ...saved.moto },
       eco:     { ...DEFAULT_PRICING.eco,     ...saved.eco },
       premium: { ...DEFAULT_PRICING.premium, ...saved.premium },
     };
+    // Cache locally so offline/fallback reads get the latest
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return merged;
   } catch {
     return loadPricingConfig();
   }
 }
 
-/** Save pricing config to Supabase DB (super-admin only, uses service role key). */
+/** Save pricing config to the pricing_config table (upsert on id=1). */
 export async function savePricingConfigToDB(config: PricingConfig): Promise<boolean> {
   const { error } = await supabaseAdmin
-    .from('app_settings')
-    .update({ pricing_config: config })
-    .eq('id', 1);
+    .from('pricing_config')
+    .upsert({ id: 1, config, updated_at: new Date().toISOString() });
   if (error) {
     console.error('Error saving pricing config to DB:', error);
     return false;
