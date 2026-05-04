@@ -8365,15 +8365,15 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
       dragElastic={{ top: 0.15, bottom: 0.3 }}
       onDragEnd={(_, info) => {
         if (info.offset.y < -35 || info.velocity.y < -300) setIsExpanded(true);
-        if (info.offset.y > 35 || info.velocity.y > 300) setIsExpanded(false);
+        if (info.offset.y > 35 || info.velocity.y > 300) { setIsExpanded(false); setSuggestions([]); }
       }}
       className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:flex-1 md:overflow-y-auto"
     >
       {/* Handle — tap to expand/collapse, drag up/down on mobile */}
       <div
-        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-pan-y"
+        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-none"
         onPointerDown={e => { dragControls.start(e); }}
-        onClick={() => setIsExpanded(e => !e)}
+        onClick={() => { if (isExpanded) setSuggestions([]); setIsExpanded(e => !e); }}
       >
         <div className="w-10 h-1.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full mx-auto transition-colors" />
       </div>
@@ -8383,7 +8383,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
           <h2 className="text-[1.35rem] md:text-[1.75rem] font-black tracking-tight leading-tight">Where to?</h2>
           <button
             type="button"
-            onClick={() => setIsExpanded(e => !e)}
+            onClick={() => { if (isExpanded) setSuggestions([]); setIsExpanded(e => !e); }}
             className="md:hidden -mr-2 w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-50 active:bg-gray-100 transition-colors"
             aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
           >
