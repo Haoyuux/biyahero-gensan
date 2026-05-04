@@ -1,0 +1,6 @@
+services:
+  app:
+    image: ${DOCKER_IMAGE:-your-dockerhub-username/biyahero-app:latest}
+    ports:
+      - "80:80"
+    restart: unless-stopped
