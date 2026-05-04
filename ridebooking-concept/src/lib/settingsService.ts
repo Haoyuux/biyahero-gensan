@@ -6,6 +6,7 @@ export interface AppSettings {
   document_title: string | null;
   app_logo_url: string | null;
   remittance_qr_url: string | null;
+  remittance_enabled: boolean;
   updated_at: string;
 }
 

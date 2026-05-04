@@ -2091,6 +2091,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     dropoff: { label: dropoff, coords: destinationCoords },
                     fare: breakdown.totalFare,
                     fareBreakdown: breakdown,
+                    rideType: selectedRide,
                     priorityRiderIds,
                   };
                   // Store payload so the re-broadcast interval can keep sending it
@@ -2979,6 +2980,35 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
                     </div>
                   </div>
                 </div>
+                {/* Fare breakdown */}
+                {request.fareBreakdown && (() => {
+                  const tier = (request.rideType ?? 'eco') as 'moto' | 'eco' | 'premium';
+                  const cfg = loadPricingConfig()[tier];
+                  const distLabel = cfg.perKmThresholdEnabled && cfg.perKmThreshold > 0
+                    ? `Distance (₱${cfg.perKmRate}/km after ${cfg.perKmThreshold} km)`
+                    : `Distance × ₱${cfg.perKmRate}/km`;
+                  const bookingFeeLabel = cfg.bookingFeeType === 'per_km'
+                    ? `Booking Fee (₱${cfg.bookingFee}/km)`
+                    : `Booking Fee`;
+                  return (
+                  <div className="bg-gray-50 rounded-2xl p-4 mb-2 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Fare Breakdown</p>
+                    {[
+                      { label: 'Base Fare',    value: request.fareBreakdown.baseFare },
+                      { label: distLabel,      value: request.fareBreakdown.distanceFee },
+                      { label: `Time × ₱${cfg.perMinuteRate}/min`, value: request.fareBreakdown.timeFee },
+                      { label: bookingFeeLabel, value: request.fareBreakdown.bookingFee },
+                    ].map(row => (
+                      <div key={row.label} className="flex justify-between text-[13px] text-gray-500">
+                        <span>{row.label}</span><span>₱{row.value}</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                      <span>Total</span><span className="text-emerald-600">₱{request.fareBreakdown.totalFare}</span>
+                    </div>
+                  </div>
+                  );
+                })()}
               </div>
             </motion.div>
           )}
@@ -3138,6 +3168,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   const [remitFile, setRemitFile] = useState<File | null>(null);
   const [remitting, setRemitting] = useState(false);
   const [hasPendingRemit, setHasPendingRemit] = useState(false);
+  const remittanceRequired = settings?.remittance_enabled ?? false;
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [viewerTitle, setViewerTitle] = useState<string>('');
   const [downloading, setDownloading] = useState(false);
@@ -3675,7 +3706,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
       {/* Tab Bar — desktop only */}
       <div className="hidden md:flex bg-white border-b border-gray-100 px-5 gap-1">
-        {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => (
+        {((['home', 'history', ...(remittanceRequired ? ['remit'] : []), ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
@@ -3688,7 +3719,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
 
       {/* Bottom Nav — mobile only */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100 flex items-stretch pb-[env(safe-area-inset-bottom)]">
-        {((['home', 'history', 'remit', ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => {
+        {((['home', 'history', ...(remittanceRequired ? ['remit'] : []), ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => {
           const active = riderTab === tab;
           const Icon = tab === 'home' ? Home : tab === 'history' ? Clock : tab === 'remit' ? Receipt : tab === 'team' ? Users : Newspaper;
           const label = tab === 'home' ? 'Home' : tab === 'history' ? 'Trips' : tab === 'remit' ? 'Remit' : tab === 'team' ? 'Team' : 'News';
@@ -3967,12 +3998,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                 <p className="text-gray-400 text-sm mb-5">Go online to start receiving ride requests.</p>
               </>
             )}
-            {hasPendingRemit && !isOnline ? (
+            {remittanceRequired && hasPendingRemit && !isOnline ? (
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
                 <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[12px] font-bold text-amber-800">Remittance Pending</p>
-                  <p className="text-[11px] text-amber-600 mt-0.5">Please wait for admin to approve your recent remittance before going online.</p>
+                  <p className="text-[11px] text-amber-600 mt-0.5">Please submit your remittance from a previous day before going online.</p>
                 </div>
               </div>
             ) : riderLocationDenied && !isOnline ? (
@@ -3986,12 +4017,12 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
             ) : null}
             <button
               onClick={() => {
-                if (!isOnline && (riderLocationDenied || hasPendingRemit)) return;
+                if (!isOnline && (riderLocationDenied || (remittanceRequired && hasPendingRemit))) return;
                 setIsOnline(prev => !prev);
               }}
               className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
                 isOnline ? 'bg-white text-gray-950 hover:bg-gray-100'
-                : (riderLocationDenied || hasPendingRemit) ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : (riderLocationDenied || (remittanceRequired && hasPendingRemit)) ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-950 text-white hover:bg-gray-800'
               }`}
             >
@@ -8005,6 +8036,25 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
 
               <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
                 <h3 className="font-bold text-gray-900 text-base mb-5">Remittance Tools</h3>
+                {/* Remittance enforcement toggle */}
+                <div className="flex items-center justify-between mb-5 pb-5 border-b border-gray-100">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Require Daily Remittance</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">When on, riders with pending remittances from a previous day cannot go online.</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!appSettings) return;
+                      const next = { ...appSettings, remittance_enabled: !appSettings.remittance_enabled };
+                      setAppSettings(next);
+                      await updateAppSettings({ remittance_enabled: next.remittance_enabled });
+                      onRefreshSettings();
+                    }}
+                    className={`relative shrink-0 ml-4 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${appSettings?.remittance_enabled ? 'bg-gray-950' : 'bg-gray-200'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${appSettings?.remittance_enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Merchant / Remittance QR Code</label>
                   <div className="flex flex-col items-center p-5 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
@@ -8752,15 +8802,25 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
           </div>
 
           {/* Fare breakdown for selected tier */}
-          {selectedBreakdown && (
+          {selectedBreakdown && (() => {
+            const cfg = (pricingConfig ?? DEFAULT_PRICING)[selectedRide as 'moto' | 'eco' | 'premium'];
+            const totalKm = distanceM / 1000;
+            const billableKm = cfg.perKmThresholdEnabled ? Math.max(0, totalKm - (cfg.perKmThreshold ?? 0)) : totalKm;
+            const distLabel = cfg.perKmThresholdEnabled && cfg.perKmThreshold > 0
+              ? `Distance (${totalKm.toFixed(1)} km, ₱${cfg.perKmRate}/km after ${cfg.perKmThreshold} km)`
+              : `Distance (${totalKm.toFixed(1)} km × ₱${cfg.perKmRate}/km)`;
+            const bookingFeeLabel = cfg.bookingFeeType === 'per_km'
+              ? `Booking Fee (₱${cfg.bookingFee}/km)`
+              : `Booking Fee`;
+            return (
             <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
               <div className="space-y-2 text-[13px]">
                 {[
-                  { label: 'Base Fare',                    value: selectedBreakdown.baseFare },
-                  { label: `Distance (${(distanceM/1000).toFixed(1)} km)`, value: selectedBreakdown.distanceFee },
-                  { label: `Time (${durationMin} min)`,    value: selectedBreakdown.timeFee },
-                  { label: 'Booking Fee',                  value: selectedBreakdown.bookingFee },
+                  { label: `Base Fare`,      value: selectedBreakdown.baseFare },
+                  { label: distLabel,        value: selectedBreakdown.distanceFee },
+                  { label: `Time (${durationMin} min × ₱${cfg.perMinuteRate}/min)`, value: selectedBreakdown.timeFee },
+                  { label: bookingFeeLabel,  value: selectedBreakdown.bookingFee },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between text-gray-500">
                     <span>{row.label}</span>
@@ -8773,7 +8833,8 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           <div className="flex items-center justify-between px-4 py-3.5 bg-gray-50 rounded-2xl border border-gray-100 mb-1">
             <div className="flex items-center gap-2.5">
@@ -9146,24 +9207,37 @@ const MatchedPanel = ({ onCancel, selectedRide, routeInfo, showNotification, act
                 </button>
               )}
               {/* Fare breakdown */}
-              <div className="mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
-                <div className="space-y-2 text-[13px]">
-                  {[
-                    { label: 'Base Fare',   value: activeFare.baseFare },
-                    { label: 'Distance',    value: activeFare.distanceFee },
-                    { label: 'Time',        value: activeFare.timeFee },
-                    { label: 'Booking Fee', value: activeFare.bookingFee },
-                  ].map(row => (
-                    <div key={row.label} className="flex justify-between text-gray-500">
-                      <span>{row.label}</span><span>₱{row.value}</span>
+              {(() => {
+                const cfg = (pricingConfig ?? DEFAULT_PRICING)[selectedRide as 'moto' | 'eco' | 'premium'];
+                const totalKm = (routeInfo?.distance ?? 0) / 1000;
+                const durMin = Math.round((routeInfo?.duration ?? 0) / 60);
+                const distLabel = cfg.perKmThresholdEnabled && cfg.perKmThreshold > 0
+                  ? `Distance (${totalKm.toFixed(1)} km, ₱${cfg.perKmRate}/km after ${cfg.perKmThreshold} km)`
+                  : `Distance (${totalKm.toFixed(1)} km × ₱${cfg.perKmRate}/km)`;
+                const bookingFeeLabel = cfg.bookingFeeType === 'per_km'
+                  ? `Booking Fee (₱${cfg.bookingFee}/km)`
+                  : `Booking Fee`;
+                return (
+                <div className="mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
+                  <div className="space-y-2 text-[13px]">
+                    {[
+                      { label: 'Base Fare',   value: activeFare.baseFare },
+                      { label: distLabel,     value: activeFare.distanceFee },
+                      { label: `Time (${durMin} min × ₱${cfg.perMinuteRate}/min)`, value: activeFare.timeFee },
+                      { label: bookingFeeLabel,                                     value: activeFare.bookingFee },
+                    ].map(row => (
+                      <div key={row.label} className="flex justify-between text-gray-500">
+                        <span>{row.label}</span><span>₱{row.value}</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                      <span>Total</span><span>₱{activeFare.totalFare}</span>
                     </div>
-                  ))}
-                  <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
-                    <span>Total</span><span>₱{activeFare.totalFare}</span>
                   </div>
                 </div>
-              </div>
+                );
+              })()}
               {riderReviews.length > 0 && (
                 <div className="mb-6 bg-gray-50 rounded-2xl p-4 border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Recent Reviews</p>
