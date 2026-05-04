@@ -7014,19 +7014,30 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                     </div>
                   ) : (
                     <>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
+                    <div>
+                      <table className="w-full text-left table-fixed">
+                        <colgroup>
+                          <col style={{width:'12%'}} />
+                          <col style={{width:'16%'}} />
+                          <col style={{width:'7%'}} />
+                          <col style={{width:'7%'}} />
+                          <col style={{width:'10%'}} />
+                          <col style={{width:'11%'}} />
+                          <col style={{width:'9%'}} />
+                          <col style={{width:'7%'}} />
+                          <col style={{width:'21%'}} />
+                        </colgroup>
                         <thead>
                           <tr className="border-b border-gray-100">
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">User</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Email</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Team Leader</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Actions</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">User</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Email</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Joined</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Role</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Team Leader</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Admin Roles</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
