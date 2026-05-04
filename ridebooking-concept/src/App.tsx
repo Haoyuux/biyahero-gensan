@@ -1685,7 +1685,22 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     return () => { supabase.removeChannel(locCh); };
   }, [currentRideId, reconnectTick]);
 
-  // Postgres-changes fallback: rider writes last_lat/last_lng to profiles during ride
+  // On match: immediately fetch rider's last known DB location as initial position
+  useEffect(() => {
+    if (!activeRider?.id || step !== 'matched') return;
+    supabase
+      .from('profiles')
+      .select('last_lat, last_lng')
+      .eq('id', activeRider.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.last_lat != null && data?.last_lng != null) {
+          setRiderLocation([data.last_lat, data.last_lng]);
+        }
+      });
+  }, [activeRider?.id, step]);
+
+  // Postgres-changes: real-time updates as rider writes location to profiles during ride
   useEffect(() => {
     if (!activeRider?.id || step !== 'matched') return;
     const riderId = activeRider.id;
