@@ -268,12 +268,15 @@ function MapBounds({ mapFocus, routeCoords }: { mapFocus: MapFocus; routeCoords:
   return null;
 }
 
-// Smooth-pan to a moving position; stops when user drags; resetKey re-enables follow
+// Smooth-pan to a moving position; stops when user drags or zooms; resetKey re-enables follow
 function MapSmoothFollow({ position, resetKey = 0 }: { position: [number, number] | null; resetKey?: number }) {
   const map = useMap();
   const userInteracted = useRef(false);
 
-  useMapEvents({ dragstart: () => { userInteracted.current = true; } });
+  useMapEvents({
+    dragstart: () => { userInteracted.current = true; },
+    zoomstart: () => { userInteracted.current = true; },
+  });
 
   useEffect(() => { userInteracted.current = false; }, [resetKey]);
 
@@ -2112,7 +2115,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
 
       {/* Map — full screen on mobile (behind panels), fills right on desktop */}
       <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
-        <RotatableMap ref={userMapRef} center={startLoc ?? DEFAULT_CENTER} zoom={15} zoomControl={false} rotate bearingSnap={10} className="absolute inset-0 w-full h-full">
+        <RotatableMap ref={userMapRef} center={startLoc ?? DEFAULT_CENTER} zoom={15} zoomControl={false} rotate touchRotate bearingSnap={10} className="absolute inset-0 w-full h-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -8325,7 +8328,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
     setActiveField(field);
     setQuery(field === 'pickup' ? (pickup === 'Current Location' ? '' : pickup) : dropoff);
     setSuggestions([]);
-    setIsExpanded(true);
+    setIsExpanded(false);
   };
 
   const handleSelect = (place: any) => {
