@@ -5927,7 +5927,7 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
 
           <div className="w-9" />
         </div>
-        <div className="max-w-6xl mx-auto">
+        <div className="w-full">
 
           {/* Live Operations */}
           {activeTab === 'live' && (() => {
@@ -7043,17 +7043,17 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                         <tbody>
                           {paginatedUsers.map((u) => (
                           <tr key={u.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-                            <td className="px-5 py-4">
-                              <div className="flex items-center gap-3">
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2 min-w-0">
                                 {u.avatar_url
-                                  ? <img src={u.avatar_url} alt="" className="w-7 h-7 rounded-full" />
-                                  : <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-black text-gray-400">{u.full_name?.[0] || '?'}</div>}
-                                <span className="font-semibold text-gray-900 text-sm">{u.full_name || '—'}</span>
+                                  ? <img src={u.avatar_url} alt="" className="w-6 h-6 rounded-full shrink-0" />
+                                  : <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 shrink-0">{u.full_name?.[0] || '?'}</div>}
+                                <span className="font-semibold text-gray-900 text-[12px] truncate">{u.full_name || '—'}</span>
                               </div>
                             </td>
-                            <td className="px-5 py-4 text-gray-400 text-[13px]">{u.email}</td>
-                            <td className="px-5 py-4">
-                              <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
+                            <td className="px-3 py-3 text-gray-400 text-[12px] truncate max-w-0">{u.email}</td>
+                            <td className="px-3 py-3">
+                              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
                                 u.role === 'super_admin' ? 'bg-purple-50 text-purple-700' :
                                 u.role === 'admin' ? 'bg-blue-50 text-blue-700' :
                                 u.role === 'team_leader' ? 'bg-amber-50 text-amber-700' :
@@ -7061,17 +7061,17 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                 'bg-gray-100 text-gray-600'
                               }`}>{u.role}</span>
                             </td>
-                            <td className="px-5 py-4 text-gray-400 text-[13px]">
+                            <td className="px-3 py-3 text-gray-400 text-[12px]">
                               {new Date(u.created_at).toLocaleDateString()}
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-3 py-3">
                               {roleUpdating === u.id ? (
                                 <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
                               ) : (
                                 <select
                                   value={u.role}
                                   onChange={e => handleRoleChange(u.id, e.target.value)}
-                                  className="text-[13px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                                  className="w-full text-[11px] font-semibold border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
                                 >
                                   <option value="user">user</option>
                                   <option value="rider">rider</option>
@@ -7081,11 +7081,11 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                 </select>
                               )}
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-3 py-3">
                               {(u.role === 'rider' || u.role === 'team_leader') ? (() => {
                                 const ledTeam = adminTeams.find(t => t.leader_id === u.id);
                                 return teamAssigning === u.id ? (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
                                     <select autoFocus
                                       defaultValue=""
                                       onChange={async e => {
@@ -7101,42 +7101,40 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                         setAdminTeams(await fetchTeams());
                                         setTeamAssigning(null);
                                       }}
-                                      className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                                      className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white w-full"
                                     >
-                                      <option value="">— pick team —</option>
+                                      <option value="">— pick —</option>
                                       {adminTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                     </select>
-                                    <button onClick={() => setTeamAssigning(null)} className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
+                                    <button onClick={() => setTeamAssigning(null)} className="text-gray-400 hover:text-gray-600 shrink-0"><X size={12} /></button>
                                   </div>
                                 ) : ledTeam ? (
-                                  <div className="flex items-center gap-2">
-                                    <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
-                                      <Crown size={10} /> {ledTeam.name}
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md truncate">
+                                      <Crown size={9} className="shrink-0" /> {ledTeam.name}
                                     </span>
                                     <button onClick={async () => {
                                       await updateTeam(ledTeam.id, { leader_id: null });
                                       setAdminTeams(await fetchTeams());
-                                    }} className="text-gray-300 hover:text-red-400 transition-colors"><X size={12} /></button>
+                                    }} className="text-gray-300 hover:text-red-400 transition-colors shrink-0"><X size={11} /></button>
                                   </div>
                                 ) : (
                                   <button onClick={() => setTeamAssigning(u.id)}
-                                    className="flex items-center gap-1 text-[11px] font-bold text-gray-500 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors">
-                                    <Crown size={10} /> Assign Team
+                                    className="flex items-center gap-1 text-[10px] font-bold text-gray-500 border border-gray-200 px-2 py-1 rounded-md hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors w-full justify-center">
+                                    <Crown size={9} /> Assign
                                   </button>
                                 );
                               })() : <span className="text-gray-300 text-[12px]">—</span>}
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-3 py-3">
                               {u.role === 'admin' ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[12px] text-gray-500">
-                                    {(u.admin_role_ids ?? []).length === 0
-                                      ? 'None assigned'
-                                      : `${(u.admin_role_ids ?? []).length} role${(u.admin_role_ids ?? []).length !== 1 ? 's' : ''}`}
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[11px] text-gray-500">
+                                    {(u.admin_role_ids ?? []).length === 0 ? 'None' : `${(u.admin_role_ids ?? []).length} role${(u.admin_role_ids ?? []).length !== 1 ? 's' : ''}`}
                                   </span>
                                   <button
                                     onClick={() => setRoleAssignTarget(u)}
-                                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-gray-200 text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold border border-gray-200 text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                   >
                                     Assign
                                   </button>
@@ -7145,18 +7143,18 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                 <span className="text-[12px] text-gray-300">—</span>
                               )}
                             </td>
-                            <td className="px-5 py-4">
-                              <span className={`px-2 py-1 rounded-lg text-[11px] font-bold ${u.is_blocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                            <td className="px-3 py-3">
+                              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${u.is_blocked ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
                                 {u.is_blocked ? 'Inactive' : 'Active'}
                               </span>
                             </td>
-                            <td className="px-5 py-4">
-                              <div className="flex items-center gap-2">
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
                                   onClick={() => setUserDetailModal(u)}
-                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold border border-gray-200 rounded-md text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                 >
-                                  <Eye size={12} /> Details
+                                  <Eye size={11} /> Details
                                 </button>
                                 {u.id !== profile.id && u.role !== 'super_admin' && (
                                   userStatusToggling === u.id ? (
@@ -7171,22 +7169,22 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
                                         if (updated) setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
                                         setUserStatusToggling(null);
                                       }}
-                                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold border rounded-lg transition-colors ${
+                                      className={`flex items-center gap-1 px-2 py-1 text-[11px] font-bold border rounded-md transition-colors ${
                                         u.is_blocked
                                           ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
                                           : 'border-red-200 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500'
                                       }`}
                                     >
-                                      {u.is_blocked ? <><CheckCircle size={12} /> Activate</> : <><Ban size={12} /> Deactivate</>}
+                                      {u.is_blocked ? <><CheckCircle size={11} /> Activate</> : <><Ban size={11} /> Deactivate</>}
                                     </button>
                                   )
                                 )}
                                 {onImpersonate && u.id !== profile.id && (
                                   <button
                                     onClick={() => onImpersonate(u)}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold border border-gray-200 rounded-md text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                   >
-                                    <Eye size={12} /> View As
+                                    <Eye size={11} /> View As
                                   </button>
                                 )}
                               </div>
