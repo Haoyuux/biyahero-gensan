@@ -3354,6 +3354,13 @@ const UserApp = ({
                     <HomePanel
                       key="home"
                       setStep={(s) => {
+                        if (s === "select" && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone)) {
+                          showNotification(
+                            "Please complete your profile before booking a ride.",
+                          );
+                          setShowProfile(true);
+                          return;
+                        }
                         if (s === "select" && locationDenied) {
                           showNotification(
                             "Please enable location access to book a ride.",
