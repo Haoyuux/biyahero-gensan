@@ -9048,34 +9048,42 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
   );
 };
 
-const URL_RE = /https?:\/\/[^\s]+/g;
+const INLINE_RE = /(\*\*(.+?)\*\*|\*(.+?)\*|https?:\/\/[^\s]+)/g;
 
-function renderWithLinks(text: string) {
+function parseInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   let last = 0;
   let match: RegExpExecArray | null;
-  URL_RE.lastIndex = 0;
-  while ((match = URL_RE.exec(text)) !== null) {
+  INLINE_RE.lastIndex = 0;
+  while ((match = INLINE_RE.exec(text)) !== null) {
     if (match.index > last) parts.push(text.slice(last, match.index));
-    const url = match[0].replace(/[.,!?)]+$/, "");
-    const trail = match[0].slice(url.length);
-    parts.push(
-      <a
-        key={match.index}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-600 underline underline-offset-2 break-all"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {url}
-      </a>,
-    );
-    if (trail) parts.push(trail);
+    if (match[0].startsWith("**")) {
+      parts.push(<strong key={match.index} className="font-bold">{match[2]}</strong>);
+    } else if (match[0].startsWith("*")) {
+      parts.push(<em key={match.index}>{match[3]}</em>);
+    } else {
+      const url = match[0].replace(/[.,!?)]+$/, "");
+      const trail = match[0].slice(url.length);
+      parts.push(
+        <a key={match.index} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 break-all" onClick={(e) => e.stopPropagation()}>
+          {url}
+        </a>,
+      );
+      if (trail) parts.push(trail);
+    }
     last = match.index + match[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts;
+}
+
+function renderContent(text: string): React.ReactNode {
+  return text.split("\n").map((line, i, arr) => (
+    <React.Fragment key={i}>
+      {parseInline(line)}
+      {i < arr.length - 1 && <br />}
+    </React.Fragment>
+  ));
 }
 
 // ─── News Feed Viewer (shared user + rider) ───────────────────────────────────
@@ -9173,9 +9181,9 @@ const NewsFeedViewer = ({
               <p
                 className={`text-[13px] text-gray-600 leading-relaxed ${isOpen ? "" : "line-clamp-3"}`}
               >
-                {renderWithLinks(post.content)}
+                {renderContent(post.content)}
               </p>
-              {post.content.length > 200 && (
+              {(post.content.length > 200 || post.content.includes("\n")) && (
                 <button
                   onClick={() => {
                     const opening = !isOpen;
@@ -9187,7 +9195,7 @@ const NewsFeedViewer = ({
                   {isOpen ? "Show less" : "Read more"}
                 </button>
               )}
-              {isUnread && post.content.length <= 200 && (
+              {isUnread && !post.content.includes("\n") && post.content.length <= 200 && (
                 <button
                   onClick={() => onMarkRead?.(post.id)}
                   className="mt-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
