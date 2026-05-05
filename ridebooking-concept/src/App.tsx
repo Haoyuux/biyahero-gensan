@@ -514,6 +514,44 @@ const MaintenanceScreen = ({ settings, appSettings }: { settings: MaintenanceSet
   );
 };
 
+// ─── Maintenance Banner ───────────────────────────────────────────────────────
+
+const MaintenanceBanner = ({ settings }: { settings: MaintenanceSettings | null }) => {
+  if (!settings) return null;
+
+  const now = new Date();
+  const start = settings.scheduled_start ? new Date(settings.scheduled_start) : null;
+  const end = settings.scheduled_end ? new Date(settings.scheduled_end) : null;
+  const fmt = (d: Date) => d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+
+  let text: string;
+  if (start && now < start) {
+    text = `Scheduled maintenance on ${fmt(start)}${end ? ` until ${fmt(end)}` : ''}. Some features will be temporarily unavailable.`;
+  } else if (end) {
+    text = `System maintenance in progress — expected back ${fmt(end)}.`;
+  } else {
+    text = 'System is under partial maintenance. Some features are temporarily unavailable.';
+  }
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-[300] bg-amber-400 overflow-hidden h-8 flex items-center">
+      <div className="flex animate-[marquee_30s_linear_infinite] whitespace-nowrap">
+        {[0, 1, 2].map(i => (
+          <span key={i} className="text-amber-950 text-xs font-bold px-12">
+            🔧 {text}
+          </span>
+        ))}
+      </div>
+      <style>{`
+        @keyframes marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-33.333%); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 // ─── Map Loading Screen ───────────────────────────────────────────────────────
 
 const MapLoadingScreen = ({ settings }: { settings: AppSettings | null }) => (
@@ -1332,7 +1370,7 @@ function readPersistedUserRide() {
   } catch { return null; }
 }
 
-const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, settings: AppSettings | null }) => {
+const UserApp = ({ profile: initialProfile, settings, maintenanceMode, maintenanceSettings }: { profile: Profile, settings: AppSettings | null, maintenanceMode?: MaintenanceMode, maintenanceSettings?: MaintenanceSettings | null }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -1911,7 +1949,9 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
   }
 
   return (
-    <div className="w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900">
+    <>
+      {maintenanceMode === 'half' && <MaintenanceBanner settings={maintenanceSettings ?? null} />}
+      <div className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${maintenanceMode === 'half' ? 'pt-8' : ''}`}>
       <ConnectionBanner state={connectionState} />
       <NotificationToast message={notification} />
 
@@ -2324,6 +2364,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
         <button onClick={() => userMapRef.current?.setBearing(0)} className="absolute bottom-4 left-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors" title="Reset to north">N</button>
       </div>
     </div>
+    </>
   );
 };
 
@@ -3174,7 +3215,7 @@ const RiderActiveRide = ({ request, profile, onComplete, onArrive, onBack, resto
 
 // ─── Rider Dashboard ──────────────────────────────────────────────────────────
 
-const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profile, settings: AppSettings | null }) => {
+const RiderDashboard = ({ profile: initialProfile, settings, maintenanceMode, maintenanceSettings }: { profile: Profile, settings: AppSettings | null, maintenanceMode?: MaintenanceMode, maintenanceSettings?: MaintenanceSettings | null }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
@@ -3748,7 +3789,9 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
   }
 
   return (
-    <div className="w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900">
+    <>
+      {maintenanceMode === 'half' && <MaintenanceBanner settings={maintenanceSettings ?? null} />}
+      <div className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${maintenanceMode === 'half' ? 'pt-8' : ''}`}>
       <ConnectionBanner state={riderConnectionState} />
       <NotificationToast message={riderNotification} />
 
@@ -4877,6 +4920,7 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 };
 
