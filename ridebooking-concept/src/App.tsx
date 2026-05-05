@@ -3289,6 +3289,14 @@ const RiderDashboard = ({ profile: initialProfile, settings, maintenanceMode, ma
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);
   }, []);
+
+  // Reset remit tab to home when half-maintenance activates
+  useEffect(() => {
+    if (maintenanceMode === 'half' && riderTab === 'remit') {
+      setRiderTab('home');
+    }
+  }, [maintenanceMode, riderTab]);
+
   const isDiscountEligible = (() => {
     const team = riderTeam ?? myTeam;
     if (!team || !team.is_active) return false;
