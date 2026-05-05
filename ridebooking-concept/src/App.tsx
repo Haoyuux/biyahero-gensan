@@ -459,16 +459,16 @@ export default function App() {
       <div className="pt-9">
         {exitBanner}
         {p.role === 'rider' ? <RiderDashboard {...{ profile: p, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} /> :
-         p.role === 'admin' ? <AdminDashboard {...{ profile: p, isSuperAdmin: false, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), maintenanceSettings } as any} /> :
-         p.role === 'super_admin' ? <AdminDashboard {...{ profile: p, isSuperAdmin: true, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), maintenanceSettings } as any} /> :
+         p.role === 'admin' ? <AdminDashboard profile={p} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} maintenanceSettings={maintenanceSettings} /> :
+         p.role === 'super_admin' ? <AdminDashboard profile={p} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} maintenanceSettings={maintenanceSettings} /> :
          <UserApp {...{ profile: p, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} />}
       </div>
     );
   }
 
   if (profile.role === 'rider' || profile.role === 'team_leader') return <RiderDashboard {...{ profile, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} />;
-  if (profile.role === 'admin') return <AdminDashboard {...{ profile, isSuperAdmin: false, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), maintenanceSettings } as any} />;
-  if (profile.role === 'super_admin') return <AdminDashboard {...{ profile, isSuperAdmin: true, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), onImpersonate: setImpersonating, maintenanceSettings } as any} />;
+  if (profile.role === 'admin') return <AdminDashboard profile={profile} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} maintenanceSettings={maintenanceSettings} />;
+  if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} onImpersonate={setImpersonating} maintenanceSettings={maintenanceSettings} />;
   return <UserApp {...{ profile, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} />;
 }
 
@@ -5629,9 +5629,169 @@ const NewsFeedViewer = ({ onClose, embedded = false }: { onClose: () => void; em
   );
 };
 
+const MaintenanceTab = ({ settings, onSaved, profile }: { settings: MaintenanceSettings | null, onSaved: (s: MaintenanceSettings) => void, profile: Profile }) => {
+  const [mode, setMode] = React.useState<MaintenanceMode>(settings?.mode ?? 'off');
+  const [message, setMessage] = React.useState(settings?.message ?? '');
+  const [immediate, setImmediate] = React.useState(!settings?.scheduled_start);
+  const [scheduledStart, setScheduledStart] = React.useState(
+    settings?.scheduled_start ? settings.scheduled_start.slice(0, 16) : ''
+  );
+  const [scheduledEnd, setScheduledEnd] = React.useState(
+    settings?.scheduled_end ? settings.scheduled_end.slice(0, 16) : ''
+  );
+  const [postNews, setPostNews] = React.useState(settings?.post_news ?? false);
+  const [saving, setSaving] = React.useState(false);
+  const [toast, setToast] = React.useState<string | null>(null);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+  const effectiveNow = getEffectiveMode(settings);
+  const statusLabel = (() => {
+    if (!settings || effectiveNow === 'off') return { color: 'bg-emerald-500', text: 'Maintenance is OFF' };
+    const start = settings.scheduled_start ? new Date(settings.scheduled_start) : null;
+    const fmt = (d: Date) => d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+    if (start && new Date() < start) {
+      return { color: effectiveNow === 'full' ? 'bg-red-500' : 'bg-amber-500', text: `${effectiveNow === 'full' ? 'Full' : 'Half'} maintenance scheduled for ${fmt(start)}` };
+    }
+    return { color: effectiveNow === 'full' ? 'bg-red-500' : 'bg-amber-500', text: `${effectiveNow === 'full' ? 'Full' : 'Half'} maintenance is ACTIVE` };
+  })();
+
+  const handleSave = async () => {
+    if (!immediate && !scheduledStart) { showToast('Set a start date/time or enable "Activate immediately".'); return; }
+    setSaving(true);
+
+    const startIso = immediate ? null : new Date(scheduledStart).toISOString();
+    const endIso = scheduledEnd ? new Date(scheduledEnd).toISOString() : null;
+
+    let auto_news_post_id = settings?.auto_news_post_id ?? null;
+
+    if (postNews && mode !== 'off') {
+      const startLabel = startIso ? new Date(startIso).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' }) : 'immediately';
+      const endLabel = endIso ? new Date(endIso).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' }) : 'further notice';
+      const newsTitle = mode === 'full' ? 'System Maintenance' : 'Partial System Maintenance';
+      const newsContent = `${message || 'We are performing scheduled maintenance.'}\n\nMaintenance window: ${startLabel} until ${endLabel}.`;
+
+      if (auto_news_post_id) {
+        await updateNewsPost(auto_news_post_id, { title: newsTitle, content: newsContent, category: 'Important', published: true, is_archived: false });
+      } else {
+        const post = await createNewsPost(newsTitle, newsContent, 'Important', null, profile.id, `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin', profile.avatar_url ?? null, true);
+        if (post) auto_news_post_id = post.id;
+      }
+    } else if (mode === 'off' && auto_news_post_id) {
+      await updateNewsPost(auto_news_post_id, { is_archived: true });
+      auto_news_post_id = null;
+    }
+
+    const ok = await updateMaintenanceSettings({ mode, message: message || null, scheduled_start: startIso, scheduled_end: endIso, post_news: postNews, auto_news_post_id });
+    setSaving(false);
+    if (ok) {
+      showToast('Maintenance settings saved.');
+      const updated: MaintenanceSettings = { id: 1, mode, message: message || null, scheduled_start: startIso, scheduled_end: endIso, post_news: postNews, auto_news_post_id, updated_at: new Date().toISOString() };
+      onSaved(updated);
+    } else {
+      showToast('Failed to save. Try again.');
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-2xl mx-auto space-y-8">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[500] bg-gray-950 text-white text-sm font-bold px-4 py-3 rounded-2xl shadow-xl">
+          {toast}
+        </div>
+      )}
+
+      {/* Status indicator */}
+      <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+        <div className={`w-2.5 h-2.5 rounded-full ${statusLabel.color}`} />
+        <span className="text-sm font-semibold text-gray-700">{statusLabel.text}</span>
+      </div>
+
+      {/* Mode selector */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Maintenance Mode</p>
+        <div className="flex gap-2">
+          {(['off', 'half', 'full'] as MaintenanceMode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`flex-1 py-3 rounded-xl font-bold text-sm capitalize transition-colors ${mode === m
+                ? m === 'off' ? 'bg-emerald-500 text-white' : m === 'half' ? 'bg-amber-400 text-amber-950' : 'bg-red-500 text-white'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Timing */}
+      <div className="space-y-4">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Schedule</p>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" checked={immediate} onChange={e => setImmediate(e.target.checked)} className="w-4 h-4 rounded" />
+          <span className="text-sm font-semibold text-gray-700">Activate immediately</span>
+        </label>
+        {!immediate && (
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Start date &amp; time</p>
+            <input
+              type="datetime-local"
+              value={scheduledStart}
+              onChange={e => setScheduledStart(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+          </div>
+        )}
+        <div>
+          <p className="text-xs text-gray-400 mb-1">End date &amp; time <span className="text-gray-300">(optional)</span></p>
+          <input
+            type="datetime-local"
+            value={scheduledEnd}
+            onChange={e => setScheduledEnd(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          />
+        </div>
+      </div>
+
+      {/* Message */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Message</p>
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          rows={3}
+          placeholder="We are performing scheduled maintenance. Thank you for your patience."
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900"
+        />
+      </div>
+
+      {/* Post news checkbox */}
+      {mode !== 'off' && (
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" checked={postNews} onChange={e => setPostNews(e.target.checked)} className="w-4 h-4 rounded" />
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Post maintenance announcement</p>
+            <p className="text-xs text-gray-400">Auto-creates or updates a news post with the maintenance details</p>
+          </div>
+        </label>
+      )}
+
+      {/* Save */}
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full bg-gray-950 text-white font-bold text-[15px] py-4 rounded-2xl hover:bg-gray-800 transition-colors disabled:opacity-50"
+      >
+        {saving ? 'Saving...' : 'Save Maintenance Settings'}
+      </button>
+    </div>
+  );
+};
+
 // ─── Admin Dashboard ───────────────────────────────────────────────────────────
 
-type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'teams' | 'news' | 'settings';
+type AdminTab = 'live' | 'drivers' | 'analytics' | 'finances' | 'reviews' | 'users' | 'riders' | 'pricing' | 'roles' | 'blocking' | 'remittances' | 'teams' | 'news' | 'settings' | 'maintenance';
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'live', label: 'Live Operations' },
@@ -5647,9 +5807,12 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: 'pricing', label: 'Pricing Config' },
   { id: 'blocking', label: 'User Blocking' },
   { id: 'settings', label: 'App Settings' },
+  { id: 'maintenance', label: 'Maintenance' },
 ];
 
-const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, onImpersonate }: { profile: Profile, isSuperAdmin: boolean, settings: AppSettings | null, onRefreshSettings: () => void, onImpersonate?: (p: Profile) => void }) => {
+const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, onImpersonate, maintenanceSettings: initialMaintenanceSettings }: { profile: Profile, isSuperAdmin: boolean, settings: AppSettings | null, onRefreshSettings: () => void, onImpersonate?: (p: Profile) => void, maintenanceSettings?: MaintenanceSettings | null }) => {
+  const [localMaintenanceSettings, setLocalMaintenanceSettings] = React.useState<MaintenanceSettings | null>(initialMaintenanceSettings ?? null);
+  React.useEffect(() => { setLocalMaintenanceSettings(initialMaintenanceSettings ?? null); }, [initialMaintenanceSettings]);
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     const saved = sessionStorage.getItem('admin_active_tab') as AdminTab | null;
     return saved ?? 'live';
@@ -8750,6 +8913,14 @@ const AdminDashboard = ({ profile, isSuperAdmin, settings, onRefreshSettings, on
             </div>
           </div>
         )}
+
+          {activeTab === 'maintenance' && (
+            <MaintenanceTab
+              settings={localMaintenanceSettings}
+              onSaved={setLocalMaintenanceSettings}
+              profile={profile}
+            />
+          )}
 
       </div>
     </div>
