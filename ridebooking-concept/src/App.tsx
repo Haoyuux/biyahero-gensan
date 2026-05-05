@@ -752,14 +752,19 @@ export default function App() {
   if (impersonating) {
     const exitBanner = (
       <div className="fixed top-0 inset-x-0 z-[400] bg-gray-950 text-white px-4 py-2 flex items-center justify-between text-[13px] font-bold shadow-lg">
-        <span>
+        <span className="flex items-center gap-2 flex-wrap">
           👁 Viewing as{" "}
           <strong>{impersonating.full_name || impersonating.email}</strong> (
           {impersonating.role})
+          {effectiveMode !== "off" && (
+            <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+              ✓ Maintenance bypassed
+            </span>
+          )}
         </span>
         <button
           onClick={() => setImpersonating(null)}
-          className="underline hover:no-underline"
+          className="underline hover:no-underline shrink-0"
         >
           Exit
         </button>
