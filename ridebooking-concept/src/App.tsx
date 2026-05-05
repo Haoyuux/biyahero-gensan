@@ -2110,7 +2110,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     fareBreakdown: breakdown,
                     rideType: selectedRide,
                     priorityRiderIds,
-                    routeDistance: distanceM,
+                    routeDistance: breakdown.distanceKm * 1000,
                   };
                   // Store payload so the re-broadcast interval can keep sending it
                   pendingRequestRef.current = requestPayload;
@@ -4135,12 +4135,15 @@ const RiderDashboard = ({ profile: initialProfile, settings }: { profile: Profil
                   <span className="text-[13px] text-gray-600 truncate">{currentRequest?.dropoff?.label}</span>
                 </div>
                 {(() => {
+                  const fareKm = currentRequest?.fareBreakdown?.distanceKm;
                   const distM = currentRequest?.routeDistance ?? 0;
-                  const d = distM > 0
-                    ? distM / 1000
-                    : (currentRequest?.pickup?.coords && currentRequest?.dropoff?.coords
-                        ? haversineKm(currentRequest.pickup.coords[0], currentRequest.pickup.coords[1], currentRequest.dropoff.coords[0], currentRequest.dropoff.coords[1])
-                        : null);
+                  const d = fareKm != null
+                    ? fareKm
+                    : distM > 0
+                      ? distM / 1000
+                      : (currentRequest?.pickup?.coords && currentRequest?.dropoff?.coords
+                          ? haversineKm(currentRequest.pickup.coords[0], currentRequest.pickup.coords[1], currentRequest.dropoff.coords[0], currentRequest.dropoff.coords[1])
+                          : null);
                   if (d === null) return null;
                   return (
                     <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">

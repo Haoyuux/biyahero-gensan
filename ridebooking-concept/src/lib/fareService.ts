@@ -27,6 +27,7 @@ export interface FareBreakdown {
   timeFee: number;
   bookingFee: number;
   totalFare: number;
+  distanceKm: number;
 }
 
 const STORAGE_KEY = 'fetch_pricing_config';
@@ -100,6 +101,7 @@ export function calculateFare(
     timeFee,
     bookingFee,
     totalFare,
+    distanceKm,
   };
 }
 
