@@ -9544,6 +9544,7 @@ const AdminDashboard = ({
   const [verifyPage, setVerifyPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
   const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
   const [financePage, setFinancePage] = useState(1);
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(
@@ -12768,7 +12769,7 @@ const AdminDashboard = ({
                 </p>
               </div>
               {(() => {
-                const ITEMS_PER_PAGE = 7;
+                const ITEMS_PER_PAGE = userPageSize;
                 const filteredUsers = allUsers.filter(
                   (u) =>
                     !userSearch ||
@@ -12799,21 +12800,38 @@ const AdminDashboard = ({
                           {filteredUsers.length} total
                         </span>
                       </h3>
-                      <div className="relative">
-                        <Search
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Search users by name or email..."
-                          value={userSearch}
-                          onChange={(e) => {
-                            setUserSearch(e.target.value);
-                            setUserPage(1);
-                          }}
-                          className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
-                        />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-semibold text-gray-400 whitespace-nowrap">Show</span>
+                          <select
+                            value={userPageSize}
+                            onChange={(e) => {
+                              setUserPageSize(Number(e.target.value));
+                              setUserPage(1);
+                            }}
+                            className="text-[12px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                          >
+                            {[5, 10, 20, 50, 100].map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="relative">
+                          <Search
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Search users by name or email..."
+                            value={userSearch}
+                            onChange={(e) => {
+                              setUserSearch(e.target.value);
+                              setUserPage(1);
+                            }}
+                            className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
+                          />
+                        </div>
                       </div>
                     </div>
                     {usersLoading ? (
@@ -13290,16 +13308,13 @@ const AdminDashboard = ({
                             </tbody>
                           </table>
                         </div>
-                        {totalPages > 1 && (
-                          <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
-                            <p className="text-[12px] text-gray-500 font-medium">
-                              Showing {startIdx + 1}-
-                              {Math.min(
-                                startIdx + ITEMS_PER_PAGE,
-                                filteredUsers.length,
-                              )}{" "}
-                              of {filteredUsers.length}
-                            </p>
+                        <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+                          <p className="text-[12px] text-gray-500 font-medium">
+                            {filteredUsers.length === 0
+                              ? "No users found"
+                              : `Showing ${startIdx + 1}–${Math.min(startIdx + ITEMS_PER_PAGE, filteredUsers.length)} of ${filteredUsers.length}`}
+                          </p>
+                          {totalPages > 1 && (
                             <div className="flex gap-1">
                               <button
                                 disabled={safePage <= 1}
@@ -13339,8 +13354,8 @@ const AdminDashboard = ({
                                 »
                               </button>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </>
                     )}
                   </div>
