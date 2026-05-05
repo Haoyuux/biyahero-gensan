@@ -474,7 +474,45 @@ export default function App() {
 
 // ─── Maintenance Screen (stub — replaced in Task 4) ──────────────────────────
 
-const MaintenanceScreen = (_props: any) => null;
+const MaintenanceScreen = ({ settings, appSettings }: { settings: MaintenanceSettings | null, appSettings: AppSettings | null }) => {
+  const msg = settings?.message || 'The system is currently under maintenance. Please check back later.';
+  const end = settings?.scheduled_end ? new Date(settings.scheduled_end) : null;
+  const endLabel = end ? end.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+
+  return (
+    <div className="w-full h-[100dvh] bg-gray-950 flex flex-col items-center justify-center px-6 text-center relative overflow-hidden">
+      {/* Animated background rings */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[600px] h-[600px] rounded-full border border-white/5 animate-ping" style={{ animationDuration: '3s' }} />
+        <div className="absolute w-[400px] h-[400px] rounded-full border border-white/5 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center gap-6 max-w-sm">
+        {appSettings?.app_logo_url ? (
+          <img src={appSettings.app_logo_url} alt="Logo" className="w-16 h-16 rounded-2xl object-cover opacity-90" />
+        ) : (
+          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/60">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+          </div>
+        )}
+
+        <div>
+          <h1 className="text-2xl font-black text-white mb-2">We'll be right back</h1>
+          <p className="text-white/50 text-sm leading-relaxed">{msg}</p>
+        </div>
+
+        {endLabel && (
+          <div className="bg-white/10 rounded-2xl px-5 py-3 border border-white/10">
+            <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-1">Expected back</p>
+            <p className="text-white font-bold text-sm">{endLabel}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─── Map Loading Screen ───────────────────────────────────────────────────────
 
