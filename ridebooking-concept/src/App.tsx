@@ -7730,7 +7730,7 @@ const RiderDashboard = ({
 
         {/* ── News Tab ── */}
         {riderTab === "news" && (
-          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded viewerRole="rider" />
+          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded viewerRole="rider" riderApproved={currentProfile.rider_status === "approved"} />
         )}
 
         {/* Universal Image Viewer Modal */}
@@ -9005,10 +9005,12 @@ const NewsFeedViewer = ({
   onClose,
   embedded = false,
   viewerRole = "user",
+  riderApproved = false,
 }: {
   onClose: () => void;
   embedded?: boolean;
   viewerRole?: "user" | "rider";
+  riderApproved?: boolean;
 }) => {
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -9016,10 +9018,14 @@ const NewsFeedViewer = ({
 
   useEffect(() => {
     fetchNewsPosts(false).then((data) => {
-      setPosts(data.filter((p) => p.visible_to === "all" || p.visible_to === viewerRole));
+      setPosts(data.filter((p) => {
+        if (p.visible_to === "rider") return viewerRole === "rider" && riderApproved;
+        if (p.visible_to === "user") return viewerRole === "user";
+        return true; // 'all'
+      }));
       setLoading(false);
     });
-  }, [viewerRole]);
+  }, [viewerRole, riderApproved]);
 
   const postList = loading ? (
     <div className="flex justify-center py-16">
