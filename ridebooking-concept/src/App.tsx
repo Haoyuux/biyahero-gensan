@@ -429,9 +429,6 @@ export default function App() {
     }
   }, [profile?.id]);
 
-  const effectiveMode: MaintenanceMode = getEffectiveMode(maintenanceSettings);
-  const isAdminRole = profile?.role === 'admin' || profile?.role === 'super_admin';
-
   if (authLoading || (session && !profile)) return <SplashScreen settings={globalSettings} />;
   if (!session || !profile) return <LoginScreen settings={globalSettings} />;
   if (!profile.onboarded) return <OnboardingScreen profile={profile} settings={globalSettings} onComplete={setProfile} />;
@@ -439,6 +436,11 @@ export default function App() {
     return <BlockedScreen profile={profile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
     return <ProfileSetupScreen profile={profile} onComplete={setProfile} />;
+
+  const effectiveMode: MaintenanceMode = getEffectiveMode(maintenanceSettings);
+  const isAdminRole = profile.role === 'admin' || profile.role === 'super_admin';
+
+  // team_leader is intentionally gated during full maintenance (same as rider)
 
   if (effectiveMode === 'full' && !isAdminRole)
     return <MaintenanceScreen settings={maintenanceSettings} appSettings={globalSettings} />;
