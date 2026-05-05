@@ -9757,6 +9757,7 @@ const AdminDashboard = ({
   const [userPageSize, setUserPageSize] = useState(10);
   const [financePage, setFinancePage] = useState(1);
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(
     null,
   );
@@ -13627,7 +13628,8 @@ const AdminDashboard = ({
                         <img
                           src={userDetailModal.avatar_url}
                           alt=""
-                          className="w-14 h-14 rounded-full object-cover"
+                          className="w-14 h-14 rounded-full object-cover cursor-pointer ring-2 ring-transparent hover:ring-blue-400 transition-all"
+                          onClick={() => setLightboxImage(userDetailModal.avatar_url)}
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-black text-gray-400">
@@ -13812,6 +13814,35 @@ const AdminDashboard = ({
                       </div>
                     )}
                 </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Image Lightbox */}
+          <AnimatePresence>
+            {lightboxImage && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+                onClick={() => setLightboxImage(null)}
+              >
+                <motion.img
+                  initial={{ scale: 0.85, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.85, opacity: 0 }}
+                  src={lightboxImage}
+                  alt=""
+                  className="max-w-[90vw] max-h-[85vh] rounded-2xl object-contain shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  onClick={() => setLightboxImage(null)}
+                  className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
