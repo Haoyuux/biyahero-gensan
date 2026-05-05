@@ -780,7 +780,7 @@ export default function App() {
               profile: p,
               settings: globalSettings,
               maintenanceMode: "off",
-              maintenanceSettings: null,
+              maintenanceSettings,
               maintenanceBannerOffset: 36,
               isImpersonating: true,
             } as any)}
@@ -791,7 +791,7 @@ export default function App() {
             isSuperAdmin={false}
             settings={globalSettings}
             onRefreshSettings={() => getAppSettings().then(setGlobalSettings)}
-            maintenanceSettings={null}
+            maintenanceSettings={maintenanceSettings}
           />
         ) : p.role === "super_admin" ? (
           <AdminDashboard
@@ -799,7 +799,7 @@ export default function App() {
             isSuperAdmin={true}
             settings={globalSettings}
             onRefreshSettings={() => getAppSettings().then(setGlobalSettings)}
-            maintenanceSettings={null}
+            maintenanceSettings={maintenanceSettings}
           />
         ) : (
           <UserApp
@@ -807,7 +807,7 @@ export default function App() {
               profile: p,
               settings: globalSettings,
               maintenanceMode: "off",
-              maintenanceSettings: null,
+              maintenanceSettings,
               maintenanceBannerOffset: 36,
               isImpersonating: true,
             } as any)}
@@ -3006,11 +3006,11 @@ const UserApp = ({
 
   return (
     <>
-      {maintenanceMode === "half" && (
+      {getEffectiveMode(maintenanceSettings ?? null) === "half" && (
         <MaintenanceBanner settings={maintenanceSettings ?? null} topOffset={maintenanceBannerOffset} />
       )}
       <div
-        className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${maintenanceMode === "half" ? "pt-8" : ""}`}
+        className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-8" : ""}`}
       >
         <ConnectionBanner state={connectionState} />
         <NotificationToast message={notification} />
@@ -5958,11 +5958,11 @@ const RiderDashboard = ({
 
   return (
     <>
-      {maintenanceMode === "half" && (
+      {getEffectiveMode(maintenanceSettings ?? null) === "half" && (
         <MaintenanceBanner settings={maintenanceSettings ?? null} topOffset={maintenanceBannerOffset} />
       )}
       <div
-        className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${maintenanceMode === "half" ? "pt-8" : ""}`}
+        className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-8" : ""}`}
       >
         <ConnectionBanner state={riderConnectionState} />
         <NotificationToast message={riderNotification} />
