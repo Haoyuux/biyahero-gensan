@@ -6413,6 +6413,8 @@ const RiderDashboard = ({
               !currentProfile.cr_url && "CR (Certificate of Registration)",
               !currentProfile.vehicle_image_url && "Vehicle photo",
               !currentProfile.vehicle_type && "Vehicle type",
+              !currentProfile.vehicle_make && "Vehicle make/brand",
+              !currentProfile.vehicle_model && "Vehicle model",
               !currentProfile.vehicle_plate && "Plate number",
             ].filter(Boolean) as string[];
 
