@@ -16082,9 +16082,8 @@ const SelectPanel = ({
                 <div className="flex items-center justify-between px-4 py-3.5 bg-gray-50 rounded-2xl border border-gray-100 mb-1">
                   <div className="flex items-center gap-2.5">
                     <CreditCard size={15} className="text-gray-400" />
-                    <span className="font-semibold text-sm">GCash</span>
+                    <span className="font-semibold text-sm">Cash</span>
                   </div>
-                  <MoreHorizontal size={17} className="text-gray-300" />
                 </div>
               </div>
 
