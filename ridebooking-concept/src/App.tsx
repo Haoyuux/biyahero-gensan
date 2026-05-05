@@ -17063,9 +17063,13 @@ const MatchedPanel = ({
                         </div>
                       )}
                     </div>
-                    <button className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
+                    <a
+                      href={activeRider?.phone ? `tel:${activeRider.phone}` : undefined}
+                      onClick={!activeRider?.phone ? (e) => e.preventDefault() : undefined}
+                      className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
+                    >
                       <Phone size={16} />
-                    </button>
+                    </a>
                   </div>
                 </div>
                 {/* Vehicle photo */}
