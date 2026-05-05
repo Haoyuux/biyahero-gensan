@@ -3868,13 +3868,25 @@ const RiderProfileScreen = ({
         )}
       </div>
       {url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          <img
-            src={url}
-            alt={label}
-            className="w-full max-h-40 object-contain bg-gray-100 hover:opacity-90 transition-opacity cursor-zoom-in"
-          />
-        </a>
+        url.toLowerCase().includes('.pdf') ? (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-5 bg-gray-50 hover:bg-gray-100 transition-colors">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+              <FileText size={18} className="text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-800">PDF Document</p>
+              <p className="text-xs text-emerald-600 font-semibold mt-0.5">Tap to view ↗</p>
+            </div>
+          </a>
+        ) : (
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <img
+              src={url}
+              alt={label}
+              className="w-full max-h-40 object-contain bg-gray-100 hover:opacity-90 transition-opacity cursor-zoom-in"
+            />
+          </a>
+        )
       ) : (
         <div className="px-4 py-8 flex flex-col items-center gap-2 text-gray-300">
           <FileText size={28} />
