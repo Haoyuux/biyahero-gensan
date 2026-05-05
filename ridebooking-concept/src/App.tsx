@@ -2168,7 +2168,7 @@ const UserApp = ({ profile: initialProfile, settings, maintenanceMode, maintenan
             {step === 'select' && (
               <SelectPanel key="select" setStep={setStep} selectedRide={selectedRide}
                 setSelectedRide={setSelectedRide} routeInfo={routeInfo} pricingConfig={pricingConfig}
-                isBooking={isBooking}
+                isBooking={isBooking} maintenanceMode={maintenanceMode}
                 onBook={async (rideId: string, breakdown: FareBreakdown, distanceM: number) => {
                   if (currentRideId) {
                     showNotification('You have an ongoing ride. Finish it before booking another.');
@@ -9351,7 +9351,7 @@ const HomePanel = ({ setStep, pickup, setPickup, setPickupCoords, dropoff, setDr
   );
 };
 
-const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook, pricingConfig, isBooking }: any) => {
+const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook, pricingConfig, isBooking, maintenanceMode }: any) => {
   const distanceM = routeInfo?.distance ?? 0;
   const durationS = routeInfo?.duration ?? 0;
   const durationMin = Math.round(durationS / 60);
@@ -9500,10 +9500,10 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
                 else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
               }
             }}
-            disabled={isBooking}
-            className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-wait"
+            disabled={isBooking || maintenanceMode === 'half'}
+            className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isBooking ? 'Booking...' : 'Book Ride'}
+            {isBooking ? 'Booking...' : maintenanceMode === 'half' ? 'Unavailable — Maintenance' : 'Book Ride'}
           </button>
         </div>
       </div>
