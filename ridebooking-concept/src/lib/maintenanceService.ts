@@ -1,3 +1,5 @@
+// ─── Maintenance Service ───────────────────────────────────────────────────────
+
 import { supabase, supabaseAdmin } from './supabase';
 
 export type MaintenanceMode = 'off' | 'half' | 'full';
@@ -46,7 +48,7 @@ export function subscribeToMaintenance(
   cb: (s: MaintenanceSettings) => void,
 ): () => void {
   const channel = supabase
-    .channel('maintenance-changes')
+    .channel(`maintenance-changes-${Date.now()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'maintenance', filter: 'id=eq.1' },
