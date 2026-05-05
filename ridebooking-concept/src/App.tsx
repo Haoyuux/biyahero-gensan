@@ -3675,12 +3675,14 @@ const RiderProfileScreen = ({
   profile,
   onBack,
   onUpdate,
+  initialEditing = false,
 }: {
   profile: Profile;
   onBack: () => void;
   onUpdate: (p: Profile) => void;
+  initialEditing?: boolean;
 }) => {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditing);
   const [firstName, setFirstName] = useState(profile.first_name || "");
   const [lastName, setLastName] = useState(profile.last_name || "");
   const [phone, setPhone] = useState(profile.phone || "");
@@ -5053,6 +5055,7 @@ const RiderDashboard = ({
 }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
+  const [openProfileEditing, setOpenProfileEditing] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>(
@@ -5729,8 +5732,9 @@ const RiderDashboard = ({
     return (
       <RiderProfileScreen
         profile={currentProfile}
-        onBack={() => setShowProfile(false)}
+        onBack={() => { setShowProfile(false); setOpenProfileEditing(false); }}
         onUpdate={setCurrentProfile}
+        initialEditing={openProfileEditing}
       />
     );
   }
@@ -6386,8 +6390,39 @@ const RiderDashboard = ({
             })()}
 
           {/* ── Home Tab ── */}
-          {riderTab === "home" && (
+          {riderTab === "home" && (() => {
+            const missingDocs = [
+              !currentProfile.avatar_url && "Profile photo",
+              !currentProfile.phone && "Contact number",
+              !currentProfile.drivers_license_url && "Driver's license",
+              !currentProfile.or_url && "OR (Official Receipt)",
+              !currentProfile.cr_url && "CR (Certificate of Registration)",
+              !currentProfile.vehicle_image_url && "Vehicle photo",
+              !currentProfile.vehicle_type && "Vehicle type",
+              !currentProfile.vehicle_plate && "Plate number",
+            ].filter(Boolean) as string[];
+
+            return (
             <>
+              {/* Missing documents reminder */}
+              {missingDocs.length > 0 && (
+                <button
+                  onClick={() => { setOpenProfileEditing(true); setShowProfile(true); }}
+                  className="w-full text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-amber-100 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertCircle size={16} className="text-amber-950" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-amber-900 mb-1">Complete your profile</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      Missing: {missingDocs.join(", ")}
+                    </p>
+                    <p className="text-xs font-bold text-amber-900 mt-1.5">Tap to upload →</p>
+                  </div>
+                </button>
+              )}
+
               {/* Go Online / Not Approved */}
               {currentProfile.rider_status !== "approved" ? (
                 <div className="rounded-2xl p-6 text-center bg-white border border-gray-100">
@@ -6873,7 +6908,8 @@ const RiderDashboard = ({
                 )}
               </div>
             </>
-          )}
+            );
+          })()}
 
           {/* ── Remittance Tab ── */}
           {riderTab === "remit" && (
