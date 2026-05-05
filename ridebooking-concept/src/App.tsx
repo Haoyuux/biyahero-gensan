@@ -169,6 +169,7 @@ import {
   uploadNewsImage,
   NEWS_CATEGORIES,
   type NewsPost,
+  type NewsAudience,
 } from "@/src/lib/newsService";
 
 // localStorage keys for persisting active ride state across refresh / disconnects
@@ -2948,7 +2949,7 @@ const UserApp = ({
   }
 
   if (showNews) {
-    return <NewsFeedViewer onClose={() => setShowNews(false)} />;
+    return <NewsFeedViewer onClose={() => setShowNews(false)} viewerRole="user" />;
   }
 
   if (showRideHistory) {
@@ -7729,7 +7730,7 @@ const RiderDashboard = ({
 
         {/* ── News Tab ── */}
         {riderTab === "news" && (
-          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded />
+          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded viewerRole="rider" />
         )}
 
         {/* Universal Image Viewer Modal */}
@@ -8509,6 +8510,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
     category: "Announcement",
     image_url: null as string | null,
     published: true,
+    visible_to: "all" as NewsAudience,
   });
 
   const resetForm = () =>
@@ -8518,6 +8520,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
       category: "Announcement",
       image_url: null,
       published: true,
+      visible_to: "all",
     });
 
   const openCreate = () => {
@@ -8533,6 +8536,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
       category: p.category,
       image_url: p.image_url,
       published: p.published,
+      visible_to: p.visible_to ?? "all",
     });
     setEditingPost(p);
     setSaveError("");
@@ -8577,6 +8581,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
         category: form.category,
         image_url: form.image_url,
         published: form.published,
+        visible_to: form.visible_to,
       });
       if (ok) {
         await reload();
@@ -8592,6 +8597,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
         authorName,
         currentProfile.avatar_url,
         form.published,
+        form.visible_to,
       );
       if (post) {
         await reload();
@@ -8779,6 +8785,20 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                   ))}
                 </select>
               </div>
+              <div className="flex items-center gap-1.5 px-3 border border-gray-200 rounded-xl">
+                <Users size={13} className="text-gray-400 shrink-0" />
+                <select
+                  value={form.visible_to}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, visible_to: e.target.value as NewsAudience }))
+                  }
+                  className="text-sm bg-transparent focus:outline-none text-gray-700 font-medium pr-1 py-2"
+                >
+                  <option value="all">Everyone</option>
+                  <option value="user">Passengers only</option>
+                  <option value="rider">Drivers only</option>
+                </select>
+              </div>
             </div>
             <textarea
               placeholder="Write your post content… *"
@@ -8881,6 +8901,11 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                           Draft
                         </span>
                       )}
+                      {post.visible_to !== "all" && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${post.visible_to === "rider" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
+                          {post.visible_to === "rider" ? "Drivers only" : "Passengers only"}
+                        </span>
+                      )}
                       <span className="text-[11px] text-gray-400">
                         {new Date(post.created_at).toLocaleDateString("en-US", {
                           month: "short",
@@ -8949,9 +8974,11 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
 const NewsFeedViewer = ({
   onClose,
   embedded = false,
+  viewerRole = "user",
 }: {
   onClose: () => void;
   embedded?: boolean;
+  viewerRole?: "user" | "rider";
 }) => {
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -8959,10 +8986,10 @@ const NewsFeedViewer = ({
 
   useEffect(() => {
     fetchNewsPosts(false).then((data) => {
-      setPosts(data);
+      setPosts(data.filter((p) => p.visible_to === "all" || p.visible_to === viewerRole));
       setLoading(false);
     });
-  }, []);
+  }, [viewerRole]);
 
   const postList = loading ? (
     <div className="flex justify-center py-16">

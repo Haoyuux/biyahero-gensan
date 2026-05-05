@@ -5,6 +5,8 @@ import { supabase, supabaseAdmin } from './supabase';
 export const NEWS_CATEGORIES = ['Announcement', 'Update', 'Promo', 'Event', 'Important'] as const;
 export type NewsCategory = typeof NEWS_CATEGORIES[number];
 
+export type NewsAudience = 'all' | 'user' | 'rider';
+
 export interface NewsPost {
   id: string;
   title: string;
@@ -16,6 +18,7 @@ export interface NewsPost {
   author_avatar: string | null;
   published: boolean;
   is_archived: boolean;
+  visible_to: NewsAudience;
   created_at: string;
   updated_at: string;
 }
@@ -43,10 +46,11 @@ export async function createNewsPost(
   authorName: string,
   authorAvatar: string | null,
   published: boolean,
+  visibleTo: NewsAudience = 'all',
 ): Promise<NewsPost | null> {
   const { data, error } = await supabase
     .from('news_posts')
-    .insert({ title, content, category, image_url: imageUrl, author_id: authorId, author_name: authorName, author_avatar: authorAvatar, published, is_archived: false })
+    .insert({ title, content, category, image_url: imageUrl, author_id: authorId, author_name: authorName, author_avatar: authorAvatar, published, is_archived: false, visible_to: visibleTo })
     .select();
   if (error || !data?.length) { console.error('createNewsPost:', error); return null; }
   return data[0] as NewsPost;
@@ -54,7 +58,7 @@ export async function createNewsPost(
 
 export async function updateNewsPost(
   id: string,
-  updates: Partial<Pick<NewsPost, 'title' | 'content' | 'category' | 'image_url' | 'published' | 'is_archived'>>,
+  updates: Partial<Pick<NewsPost, 'title' | 'content' | 'category' | 'image_url' | 'published' | 'is_archived' | 'visible_to'>>,
 ): Promise<boolean> {
   const { error } = await supabase
     .from('news_posts')
