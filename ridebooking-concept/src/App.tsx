@@ -15467,7 +15467,13 @@ const RealtimeChat = ({
       },
       (status) => setSubStatus(status),
     );
-    return unsub;
+    // Polling fallback — catches messages that realtime misses (e.g. impersonation sessions)
+    const poll = setInterval(() => {
+      fetchMessages(rideId).then(({ messages: msgs }) => {
+        if (msgs.length) setMessages(msgs);
+      });
+    }, 3000);
+    return () => { unsub(); clearInterval(poll); };
   }, [rideId, senderId]);
 
   useEffect(() => {
