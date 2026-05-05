@@ -769,12 +769,12 @@ export default function App() {
     return (
       <div className="pt-9">
         {exitBanner}
-        {p.role === "rider" ? (
+        {p.role === "rider" || p.role === "team_leader" ? (
           <RiderDashboard
             {...({
               profile: p,
               settings: globalSettings,
-              maintenanceMode: undefined,
+              maintenanceMode: "off",
               maintenanceSettings: null,
               maintenanceBannerOffset: 36,
             } as any)}
@@ -800,7 +800,7 @@ export default function App() {
             {...({
               profile: p,
               settings: globalSettings,
-              maintenanceMode: undefined,
+              maintenanceMode: "off",
               maintenanceSettings: null,
               maintenanceBannerOffset: 36,
             } as any)}
