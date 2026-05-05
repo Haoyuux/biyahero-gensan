@@ -4564,7 +4564,18 @@ const RiderActiveRide = ({
         setUnreadCount((prev) => prev + 1);
       }
     });
-    return unsub;
+    let lastOtherCount = 0;
+    const poll = setInterval(() => {
+      if (isChatOpenRef.current) return;
+      fetchMessages(request.rideId).then(({ messages: msgs }) => {
+        const otherCount = msgs.filter((m) => m.sender_id !== profile.id).length;
+        if (otherCount > lastOtherCount) {
+          setUnreadCount((prev) => prev + (otherCount - lastOtherCount));
+        }
+        lastOtherCount = otherCount;
+      });
+    }, 3000);
+    return () => { unsub(); clearInterval(poll); };
   }, [request.rideId, profile.id]);
 
   useEffect(() => {
@@ -16828,7 +16839,18 @@ const MatchedPanel = ({
         setUnreadCount((prev) => prev + 1);
       }
     });
-    return unsub;
+    let lastOtherCount = 0;
+    const poll = setInterval(() => {
+      if (isChatOpenRef.current) return;
+      fetchMessages(rideId).then(({ messages: msgs }) => {
+        const otherCount = msgs.filter((m) => m.sender_id !== userId).length;
+        if (otherCount > lastOtherCount) {
+          setUnreadCount((prev) => prev + (otherCount - lastOtherCount));
+        }
+        lastOtherCount = otherCount;
+      });
+    }, 3000);
+    return () => { unsub(); clearInterval(poll); };
   }, [rideId, userId]);
 
   useEffect(() => {
