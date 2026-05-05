@@ -3843,7 +3843,7 @@ const RiderDashboard = ({ profile: initialProfile, settings, maintenanceMode, ma
 
       {/* Tab Bar — desktop only */}
       <div className="hidden md:flex bg-white border-b border-gray-100 px-5 gap-1">
-        {((['home', 'history', ...(remittanceRequired ? ['remit'] : []), ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => (
+        {((['home', 'history', ...(remittanceRequired && maintenanceMode !== 'half' ? ['remit'] : []), ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => (
           <button
             key={tab}
             onClick={() => setRiderTab(tab)}
@@ -3856,7 +3856,7 @@ const RiderDashboard = ({ profile: initialProfile, settings, maintenanceMode, ma
 
       {/* Bottom Nav — mobile only */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100 flex items-stretch pb-[env(safe-area-inset-bottom)]">
-        {((['home', 'history', ...(remittanceRequired ? ['remit'] : []), ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => {
+        {((['home', 'history', ...(remittanceRequired && maintenanceMode !== 'half' ? ['remit'] : []), ...(isTeamLeader ? ['team'] : []), 'news'] as const) as Array<'home'|'history'|'remit'|'team'|'news'>).map(tab => {
           const active = riderTab === tab;
           const Icon = tab === 'home' ? Home : tab === 'history' ? Clock : tab === 'remit' ? Receipt : tab === 'team' ? Users : Newspaper;
           const label = tab === 'home' ? 'Home' : tab === 'history' ? 'Trips' : tab === 'remit' ? 'Remit' : tab === 'team' ? 'Team' : 'News';
@@ -4154,16 +4154,17 @@ const RiderDashboard = ({ profile: initialProfile, settings, maintenanceMode, ma
             ) : null}
             <button
               onClick={() => {
+                if (maintenanceMode === 'half' && !isOnline) return;
                 if (!isOnline && (riderLocationDenied || (remittanceRequired && hasPendingRemit))) return;
                 setIsOnline(prev => !prev);
               }}
               className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
                 isOnline ? 'bg-white text-gray-950 hover:bg-gray-100'
-                : (riderLocationDenied || (remittanceRequired && hasPendingRemit)) ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : (maintenanceMode === 'half' || riderLocationDenied || (remittanceRequired && hasPendingRemit)) ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-950 text-white hover:bg-gray-800'
               }`}
             >
-              {isOnline ? 'Go Offline' : 'Go Online'}
+              {isOnline ? 'Go Offline' : maintenanceMode === 'half' ? 'Unavailable — Maintenance' : 'Go Online'}
             </button>
           </motion.div>
         ) : null}
