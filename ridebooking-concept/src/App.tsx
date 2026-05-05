@@ -9542,6 +9542,7 @@ const AdminDashboard = ({
   const [driverPage, setDriverPage] = useState(1);
   const [verifySearch, setVerifySearch] = useState("");
   const [verifyPage, setVerifyPage] = useState(1);
+  const [verifyStatusFilter, setVerifyStatusFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(10);
@@ -12071,16 +12072,14 @@ const AdminDashboard = ({
               {/* Riders table */}
               {(() => {
                 const ITEMS_PER_PAGE = 7;
-                const filtered = riders.filter(
-                  (r) =>
-                    !verifySearch ||
-                    (r.full_name || "")
-                      .toLowerCase()
-                      .includes(verifySearch.toLowerCase()) ||
-                    (r.email || "")
-                      .toLowerCase()
-                      .includes(verifySearch.toLowerCase()),
-                );
+                const filtered = riders.filter((r) => {
+                  if (verifyStatusFilter !== "all" && r.rider_status !== verifyStatusFilter) return false;
+                  if (!verifySearch) return true;
+                  return (
+                    (r.full_name || "").toLowerCase().includes(verifySearch.toLowerCase()) ||
+                    (r.email || "").toLowerCase().includes(verifySearch.toLowerCase())
+                  );
+                });
                 const totalPages = Math.max(
                   1,
                   Math.ceil(filtered.length / ITEMS_PER_PAGE),
@@ -12101,21 +12100,37 @@ const AdminDashboard = ({
                           {filtered.length} total
                         </span>
                       </h3>
-                      <div className="relative">
-                        <Search
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Search applicants..."
-                          value={verifySearch}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={verifyStatusFilter}
                           onChange={(e) => {
-                            setVerifySearch(e.target.value);
+                            setVerifyStatusFilter(e.target.value);
                             setVerifyPage(1);
                           }}
-                          className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
-                        />
+                          className="text-[12px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="unsubmitted">Unsubmitted</option>
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                        <div className="relative">
+                          <Search
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Search applicants..."
+                            value={verifySearch}
+                            onChange={(e) => {
+                              setVerifySearch(e.target.value);
+                              setVerifyPage(1);
+                            }}
+                            className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-56 text-[13px]"
+                          />
+                        </div>
                       </div>
                     </div>
                     {ridersLoading ? (
