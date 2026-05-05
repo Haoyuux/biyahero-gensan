@@ -1348,8 +1348,9 @@ const ProfileSetupScreen = ({
       setError("Last name is required.");
       return;
     }
-    if (!phone.trim()) {
-      setError("Phone number is required.");
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('09')) {
+      setError("Phone number must be 11 digits and start with 09.");
       return;
     }
     if (!birthday) {
@@ -1363,11 +1364,17 @@ const ProfileSetupScreen = ({
 
     setSaving(true);
     setError("");
+    const { data: dup } = await supabase.from('profiles').select('id').eq('phone', phoneDigits).neq('id', profile.id).maybeSingle();
+    if (dup) {
+      setError("This phone number is already registered to another account.");
+      setSaving(false);
+      return;
+    }
     const updated = await updateProfile(profile.id, {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       full_name: `${firstName.trim()} ${lastName.trim()}`,
-      phone: phone.trim(),
+      phone: phoneDigits,
       birthday,
       sex,
       avatar_url: avatarUrl || profile.avatar_url,
@@ -1490,9 +1497,11 @@ const ProfileSetupScreen = ({
                 />
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+63 917 123 4567"
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  placeholder="09XXXXXXXXX"
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={11}
                   className="w-full bg-white border border-gray-200 rounded-2xl pl-10 pr-4 py-3 text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                 />
               </div>
@@ -1624,23 +1633,28 @@ const UserProfileScreen = ({
   };
 
   const handleSave = async () => {
-    if (
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !phone.trim() ||
-      !birthday ||
-      !sex
-    ) {
+    if (!firstName.trim() || !lastName.trim() || !birthday || !sex) {
       setError("All fields are required.");
+      return;
+    }
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('09')) {
+      setError("Phone number must be 11 digits and start with 09.");
       return;
     }
     setSaving(true);
     setError("");
+    const { data: dup } = await supabase.from('profiles').select('id').eq('phone', phoneDigits).neq('id', profile.id).maybeSingle();
+    if (dup) {
+      setError("This phone number is already registered to another account.");
+      setSaving(false);
+      return;
+    }
     const updated = await updateProfile(profile.id, {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       full_name: `${firstName.trim()} ${lastName.trim()}`,
-      phone: phone.trim(),
+      phone: phoneDigits,
       birthday,
       sex,
       avatar_url: avatarUrl || profile.avatar_url,
@@ -1852,9 +1866,11 @@ const UserProfileScreen = ({
                   />
                   <input
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+63 917 123 4567"
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="09XXXXXXXXX"
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={11}
                     className="w-full bg-white border border-gray-200 rounded-2xl pl-10 pr-4 py-3 text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
                   />
                 </div>
@@ -3725,13 +3741,24 @@ const RiderProfileScreen = ({
   };
 
   const handleSave = async () => {
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('09')) {
+      setError("Phone number must be 11 digits and start with 09.");
+      return;
+    }
     setSaving(true);
     setError("");
+    const { data: dup } = await supabase.from('profiles').select('id').eq('phone', phoneDigits).neq('id', profile.id).maybeSingle();
+    if (dup) {
+      setError("This phone number is already registered to another account.");
+      setSaving(false);
+      return;
+    }
     const updated = await updateProfile(profile.id, {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       full_name: `${firstName.trim()} ${lastName.trim()}`,
-      phone: phone.trim(),
+      phone: phoneDigits,
       birthday,
       sex,
       avatar_url: avatarUrl || profile.avatar_url,
@@ -3928,7 +3955,7 @@ const RiderProfileScreen = ({
                   </div>
                 )}
               </div>
-              {editing && (
+              {editing && profile.rider_status !== 'approved' && (
                 <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-emerald-600 transition-colors">
                   <input
                     type="file"
@@ -4158,9 +4185,11 @@ const RiderProfileScreen = ({
                     />
                     <input
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="Phone"
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                      placeholder="09XXXXXXXXX"
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
                       className="w-full bg-white border border-gray-200 rounded-2xl pl-10 pr-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
                     />
                   </div>
