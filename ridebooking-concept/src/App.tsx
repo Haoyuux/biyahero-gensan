@@ -8969,6 +8969,36 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
   );
 };
 
+const URL_RE = /https?:\/\/[^\s]+/g;
+
+function renderWithLinks(text: string) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((match = URL_RE.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const url = match[0].replace(/[.,!?)]+$/, "");
+    const trail = match[0].slice(url.length);
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 underline underline-offset-2 break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>,
+    );
+    if (trail) parts.push(trail);
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 // ─── News Feed Viewer (shared user + rider) ───────────────────────────────────
 
 const NewsFeedViewer = ({
@@ -9040,7 +9070,7 @@ const NewsFeedViewer = ({
               <p
                 className={`text-[13px] text-gray-600 leading-relaxed ${isOpen ? "" : "line-clamp-3"}`}
               >
-                {post.content}
+                {renderWithLinks(post.content)}
               </p>
               {post.content.length > 200 && (
                 <button
