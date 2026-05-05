@@ -749,7 +749,7 @@ export default function App() {
 
   if (impersonating) {
     const exitBanner = (
-      <div className="fixed top-0 inset-x-0 z-[200] bg-amber-400 text-amber-950 px-4 py-2 flex items-center justify-between text-[13px] font-bold shadow-lg">
+      <div className="fixed top-0 inset-x-0 z-[400] bg-gray-950 text-white px-4 py-2 flex items-center justify-between text-[13px] font-bold shadow-lg">
         <span>
           👁 Viewing as{" "}
           <strong>{impersonating.full_name || impersonating.email}</strong> (
@@ -774,6 +774,7 @@ export default function App() {
               settings: globalSettings,
               maintenanceMode: effectiveMode,
               maintenanceSettings,
+              maintenanceBannerOffset: 36,
             } as any)}
           />
         ) : p.role === "admin" ? (
@@ -799,6 +800,7 @@ export default function App() {
               settings: globalSettings,
               maintenanceMode: effectiveMode,
               maintenanceSettings,
+              maintenanceBannerOffset: 36,
             } as any)}
           />
         )}
@@ -931,8 +933,10 @@ const MaintenanceScreen = ({
 
 const MaintenanceBanner = ({
   settings,
+  topOffset = 0,
 }: {
   settings: MaintenanceSettings | null;
+  topOffset?: number;
 }) => {
   if (!settings) return null;
 
@@ -955,7 +959,7 @@ const MaintenanceBanner = ({
   }
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[300] bg-amber-400 overflow-hidden h-8 flex items-center">
+    <div className="fixed inset-x-0 z-[300] bg-amber-400 overflow-hidden h-8 flex items-center" style={{ top: topOffset }}>
       <div className="flex animate-[marquee_30s_linear_infinite] whitespace-nowrap">
         {[0, 1, 2].map((i) => (
           <span key={i} className="text-amber-950 text-xs font-bold px-12">
@@ -2179,11 +2183,13 @@ const UserApp = ({
   settings,
   maintenanceMode,
   maintenanceSettings,
+  maintenanceBannerOffset = 0,
 }: {
   profile: Profile;
   settings: AppSettings | null;
   maintenanceMode?: MaintenanceMode;
   maintenanceSettings?: MaintenanceSettings | null;
+  maintenanceBannerOffset?: number;
 }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
@@ -2955,7 +2961,7 @@ const UserApp = ({
   return (
     <>
       {maintenanceMode === "half" && (
-        <MaintenanceBanner settings={maintenanceSettings ?? null} />
+        <MaintenanceBanner settings={maintenanceSettings ?? null} topOffset={maintenanceBannerOffset} />
       )}
       <div
         className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${maintenanceMode === "half" ? "pt-8" : ""}`}
@@ -5037,11 +5043,13 @@ const RiderDashboard = ({
   settings,
   maintenanceMode,
   maintenanceSettings,
+  maintenanceBannerOffset = 0,
 }: {
   profile: Profile;
   settings: AppSettings | null;
   maintenanceMode?: MaintenanceMode;
   maintenanceSettings?: MaintenanceSettings | null;
+  maintenanceBannerOffset?: number;
 }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
@@ -5818,7 +5826,7 @@ const RiderDashboard = ({
   return (
     <>
       {maintenanceMode === "half" && (
-        <MaintenanceBanner settings={maintenanceSettings ?? null} />
+        <MaintenanceBanner settings={maintenanceSettings ?? null} topOffset={maintenanceBannerOffset} />
       )}
       <div
         className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${maintenanceMode === "half" ? "pt-8" : ""}`}
