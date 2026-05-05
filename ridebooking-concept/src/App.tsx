@@ -9133,7 +9133,7 @@ const NewsFeedViewer = ({
       </p>
     </div>
   ) : (
-    <div className={`space-y-4 ${embedded ? "" : "p-4"}`}>
+    <div className={`space-y-4 ${embedded ? "pb-[calc(5rem+env(safe-area-inset-bottom))]" : "p-4 pb-[max(2rem,env(safe-area-inset-bottom))]"}`}>
       {readIds && posts.some((p) => !readIds.has(p.id)) && (
         <button
           onClick={() => onMarkAllRead?.(posts.map((p) => p.id))}
@@ -9230,7 +9230,7 @@ const NewsFeedViewer = ({
         </div>
         <Newspaper size={20} className="text-gray-300" />
       </div>
-      <div className="flex-1 overflow-y-auto p-4">{postList}</div>
+      <div className="flex-1 overflow-y-auto p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">{postList}</div>
     </div>
   );
 };
