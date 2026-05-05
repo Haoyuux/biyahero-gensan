@@ -2068,7 +2068,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
               <SelectPanel key="select" setStep={setStep} selectedRide={selectedRide}
                 setSelectedRide={setSelectedRide} routeInfo={routeInfo} pricingConfig={pricingConfig}
                 isBooking={isBooking}
-                onBook={async (rideId: string, breakdown: FareBreakdown) => {
+                onBook={async (rideId: string, breakdown: FareBreakdown, distanceM: number) => {
                   if (currentRideId) {
                     showNotification('You have an ongoing ride. Finish it before booking another.');
                     return;
@@ -2110,7 +2110,7 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
                     fareBreakdown: breakdown,
                     rideType: selectedRide,
                     priorityRiderIds,
-                    routeDistance: routeInfo?.distance ?? 0,
+                    routeDistance: distanceM,
                   };
                   // Store payload so the re-broadcast interval can keep sending it
                   pendingRequestRef.current = requestPayload;
@@ -9388,7 +9388,7 @@ const SelectPanel = ({ setStep, selectedRide, setSelectedRide, routeInfo, onBook
             onClick={async () => {
               const bd = dynamicRides.find(r => r.id === selectedRide)?.breakdown;
               if (bd) {
-                if (onBook) await onBook(genId(), bd);
+                if (onBook) await onBook(genId(), bd, distanceM);
                 else { setStep('searching'); setTimeout(() => setStep('matched'), 3500); }
               }
             }}
