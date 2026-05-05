@@ -2277,6 +2277,40 @@ const UserApp = ({
   );
   const [showNews, setShowNews] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const _newsReadKey = `fetch_news_read_${currentProfile.id}`;
+  const [newsReadIds, setNewsReadIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${initialProfile.id}`) || "[]")); }
+    catch { return new Set(); }
+  });
+  const [newsUnreadCount, setNewsUnreadCount] = useState(0);
+  useEffect(() => {
+    fetchNewsPosts(false).then((posts) => {
+      const visible = posts.filter((p) => p.visible_to === "all" || p.visible_to === "user");
+      const stored: Set<string> = (() => {
+        try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${currentProfile.id}`) || "[]")); }
+        catch { return new Set(); }
+      })();
+      setNewsUnreadCount(visible.filter((p) => !stored.has(p.id)).length);
+    });
+  }, []);
+  const markUserNewsRead = (id: string) => {
+    setNewsReadIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem(_newsReadKey, JSON.stringify([...next]));
+      return next;
+    });
+    setNewsUnreadCount((c) => Math.max(0, c - 1));
+  };
+  const markAllUserNewsRead = (ids: string[]) => {
+    setNewsReadIds((prev) => {
+      const next = new Set([...prev, ...ids]);
+      localStorage.setItem(_newsReadKey, JSON.stringify([...next]));
+      return next;
+    });
+    setNewsUnreadCount(0);
+  };
   const [riderLocation, setRiderLocation] = useState<[number, number] | null>(
     null,
   );
@@ -2949,7 +2983,7 @@ const UserApp = ({
   }
 
   if (showNews) {
-    return <NewsFeedViewer onClose={() => setShowNews(false)} viewerRole="user" />;
+    return <NewsFeedViewer onClose={() => setShowNews(false)} viewerRole="user" readIds={newsReadIds} onMarkRead={markUserNewsRead} onMarkAllRead={markAllUserNewsRead} />;
   }
 
   if (showRideHistory) {
@@ -3200,9 +3234,14 @@ const UserApp = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setShowNews(true)}
-                className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl"
+                className="w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 rounded-xl relative"
               >
                 <Newspaper size={16} className="text-gray-600" />
+                {newsUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                    {newsUnreadCount > 99 ? "99+" : newsUnreadCount}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setShowChatHistory(true)}
@@ -5112,6 +5151,41 @@ const RiderDashboard = ({
   const [riderTab, setRiderTab] = useState<
     "home" | "history" | "remit" | "team" | "news"
   >("home");
+  const _riderNewsReadKey = `fetch_news_read_${initialProfile.id}`;
+  const [riderNewsReadIds, setRiderNewsReadIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${initialProfile.id}`) || "[]")); }
+    catch { return new Set(); }
+  });
+  const [riderNewsUnreadCount, setRiderNewsUnreadCount] = useState(0);
+  useEffect(() => {
+    const approved = initialProfile.rider_status === "approved";
+    fetchNewsPosts(false).then((posts) => {
+      const visible = posts.filter((p) => p.visible_to === "all" || (p.visible_to === "rider" && approved));
+      const stored: Set<string> = (() => {
+        try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${initialProfile.id}`) || "[]")); }
+        catch { return new Set(); }
+      })();
+      setRiderNewsUnreadCount(visible.filter((p) => !stored.has(p.id)).length);
+    });
+  }, []);
+  const markRiderNewsRead = (id: string) => {
+    setRiderNewsReadIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem(_riderNewsReadKey, JSON.stringify([...next]));
+      return next;
+    });
+    setRiderNewsUnreadCount((c) => Math.max(0, c - 1));
+  };
+  const markAllRiderNewsRead = (ids: string[]) => {
+    setRiderNewsReadIds((prev) => {
+      const next = new Set([...prev, ...ids]);
+      localStorage.setItem(_riderNewsReadKey, JSON.stringify([...next]));
+      return next;
+    });
+    setRiderNewsUnreadCount(0);
+  };
   const [myTeam, setMyTeam] = useState<Team | null>(null);
   const [myTeamLoading, setMyTeamLoading] = useState(false);
   const [allRidersForTeam, setAllRidersForTeam] = useState<Profile[]>([]);
@@ -6008,9 +6082,14 @@ const RiderDashboard = ({
                 className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${active ? "text-gray-950" : "text-gray-400"}`}
               >
                 <div
-                  className={`w-8 h-8 flex items-center justify-center rounded-xl transition-colors ${active ? "bg-gray-950 text-white" : "text-gray-400"}`}
+                  className={`w-8 h-8 flex items-center justify-center rounded-xl transition-colors relative ${active ? "bg-gray-950 text-white" : "text-gray-400"}`}
                 >
                   <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
+                  {tab === "news" && riderNewsUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                      {riderNewsUnreadCount > 99 ? "99+" : riderNewsUnreadCount}
+                    </span>
+                  )}
                 </div>
                 <span
                   className={`text-[10px] font-bold tracking-wide ${active ? "text-gray-950" : "text-gray-400"}`}
@@ -7730,7 +7809,7 @@ const RiderDashboard = ({
 
         {/* ── News Tab ── */}
         {riderTab === "news" && (
-          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded viewerRole="rider" riderApproved={currentProfile.rider_status === "approved"} />
+          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded viewerRole="rider" riderApproved={currentProfile.rider_status === "approved"} readIds={riderNewsReadIds} onMarkRead={markRiderNewsRead} onMarkAllRead={markAllRiderNewsRead} />
         )}
 
         {/* Universal Image Viewer Modal */}
@@ -9006,11 +9085,17 @@ const NewsFeedViewer = ({
   embedded = false,
   viewerRole = "user",
   riderApproved = false,
+  readIds,
+  onMarkRead,
+  onMarkAllRead,
 }: {
   onClose: () => void;
   embedded?: boolean;
   viewerRole?: "user" | "rider";
   riderApproved?: boolean;
+  readIds?: Set<string>;
+  onMarkRead?: (id: string) => void;
+  onMarkAllRead?: (ids: string[]) => void;
 }) => {
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -9041,12 +9126,21 @@ const NewsFeedViewer = ({
     </div>
   ) : (
     <div className={`space-y-4 ${embedded ? "" : "p-4"}`}>
+      {readIds && posts.some((p) => !readIds.has(p.id)) && (
+        <button
+          onClick={() => onMarkAllRead?.(posts.map((p) => p.id))}
+          className="w-full text-[12px] font-bold text-gray-500 hover:text-gray-900 py-2 text-right pr-1 transition-colors"
+        >
+          Mark all as read
+        </button>
+      )}
       {posts.map((post) => {
         const isOpen = expanded === post.id;
+        const isUnread = readIds ? !readIds.has(post.id) : false;
         return (
           <div
             key={post.id}
-            className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm"
+            className={`bg-white rounded-2xl overflow-hidden border shadow-sm transition-colors ${isUnread ? "border-blue-200" : "border-gray-100"}`}
           >
             {post.image_url && (
               <img
@@ -9057,6 +9151,9 @@ const NewsFeedViewer = ({
             )}
             <div className="px-4 py-4">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
+                {isUnread && (
+                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                )}
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${CATEGORY_COLORS[post.category] ?? "bg-gray-100 text-gray-600"}`}
                 >
@@ -9080,10 +9177,22 @@ const NewsFeedViewer = ({
               </p>
               {post.content.length > 200 && (
                 <button
-                  onClick={() => setExpanded(isOpen ? null : post.id)}
+                  onClick={() => {
+                    const opening = !isOpen;
+                    setExpanded(opening ? post.id : null);
+                    if (opening && isUnread) onMarkRead?.(post.id);
+                  }}
                   className="text-[12px] font-bold text-gray-950 mt-1.5 hover:underline"
                 >
                   {isOpen ? "Show less" : "Read more"}
+                </button>
+              )}
+              {isUnread && post.content.length <= 200 && (
+                <button
+                  onClick={() => onMarkRead?.(post.id)}
+                  className="mt-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  Mark as read
                 </button>
               )}
             </div>
