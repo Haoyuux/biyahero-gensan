@@ -22,6 +22,7 @@ import { sendMessage, fetchMessages, subscribeToMessages, fetchUserConversations
 import { requestNotificationPermission, pushNotification } from '@/src/lib/notificationService';
 import { getRiderRemittances, getRiderDailyStats, uploadReceipt, createRemittance, getAllRemittances, reviewRemittance, hasPendingRemittance, getTeamRemittances, type Remittance } from '@/src/lib/remittanceService';
 import { getAppSettings, updateAppSettings, uploadSettingImage, type AppSettings } from '@/src/lib/settingsService';
+import { getMaintenanceSettings, updateMaintenanceSettings, subscribeToMaintenance, getEffectiveMode, type MaintenanceSettings, type MaintenanceMode } from '@/src/lib/maintenanceService';
 import { fetchTeams, fetchTeamWithMembers, fetchMyTeam, fetchRiderMembership, createTeam, updateTeam, deleteTeam, addTeamMember, removeTeamMember, type Team, type TeamMember } from '@/src/lib/teamService';
 import { fetchNewsPosts, createNewsPost, updateNewsPost, deleteNewsPost, uploadNewsImage, NEWS_CATEGORIES, type NewsPost } from '@/src/lib/newsService';
 
@@ -366,11 +367,21 @@ export default function App() {
     setImpersonatingRaw(p);
   };
   const [globalSettings, setGlobalSettings] = useState<AppSettings | null>(null);
+  const [maintenanceSettings, setMaintenanceSettings] = useState<MaintenanceSettings | null>(null);
   const [mapLoading, setMapLoading] = useState(false);
   const mapLoadShownRef = React.useRef(false);
 
   useEffect(() => {
     getAppSettings().then(setGlobalSettings);
+  }, []);
+
+  useEffect(() => {
+    getMaintenanceSettings().then(setMaintenanceSettings);
+    const unsub = subscribeToMaintenance(setMaintenanceSettings);
+    const interval = setInterval(() => {
+      setMaintenanceSettings(prev => prev ? { ...prev } : prev);
+    }, 60000);
+    return () => { unsub(); clearInterval(interval); };
   }, []);
 
   useEffect(() => {
@@ -418,6 +429,9 @@ export default function App() {
     }
   }, [profile?.id]);
 
+  const effectiveMode: MaintenanceMode = getEffectiveMode(maintenanceSettings);
+  const isAdminRole = profile?.role === 'admin' || profile?.role === 'super_admin';
+
   if (authLoading || (session && !profile)) return <SplashScreen settings={globalSettings} />;
   if (!session || !profile) return <LoginScreen settings={globalSettings} />;
   if (!profile.onboarded) return <OnboardingScreen profile={profile} settings={globalSettings} onComplete={setProfile} />;
@@ -425,6 +439,9 @@ export default function App() {
     return <BlockedScreen profile={profile} />;
   if (!profile.profile_completed && (profile.role === 'user' || profile.role === 'rider'))
     return <ProfileSetupScreen profile={profile} onComplete={setProfile} />;
+
+  if (effectiveMode === 'full' && !isAdminRole)
+    return <MaintenanceScreen settings={maintenanceSettings} appSettings={globalSettings} />;
 
   if (mapLoading) return <MapLoadingScreen settings={globalSettings} />;
 
@@ -439,19 +456,23 @@ export default function App() {
     return (
       <div className="pt-9">
         {exitBanner}
-        {p.role === 'rider' ? <RiderDashboard profile={p} settings={globalSettings} /> :
-         p.role === 'admin' ? <AdminDashboard profile={p} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} /> :
-         p.role === 'super_admin' ? <AdminDashboard profile={p} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} /> :
-         <UserApp profile={p} settings={globalSettings} />}
+        {p.role === 'rider' ? <RiderDashboard {...{ profile: p, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} /> :
+         p.role === 'admin' ? <AdminDashboard {...{ profile: p, isSuperAdmin: false, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), maintenanceSettings } as any} /> :
+         p.role === 'super_admin' ? <AdminDashboard {...{ profile: p, isSuperAdmin: true, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), maintenanceSettings } as any} /> :
+         <UserApp {...{ profile: p, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} />}
       </div>
     );
   }
 
-  if (profile.role === 'rider' || profile.role === 'team_leader') return <RiderDashboard profile={profile} settings={globalSettings} />;
-  if (profile.role === 'admin') return <AdminDashboard profile={profile} isSuperAdmin={false} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} />;
-  if (profile.role === 'super_admin') return <AdminDashboard profile={profile} isSuperAdmin={true} settings={globalSettings} onRefreshSettings={() => getAppSettings().then(setGlobalSettings)} onImpersonate={setImpersonating} />;
-  return <UserApp profile={profile} settings={globalSettings} />;
+  if (profile.role === 'rider' || profile.role === 'team_leader') return <RiderDashboard {...{ profile, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} />;
+  if (profile.role === 'admin') return <AdminDashboard {...{ profile, isSuperAdmin: false, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), maintenanceSettings } as any} />;
+  if (profile.role === 'super_admin') return <AdminDashboard {...{ profile, isSuperAdmin: true, settings: globalSettings, onRefreshSettings: () => getAppSettings().then(setGlobalSettings), onImpersonate: setImpersonating, maintenanceSettings } as any} />;
+  return <UserApp {...{ profile, settings: globalSettings, maintenanceMode: effectiveMode, maintenanceSettings } as any} />;
 }
+
+// ─── Maintenance Screen (stub — replaced in Task 4) ──────────────────────────
+
+const MaintenanceScreen = (_props: any) => null;
 
 // ─── Map Loading Screen ───────────────────────────────────────────────────────
 
