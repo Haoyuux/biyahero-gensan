@@ -777,6 +777,7 @@ export default function App() {
               maintenanceMode: "off",
               maintenanceSettings: null,
               maintenanceBannerOffset: 36,
+              isImpersonating: true,
             } as any)}
           />
         ) : p.role === "admin" ? (
@@ -803,6 +804,7 @@ export default function App() {
               maintenanceMode: "off",
               maintenanceSettings: null,
               maintenanceBannerOffset: 36,
+              isImpersonating: true,
             } as any)}
           />
         )}
@@ -2187,12 +2189,14 @@ const UserApp = ({
   maintenanceMode,
   maintenanceSettings,
   maintenanceBannerOffset = 0,
+  isImpersonating = false,
 }: {
   profile: Profile;
   settings: AppSettings | null;
   maintenanceMode?: MaintenanceMode;
   maintenanceSettings?: MaintenanceSettings | null;
   maintenanceBannerOffset?: number;
+  isImpersonating?: boolean;
 }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
@@ -3326,7 +3330,7 @@ const UserApp = ({
                       </div>
                     </motion.div>
                   )}
-                  {!currentRideId && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone) && (
+                  {!currentRideId && !isImpersonating && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone) && (
                     <div className="mx-3 mb-2 rounded-2xl bg-orange-50 border border-orange-200 px-4 py-3 flex items-start gap-3">
                       <AlertCircle
                         size={18}
@@ -3376,7 +3380,7 @@ const UserApp = ({
                     <HomePanel
                       key="home"
                       setStep={(s) => {
-                        if (s === "select" && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone)) {
+                        if (s === "select" && !isImpersonating && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone)) {
                           showNotification(
                             "Please complete your profile before booking a ride.",
                           );
@@ -5129,12 +5133,14 @@ const RiderDashboard = ({
   maintenanceMode,
   maintenanceSettings,
   maintenanceBannerOffset = 0,
+  isImpersonating = false,
 }: {
   profile: Profile;
   settings: AppSettings | null;
   maintenanceMode?: MaintenanceMode;
   maintenanceSettings?: MaintenanceSettings | null;
   maintenanceBannerOffset?: number;
+  isImpersonating?: boolean;
 }) => {
   const [currentProfile, setCurrentProfile] = useState<Profile>(initialProfile);
   const [showProfile, setShowProfile] = useState(false);
@@ -6530,7 +6536,7 @@ const RiderDashboard = ({
             return (
             <>
               {/* Missing documents reminder */}
-              {missingDocs.length > 0 && (
+              {missingDocs.length > 0 && !isImpersonating && (
                 <button
                   onClick={() => { setOpenProfileEditing(true); setShowProfile(true); }}
                   className="w-full text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-amber-100 transition-colors"
