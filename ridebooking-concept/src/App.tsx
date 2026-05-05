@@ -3326,6 +3326,28 @@ const UserApp = ({
                       </div>
                     </motion.div>
                   )}
+                  {!currentRideId && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone) && (
+                    <div className="mx-3 mb-2 rounded-2xl bg-orange-50 border border-orange-200 px-4 py-3 flex items-start gap-3">
+                      <AlertCircle
+                        size={18}
+                        className="text-orange-500 shrink-0 mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <p className="text-[13px] font-bold text-orange-800">
+                          Profile incomplete
+                        </p>
+                        <p className="text-[12px] text-orange-600 mt-0.5">
+                          Complete your profile to book a ride.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowProfile(true)}
+                        className="shrink-0 text-[11px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Complete
+                      </button>
+                    </div>
+                  )}
                   {!currentRideId && locationDenied && (
                     <div className="mx-3 mb-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
                       <MapPin
