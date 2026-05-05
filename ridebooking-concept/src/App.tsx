@@ -1740,19 +1740,19 @@ const UserApp = ({ profile: initialProfile, settings }: { profile: Profile, sett
     const ctrl = new AbortController();
     let retried = false;
     const tryFetch = async () => {
-      let coords = await fetchOsrmRoute(startLoc, endLoc, ctrl.signal);
-      if (!coords && !retried && !ctrl.signal.aborted) {
-        // one retry after short delay
+      let result = await fetchOsrmRouteWithInfo(startLoc, endLoc, ctrl.signal);
+      if (!result && !retried && !ctrl.signal.aborted) {
         retried = true;
         await new Promise(r => setTimeout(r, 2000));
-        coords = await fetchOsrmRoute(startLoc, endLoc, ctrl.signal);
+        result = await fetchOsrmRouteWithInfo(startLoc, endLoc, ctrl.signal);
       }
       if (ctrl.signal.aborted) return;
-      if (coords) {
-        // pull distance/duration from second fetch attempt too
-        setRouteCoords(coords);
+      if (result) {
+        setRouteCoords(result.coords);
+        setRouteInfo({ distance: result.distance, duration: result.duration });
       } else {
         setRouteCoords([startLoc, endLoc]); // straight-line fallback
+        setRouteInfo(null);
       }
       setMapFocus({ coords: 'route', key: Date.now() });
     };
