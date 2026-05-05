@@ -30,7 +30,7 @@ export interface FareBreakdown {
   distanceKm: number;
 }
 
-const STORAGE_KEY = 'fetch_pricing_config';
+const STORAGE_KEY = 'biyahero_pricing_config';
 
 export const DEFAULT_PRICING: PricingConfig = {
   teamBookingFeeDiscount: 0,

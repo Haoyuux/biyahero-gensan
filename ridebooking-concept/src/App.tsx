@@ -173,8 +173,8 @@ import {
 } from "@/src/lib/newsService";
 
 // localStorage keys for persisting active ride state across refresh / disconnects
-const USER_RIDE_KEY = "fetch_user_ride";
-const RIDER_RIDE_KEY = "fetch_rider_ride";
+const USER_RIDE_KEY = "biyahero_user_ride";
+const RIDER_RIDE_KEY = "biyahero_rider_ride";
 
 interface FavoritePlace {
   id: string;
@@ -182,7 +182,7 @@ interface FavoritePlace {
   label: string;
   coords: [number, number];
 }
-const FAVORITES_KEY = "fetch_favorites";
+const FAVORITES_KEY = "biyahero_favorites";
 
 /** Haversine distance in km between two lat/lng pairs. */
 const haversineKm = (
@@ -267,8 +267,8 @@ const GPS_OPTS: PositionOptions = {
 };
 const ROUTE_REFRESH_METERS = 75;
 const ROUTE_REFRESH_MS = 5000;
-const OFFLINE_MAP_CACHE = "fetch-offline-map-v1";
-const OFFLINE_RIDER_ROUTE_KEY_PREFIX = "fetch_offline_rider_route_";
+const OFFLINE_MAP_CACHE = "biyahero-offline-map-v1";
+const OFFLINE_RIDER_ROUTE_KEY_PREFIX = "biyahero_offline_rider_route_";
 const OFFLINE_TILE_ZOOMS = [15, 16, 17];
 const OFFLINE_TILE_LIMIT = 260;
 
@@ -774,8 +774,8 @@ export default function App() {
             {...({
               profile: p,
               settings: globalSettings,
-              maintenanceMode: effectiveMode,
-              maintenanceSettings,
+              maintenanceMode: undefined,
+              maintenanceSettings: null,
               maintenanceBannerOffset: 36,
             } as any)}
           />
@@ -785,7 +785,7 @@ export default function App() {
             isSuperAdmin={false}
             settings={globalSettings}
             onRefreshSettings={() => getAppSettings().then(setGlobalSettings)}
-            maintenanceSettings={maintenanceSettings}
+            maintenanceSettings={null}
           />
         ) : p.role === "super_admin" ? (
           <AdminDashboard
@@ -793,15 +793,15 @@ export default function App() {
             isSuperAdmin={true}
             settings={globalSettings}
             onRefreshSettings={() => getAppSettings().then(setGlobalSettings)}
-            maintenanceSettings={maintenanceSettings}
+            maintenanceSettings={null}
           />
         ) : (
           <UserApp
             {...({
               profile: p,
               settings: globalSettings,
-              maintenanceMode: effectiveMode,
-              maintenanceSettings,
+              maintenanceMode: undefined,
+              maintenanceSettings: null,
               maintenanceBannerOffset: 36,
             } as any)}
           />
@@ -2277,9 +2277,9 @@ const UserApp = ({
   );
   const [showNews, setShowNews] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const _newsReadKey = `fetch_news_read_${currentProfile.id}`;
+  const _newsReadKey = `biyahero_news_read_${currentProfile.id}`;
   const [newsReadIds, setNewsReadIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${initialProfile.id}`) || "[]")); }
+    try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) || "[]")); }
     catch { return new Set(); }
   });
   const [newsUnreadCount, setNewsUnreadCount] = useState(0);
@@ -2287,7 +2287,7 @@ const UserApp = ({
     fetchNewsPosts(false).then((posts) => {
       const visible = posts.filter((p) => p.visible_to === "all" || p.visible_to === "user");
       const stored: Set<string> = (() => {
-        try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${currentProfile.id}`) || "[]")); }
+        try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${currentProfile.id}`) || "[]")); }
         catch { return new Set(); }
       })();
       setNewsUnreadCount(visible.filter((p) => !stored.has(p.id)).length);
@@ -5180,9 +5180,9 @@ const RiderDashboard = ({
   const [riderTab, setRiderTab] = useState<
     "home" | "history" | "remit" | "team" | "news"
   >("home");
-  const _riderNewsReadKey = `fetch_news_read_${initialProfile.id}`;
+  const _riderNewsReadKey = `biyahero_news_read_${initialProfile.id}`;
   const [riderNewsReadIds, setRiderNewsReadIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${initialProfile.id}`) || "[]")); }
+    try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) || "[]")); }
     catch { return new Set(); }
   });
   const [riderNewsUnreadCount, setRiderNewsUnreadCount] = useState(0);
@@ -5191,7 +5191,7 @@ const RiderDashboard = ({
     fetchNewsPosts(false).then((posts) => {
       const visible = posts.filter((p) => p.visible_to === "all" || (p.visible_to === "rider" && approved));
       const stored: Set<string> = (() => {
-        try { return new Set(JSON.parse(localStorage.getItem(`fetch_news_read_${initialProfile.id}`) || "[]")); }
+        try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) || "[]")); }
         catch { return new Set(); }
       })();
       setRiderNewsUnreadCount(visible.filter((p) => !stored.has(p.id)).length);
