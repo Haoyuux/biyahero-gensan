@@ -2901,16 +2901,27 @@ const UserApp = ({
     if (lastStart && movedMeters < ROUTE_REFRESH_METERS && fetchedRecently)
       return;
 
-    setRiderPickupRouteCoords((prev) => prev ?? [riderLocation, startLoc]);
     riderPickupRouteStartRef.current = riderLocation;
     riderPickupRouteFetchedAtRef.current = now;
 
     const ctrl = new AbortController();
     const timeout = window.setTimeout(() => ctrl.abort(), 8000);
     const fetchRiderPickupRoute = async () => {
-      const coords = await fetchOsrmRoute(riderLocation, startLoc, ctrl.signal);
+      let coords = await fetchOsrmRoute(riderLocation, startLoc, ctrl.signal);
       if (ctrl.signal.aborted) return;
-      setRiderPickupRouteCoords(coords ?? [riderLocation, startLoc]);
+      // Retry once on failure before falling back to straight line
+      if (!coords) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (ctrl.signal.aborted) return;
+        coords = await fetchOsrmRoute(riderLocation, startLoc, ctrl.signal);
+        if (ctrl.signal.aborted) return;
+      }
+      if (coords) {
+        setRiderPickupRouteCoords(coords);
+      } else {
+        // Only use straight line if no previous route exists
+        setRiderPickupRouteCoords((prev) => prev ?? [riderLocation, startLoc]);
+      }
     };
 
     fetchRiderPickupRoute();
