@@ -13608,7 +13608,9 @@ const AdminDashboard = ({
                   {/* Header */}
                   <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
                     <h3 className="font-black text-gray-950 text-base">
-                      User Details
+                      {userDetailModal.role === "rider" || userDetailModal.role === "team_leader"
+                        ? "Rider Details"
+                        : "User Details"}
                     </h3>
                     <button
                       onClick={() => setUserDetailModal(null)}
@@ -13639,57 +13641,109 @@ const AdminDashboard = ({
                         <p className="text-[12px] text-gray-400">
                           {userDetailModal.email}
                         </p>
-                        <span
-                          className={`inline-block mt-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${userDetailModal.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
-                        >
-                          {userDetailModal.is_blocked ? "Inactive" : "Active"}
-                        </span>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${userDetailModal.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
+                          >
+                            {userDetailModal.is_blocked ? "Inactive" : "Active"}
+                          </span>
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-600">
+                            {userDetailModal.is_online ? "Online" : "Offline"}
+                          </span>
+                          {(userDetailModal.role === "rider" || userDetailModal.role === "team_leader") && (
+                            <span className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                              userDetailModal.rider_status === "approved" ? "bg-emerald-50 text-emerald-700" :
+                              userDetailModal.rider_status === "pending" ? "bg-amber-50 text-amber-700" :
+                              userDetailModal.rider_status === "rejected" ? "bg-red-50 text-red-600" :
+                              "bg-gray-100 text-gray-500"
+                            }`}>
+                              {userDetailModal.rider_status || "unsubmitted"}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {/* Info rows */}
-                    {[
-                      { label: "Role", value: userDetailModal.role },
-                      { label: "Phone", value: userDetailModal.phone || "—" },
-                      {
-                        label: "Birthday",
-                        value: userDetailModal.birthday || "—",
-                      },
-                      { label: "Sex", value: userDetailModal.sex || "—" },
-                      {
-                        label: "Joined",
-                        value: new Date(
-                          userDetailModal.created_at,
-                        ).toLocaleDateString("en-PH", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        }),
-                      },
-                      {
-                        label: "Last Seen",
-                        value: userDetailModal.last_seen_at
-                          ? new Date(
-                              userDetailModal.last_seen_at,
-                            ).toLocaleString("en-PH")
-                          : "—",
-                      },
-                      {
-                        label: "Online",
-                        value: userDetailModal.is_online ? "Yes" : "No",
-                      },
-                    ].map(({ label, value }) => (
-                      <div
-                        key={label}
-                        className="flex justify-between items-start border-b border-gray-50 pb-3 last:border-0"
-                      >
-                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                          {label}
-                        </span>
-                        <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
-                          {value}
-                        </span>
+
+                    {/* Personal Info */}
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Personal Info</p>
+                      {[
+                        { label: "First Name", value: userDetailModal.first_name || "—" },
+                        { label: "Last Name", value: userDetailModal.last_name || "—" },
+                        { label: "Phone", value: userDetailModal.phone || "—" },
+                        { label: "Birthday", value: userDetailModal.birthday || "—" },
+                        { label: "Sex", value: userDetailModal.sex || "—" },
+                        { label: "Role", value: userDetailModal.role },
+                        { label: "Profile Complete", value: userDetailModal.profile_completed ? "Yes" : "No" },
+                        { label: "Joined", value: new Date(userDetailModal.created_at).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) },
+                        { label: "Last Seen", value: userDetailModal.last_seen_at ? new Date(userDetailModal.last_seen_at).toLocaleString("en-PH") : "—" },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0">
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                          <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Rider Vehicle Info */}
+                    {(userDetailModal.role === "rider" || userDetailModal.role === "team_leader") && (
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Vehicle Info</p>
+                        {[
+                          { label: "Type", value: userDetailModal.vehicle_type || "—" },
+                          { label: "Make", value: userDetailModal.vehicle_make || "—" },
+                          { label: "Model", value: userDetailModal.vehicle_model || "—" },
+                          { label: "Plate", value: userDetailModal.vehicle_plate || "—" },
+                          { label: "Color", value: userDetailModal.vehicle_color || "—" },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                            <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                          </div>
+                        ))}
+                        {userDetailModal.vehicle_image_url && (
+                          <div className="mt-2">
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Vehicle Photo</p>
+                            <img src={userDetailModal.vehicle_image_url} alt="Vehicle" className="w-full rounded-xl object-cover max-h-40" />
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Rider Documents */}
+                    {(userDetailModal.role === "rider" || userDetailModal.role === "team_leader") && (
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Documents</p>
+                        <div className="space-y-2">
+                          {[
+                            { label: "Driver's License", url: userDetailModal.drivers_license_url },
+                            { label: "OR (Official Receipt)", url: userDetailModal.or_url },
+                            { label: "CR (Certificate of Registration)", url: userDetailModal.cr_url },
+                          ].map(({ label, url }) => (
+                            <div key={label} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                              {url ? (
+                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-[12px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                                  <Eye size={12} /> View
+                                </a>
+                              ) : (
+                                <span className="text-[13px] font-semibold text-gray-400">—</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {[
+                          { label: "Reviewed By", value: userDetailModal.reviewed_by_name || "—" },
+                          { label: "Reviewed At", value: userDetailModal.reviewed_at ? new Date(userDetailModal.reviewed_at).toLocaleString("en-PH") : "—" },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                            <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {userDetailModal.is_blocked && (
                       <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
                         <p className="text-[11px] font-bold text-red-400 uppercase tracking-wider">
