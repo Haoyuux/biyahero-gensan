@@ -12,6 +12,8 @@ export interface MaintenanceSettings {
   scheduled_end: string | null;
   post_news: boolean;
   auto_news_post_id: string | null;
+  reg_user_disabled: boolean;
+  reg_rider_disabled: boolean;
   updated_at: string;
 }
 

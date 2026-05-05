@@ -717,6 +717,7 @@ export default function App() {
         profile={profile}
         settings={globalSettings}
         onComplete={setProfile}
+        maintenanceSettings={maintenanceSettings}
       />
     );
   if (
@@ -1202,14 +1203,21 @@ const OnboardingScreen = ({
   profile,
   settings,
   onComplete,
+  maintenanceSettings,
 }: {
   profile: Profile;
   settings: AppSettings | null;
   onComplete: (p: Profile) => void;
+  maintenanceSettings?: MaintenanceSettings | null;
 }) => {
   const [loading, setLoading] = useState<"rider" | "user" | null>(null);
 
+  const userDisabled = maintenanceSettings?.reg_user_disabled ?? false;
+  const riderDisabled = maintenanceSettings?.reg_rider_disabled ?? false;
+
   const handleSelect = async (role: "rider" | "user") => {
+    if (role === "user" && userDisabled) return;
+    if (role === "rider" && riderDisabled) return;
     setLoading(role);
     const updated = await updateProfile(profile.id, { role, onboarded: true });
     if (updated) onComplete(updated);
@@ -1238,56 +1246,50 @@ const OnboardingScreen = ({
 
         <div className="space-y-3">
           <motion.button
-            whileTap={{ scale: 0.98 }}
+            whileTap={userDisabled ? {} : { scale: 0.98 }}
             onClick={() => handleSelect("user")}
-            disabled={!!loading}
-            className="w-full bg-gray-950 text-white rounded-2xl p-5 text-left flex items-center gap-4 hover:bg-gray-800 transition-colors duration-150 disabled:opacity-50 group"
+            disabled={!!loading || userDisabled}
+            className={`w-full rounded-2xl p-5 text-left flex items-center gap-4 transition-colors duration-150 group ${userDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-950 text-white hover:bg-gray-800 disabled:opacity-50"}`}
           >
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
-              <MapPin size={20} className="text-white" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${userDisabled ? "bg-gray-200" : "bg-white/10"}`}>
+              <MapPin size={20} className={userDisabled ? "text-gray-400" : "text-white"} />
             </div>
             <div className="flex-1">
               <p className="font-bold text-[15px] leading-tight">
                 I'm a Passenger
               </p>
-              <p className="text-gray-400 text-xs mt-0.5">
-                Book rides around the city
+              <p className={`text-xs mt-0.5 ${userDisabled ? "text-red-400 font-semibold" : "text-gray-400"}`}>
+                {userDisabled ? "Registration currently closed" : "Book rides around the city"}
               </p>
             </div>
             {loading === "user" ? (
               <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
-            ) : (
-              <ChevronLeft
-                size={16}
-                className="text-gray-500 rotate-180 shrink-0"
-              />
+            ) : !userDisabled && (
+              <ChevronLeft size={16} className="text-gray-500 rotate-180 shrink-0" />
             )}
           </motion.button>
 
           <motion.button
-            whileTap={{ scale: 0.98 }}
+            whileTap={riderDisabled ? {} : { scale: 0.98 }}
             onClick={() => handleSelect("rider")}
-            disabled={!!loading}
-            className="w-full bg-white border border-gray-100 shadow-sm text-gray-900 rounded-2xl p-5 text-left flex items-center gap-4 hover:border-gray-200 hover:shadow-md transition-all duration-150 disabled:opacity-50"
+            disabled={!!loading || riderDisabled}
+            className={`w-full rounded-2xl p-5 text-left flex items-center gap-4 transition-all duration-150 ${riderDisabled ? "bg-gray-100 cursor-not-allowed" : "bg-white border border-gray-100 shadow-sm text-gray-900 hover:border-gray-200 hover:shadow-md disabled:opacity-50"}`}
           >
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
-              <Navigation size={20} className="text-emerald-600" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${riderDisabled ? "bg-gray-200" : "bg-emerald-50"}`}>
+              <Navigation size={20} className={riderDisabled ? "text-gray-400" : "text-emerald-600"} />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-[15px] leading-tight">
+              <p className={`font-bold text-[15px] leading-tight ${riderDisabled ? "text-gray-400" : ""}`}>
                 I'm a Driver
               </p>
-              <p className="text-gray-400 text-xs mt-0.5">
-                Accept trips and earn money
+              <p className={`text-xs mt-0.5 ${riderDisabled ? "text-red-400 font-semibold" : "text-gray-400"}`}>
+                {riderDisabled ? "Registration currently closed" : "Accept trips and earn money"}
               </p>
             </div>
             {loading === "rider" ? (
               <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin shrink-0" />
-            ) : (
-              <ChevronLeft
-                size={16}
-                className="text-gray-300 rotate-180 shrink-0"
-              />
+            ) : !riderDisabled && (
+              <ChevronLeft size={16} className="text-gray-300 rotate-180 shrink-0" />
             )}
           </motion.button>
         </div>
@@ -9072,6 +9074,8 @@ const MaintenanceTab = ({
     settings?.scheduled_end ? settings.scheduled_end.slice(0, 16) : "",
   );
   const [postNews, setPostNews] = React.useState(settings?.post_news ?? false);
+  const [regUserDisabled, setRegUserDisabled] = React.useState(settings?.reg_user_disabled ?? false);
+  const [regRiderDisabled, setRegRiderDisabled] = React.useState(settings?.reg_rider_disabled ?? false);
   const [saving, setSaving] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
 
@@ -9179,6 +9183,8 @@ const MaintenanceTab = ({
         scheduled_end: endIso,
         post_news: mode !== "off" && postNews,
         auto_news_post_id,
+        reg_user_disabled: regUserDisabled,
+        reg_rider_disabled: regRiderDisabled,
       });
       if (ok) {
         showToast("Maintenance settings saved.");
@@ -9190,6 +9196,8 @@ const MaintenanceTab = ({
           scheduled_end: endIso,
           post_news: mode !== "off" && postNews,
           auto_news_post_id,
+          reg_user_disabled: regUserDisabled,
+          reg_rider_disabled: regRiderDisabled,
           updated_at: new Date().toISOString(),
         };
         onSaved(updated);
@@ -9319,6 +9327,35 @@ const MaintenanceTab = ({
           </div>
         </label>
       )}
+
+      {/* Registration controls */}
+      <div className="space-y-3">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Registration</p>
+        <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+          <input
+            type="checkbox"
+            checked={regUserDisabled}
+            onChange={(e) => setRegUserDisabled(e.target.checked)}
+            className="w-4 h-4 rounded accent-red-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Disable passenger registration</p>
+            <p className="text-xs text-gray-400">New users cannot select the Passenger role</p>
+          </div>
+        </label>
+        <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+          <input
+            type="checkbox"
+            checked={regRiderDisabled}
+            onChange={(e) => setRegRiderDisabled(e.target.checked)}
+            className="w-4 h-4 rounded accent-red-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Disable driver registration</p>
+            <p className="text-xs text-gray-400">New users cannot select the Driver role</p>
+          </div>
+        </label>
+      </div>
 
       {/* Save */}
       <button
