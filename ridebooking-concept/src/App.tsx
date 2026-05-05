@@ -4945,9 +4945,13 @@ const RiderActiveRide = ({
         >
           <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
-              {request.user?.first_name?.[0] || "U"}
-            </div>
+            {request.user?.avatar_url ? (
+              <img src={request.user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+                {request.user?.first_name?.[0] || "U"}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="font-black text-gray-900 text-sm truncate">
                 {request.user?.first_name} {request.user?.last_name || ""}
@@ -4962,6 +4966,28 @@ const RiderActiveRide = ({
               <p className="font-black text-lg text-emerald-600">
                 ₱{request.fare}
               </p>
+              {/* Chat button */}
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); setUnreadCount(0); }}
+                  className="w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center text-gray-600 transition-colors"
+                >
+                  <MessageSquare size={15} />
+                </button>
+                {unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 pointer-events-none">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </div>
+                )}
+              </div>
+              {/* Call button */}
+              <a
+                href={request.user?.phone ? `tel:${request.user.phone}` : undefined}
+                onClick={(e) => { e.stopPropagation(); if (!request.user?.phone) e.preventDefault(); }}
+                className="w-9 h-9 bg-emerald-50 hover:bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 transition-colors"
+              >
+                <Phone size={15} />
+              </a>
               <ChevronLeft
                 size={18}
                 className={`text-gray-400 transition-transform duration-200 ${isPanelExpanded ? "rotate-90" : "-rotate-90"}`}
@@ -4990,6 +5016,28 @@ const RiderActiveRide = ({
                     <ChevronLeft size={14} /> Back to dashboard
                   </button>
                 )}
+                {/* Passenger details */}
+                <div className="bg-gray-50 rounded-2xl p-4 mb-4 flex items-center gap-3">
+                  {request.user?.avatar_url ? (
+                    <img src={request.user.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 text-lg shrink-0">
+                      {request.user?.first_name?.[0] || "U"}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-gray-900 text-sm">
+                      {request.user?.first_name} {request.user?.last_name || ""}
+                    </p>
+                    {request.user?.phone ? (
+                      <a href={`tel:${request.user.phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <Phone size={11} /> {request.user.phone}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-0.5">No phone number</p>
+                    )}
+                  </div>
+                </div>
                 {/* Route */}
                 <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-3">
                   <div
