@@ -8958,24 +8958,6 @@ const NewsFeedViewer = ({
               <p className="font-black text-gray-950 text-[15px] leading-snug mb-2">
                 {post.title}
               </p>
-              {post.author_name && (
-                <div className="flex items-center gap-2 mb-2">
-                  {post.author_avatar ? (
-                    <img
-                      src={post.author_avatar}
-                      alt={post.author_name}
-                      className="w-5 h-5 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center">
-                      <User size={10} className="text-gray-500" />
-                    </div>
-                  )}
-                  <span className="text-[11px] text-gray-500 font-semibold">
-                    {post.author_name}
-                  </span>
-                </div>
-              )}
               <p
                 className={`text-[13px] text-gray-600 leading-relaxed ${isOpen ? "" : "line-clamp-3"}`}
               >
