@@ -5660,36 +5660,40 @@ const MaintenanceTab = ({ settings, onSaved, profile }: { settings: MaintenanceS
     if (!immediate && !scheduledStart) { showToast('Set a start date/time or enable "Activate immediately".'); return; }
     setSaving(true);
 
-    const startIso = immediate ? null : new Date(scheduledStart).toISOString();
-    const endIso = scheduledEnd ? new Date(scheduledEnd).toISOString() : null;
+    try {
+      const startIso = immediate ? null : new Date(scheduledStart).toISOString();
+      const endIso = scheduledEnd ? new Date(scheduledEnd).toISOString() : null;
 
-    let auto_news_post_id = settings?.auto_news_post_id ?? null;
+      let auto_news_post_id = settings?.auto_news_post_id ?? null;
 
-    if (postNews && mode !== 'off') {
-      const startLabel = startIso ? new Date(startIso).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' }) : 'immediately';
-      const endLabel = endIso ? new Date(endIso).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' }) : 'further notice';
-      const newsTitle = mode === 'full' ? 'System Maintenance' : 'Partial System Maintenance';
-      const newsContent = `${message || 'We are performing scheduled maintenance.'}\n\nMaintenance window: ${startLabel} until ${endLabel}.`;
+      if (postNews && mode !== 'off') {
+        const startLabel = startIso ? new Date(startIso).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' }) : 'immediately';
+        const endLabel = endIso ? new Date(endIso).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' }) : 'further notice';
+        const newsTitle = mode === 'full' ? 'System Maintenance' : 'Partial System Maintenance';
+        const newsContent = `${message || 'We are performing scheduled maintenance.'}\n\nMaintenance window: ${startLabel} until ${endLabel}.`;
 
-      if (auto_news_post_id) {
-        await updateNewsPost(auto_news_post_id, { title: newsTitle, content: newsContent, category: 'Important', published: true, is_archived: false });
-      } else {
-        const post = await createNewsPost(newsTitle, newsContent, 'Important', null, profile.id, `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin', profile.avatar_url ?? null, true);
-        if (post) auto_news_post_id = post.id;
+        if (auto_news_post_id) {
+          const newsOk = await updateNewsPost(auto_news_post_id, { title: newsTitle, content: newsContent, category: 'Important', published: true, is_archived: false });
+          if (!newsOk) { showToast('Failed to update news post. Try again.'); return; }
+        } else {
+          const post = await createNewsPost(newsTitle, newsContent, 'Important', null, profile.id, `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin', profile.avatar_url ?? null, true);
+          if (post) auto_news_post_id = post.id;
+        }
+      } else if (mode === 'off' && auto_news_post_id) {
+        await updateNewsPost(auto_news_post_id, { is_archived: true });
+        auto_news_post_id = null;
       }
-    } else if (mode === 'off' && auto_news_post_id) {
-      await updateNewsPost(auto_news_post_id, { is_archived: true });
-      auto_news_post_id = null;
-    }
 
-    const ok = await updateMaintenanceSettings({ mode, message: message || null, scheduled_start: startIso, scheduled_end: endIso, post_news: postNews, auto_news_post_id });
-    setSaving(false);
-    if (ok) {
-      showToast('Maintenance settings saved.');
-      const updated: MaintenanceSettings = { id: 1, mode, message: message || null, scheduled_start: startIso, scheduled_end: endIso, post_news: postNews, auto_news_post_id, updated_at: new Date().toISOString() };
-      onSaved(updated);
-    } else {
-      showToast('Failed to save. Try again.');
+      const ok = await updateMaintenanceSettings({ mode, message: message || null, scheduled_start: startIso, scheduled_end: endIso, post_news: mode !== 'off' && postNews, auto_news_post_id });
+      if (ok) {
+        showToast('Maintenance settings saved.');
+        const updated: MaintenanceSettings = { id: 1, mode, message: message || null, scheduled_start: startIso, scheduled_end: endIso, post_news: mode !== 'off' && postNews, auto_news_post_id, updated_at: new Date().toISOString() };
+        onSaved(updated);
+      } else {
+        showToast('Failed to save. Try again.');
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
