@@ -662,15 +662,66 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (globalSettings?.app_logo_url) {
-      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = "icon";
-        document.getElementsByTagName("head")[0].appendChild(link);
+    const head = document.getElementsByTagName("head")[0];
+    const appName = globalSettings?.app_name || "BiyaHero";
+    const logoUrl = globalSettings?.app_logo_url;
+
+    // Browser tab title
+    document.title = globalSettings?.document_title || appName;
+
+    // Browser tab favicon
+    if (logoUrl) {
+      let favicon = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!favicon) {
+        favicon = document.createElement("link");
+        favicon.rel = "icon";
+        head.appendChild(favicon);
       }
-      link.href = globalSettings.app_logo_url;
+      favicon.href = logoUrl;
     }
+
+    // iOS home screen icon (apple-touch-icon)
+    if (logoUrl) {
+      let touchIcon = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+      if (!touchIcon) {
+        touchIcon = document.createElement("link");
+        touchIcon.rel = "apple-touch-icon";
+        head.appendChild(touchIcon);
+      }
+      touchIcon.href = logoUrl;
+    }
+
+    // iOS home screen app name
+    let appTitleMeta = document.querySelector("meta[name='apple-mobile-web-app-title']") as HTMLMetaElement;
+    if (!appTitleMeta) {
+      appTitleMeta = document.createElement("meta");
+      appTitleMeta.name = "apple-mobile-web-app-title";
+      head.appendChild(appTitleMeta);
+    }
+    appTitleMeta.content = appName;
+
+    // Web app manifest (Android/Chrome PWA — also read by iOS for display: standalone)
+    const manifest = {
+      name: appName,
+      short_name: appName,
+      start_url: "/",
+      display: "standalone",
+      background_color: "#000000",
+      theme_color: "#000000",
+      ...(logoUrl ? {
+        icons: [
+          { src: logoUrl, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src: logoUrl, sizes: "512x512", type: "image/png", purpose: "any maskable" },
+        ],
+      } : {}),
+    };
+    let manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
+    if (!manifestLink) {
+      manifestLink = document.createElement("link");
+      manifestLink.rel = "manifest";
+      head.appendChild(manifestLink);
+    }
+    manifestLink.href = `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}`;
   }, [globalSettings]);
 
   useEffect(() => {
