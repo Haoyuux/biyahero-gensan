@@ -9545,6 +9545,9 @@ const MaintenanceTab = ({
     settings?.mode ?? "off",
   );
   const [message, setMessage] = React.useState(settings?.message ?? "");
+  const [marqueeMessage, setMarqueeMessage] = React.useState(
+    settings?.marquee_message ?? "",
+  );
   const [immediate, setImmediate] = React.useState(!settings?.scheduled_start);
   const [scheduledStart, setScheduledStart] = React.useState(
     settings?.scheduled_start ? settings.scheduled_start.slice(0, 16) : "",
@@ -9662,6 +9665,7 @@ const MaintenanceTab = ({
       const ok = await updateMaintenanceSettings({
         mode,
         message: message || null,
+        marquee_message: marqueeMessage || null,
         scheduled_start: startIso,
         scheduled_end: endIso,
         post_news: mode !== "off" && postNews,
@@ -9675,6 +9679,7 @@ const MaintenanceTab = ({
           id: 1,
           mode,
           message: message || null,
+          marquee_message: marqueeMessage || null,
           scheduled_start: startIso,
           scheduled_end: endIso,
           post_news: mode !== "off" && postNews,
@@ -9789,6 +9794,23 @@ const MaintenanceTab = ({
           placeholder="We are performing scheduled maintenance. Thank you for your patience."
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900"
         />
+      </div>
+
+      {/* Marquee Text */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+          Marquee Text
+        </p>
+        <input
+          type="text"
+          value={marqueeMessage}
+          onChange={(e) => setMarqueeMessage(e.target.value)}
+          placeholder="System is under partial maintenance. Some features are temporarily unavailable."
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+        />
+        <p className="text-[11px] text-gray-400 mt-1.5 ml-1">
+          Shown in the scrolling banner during half maintenance. Leave blank to use the default.
+        </p>
       </div>
 
       {/* Post news checkbox */}
