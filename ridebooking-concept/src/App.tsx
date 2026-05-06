@@ -971,7 +971,7 @@ const MaintenanceBanner = ({
   return (
     <div
       className="fixed inset-x-0 z-[300] bg-amber-400 overflow-hidden h-8 flex items-center"
-      style={{ top: topOffset }}
+      style={{ top: `calc(${topOffset}px + env(safe-area-inset-top))` }}
     >
       <div className="flex animate-[marquee_30s_linear_infinite] whitespace-nowrap">
         {[0, 1, 2].map((i) => (
@@ -3096,7 +3096,7 @@ const UserApp = ({
         />
       )}
       <div
-        className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-8" : ""}`}
+        className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-[calc(env(safe-area-inset-top)+2rem)]" : ""}`}
       >
         <ConnectionBanner state={connectionState} />
         <NotificationToast message={notification} />
@@ -6172,7 +6172,7 @@ const RiderDashboard = ({
         />
       )}
       <div
-        className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-8" : ""}`}
+        className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-[calc(env(safe-area-inset-top)+2rem)]" : ""}`}
       >
         <ConnectionBanner state={riderConnectionState} />
         <NotificationToast message={riderNotification} />
@@ -16436,7 +16436,7 @@ const HomePanel = ({
         <div className="w-10 h-1.5 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full mx-auto transition-colors" />
       </div>
 
-      <div className="px-5 pb-2 md:px-6 md:pt-6">
+      <div className="px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:px-6 md:pt-6">
         <div className="flex items-center justify-between mb-3 md:mb-5">
           <h2 className="text-[1.35rem] md:text-[1.75rem] font-black tracking-tight leading-tight">
             Where to?
@@ -16817,7 +16817,7 @@ const SelectPanel = ({
     >
       {/* Draggable handle */}
       <div
-        className="w-full pt-4 pb-3 md:hidden cursor-grab active:cursor-grabbing select-none touch-none flex flex-col items-center gap-3"
+        className="w-full pt-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden cursor-grab active:cursor-grabbing select-none touch-none flex flex-col items-center gap-3"
         onPointerDown={(e) => dragControls.start(e)}
         onClick={() => setIsCollapsed((c) => !c)}
       >
@@ -17361,7 +17361,7 @@ const MatchedPanel = ({
         {/* Handle + always-visible header — tap to expand/collapse */}
         <button
           onClick={() => setIsExpanded((e) => !e)}
-          className="w-full pt-4 pb-4 px-6 text-left md:hidden"
+          className="w-full pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] px-6 text-left md:hidden"
         >
           <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
           <div className="flex items-center justify-between">
@@ -17810,7 +17810,7 @@ const RatingPanel = ({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 300, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-6 pb-8 pointer-events-auto flex flex-col gap-5 md:flex-1 md:overflow-y-auto"
+      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none p-6 pb-[max(2rem,env(safe-area-inset-bottom))] pointer-events-auto flex flex-col gap-5 md:flex-1 md:overflow-y-auto"
     >
       <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto md:hidden" />
 
