@@ -957,15 +957,16 @@ const MaintenanceBanner = ({
   const fmt = (d: Date) =>
     d.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
 
-  let text: string;
-  if (start && now < start) {
-    text = `Scheduled maintenance on ${fmt(start)}${end ? ` until ${fmt(end)}` : ""}. Some features will be temporarily unavailable.`;
-  } else if (end) {
-    text = `System maintenance in progress — expected back ${fmt(end)}.`;
-  } else {
-    text =
-      "System is under partial maintenance. Some features are temporarily unavailable.";
-  }
+  const autoText = (() => {
+    if (start && now < start) {
+      return `Scheduled maintenance on ${fmt(start)}${end ? ` until ${fmt(end)}` : ""}. Some features will be temporarily unavailable.`;
+    } else if (end) {
+      return `System maintenance in progress — expected back ${fmt(end)}.`;
+    }
+    return "System is under partial maintenance. Some features are temporarily unavailable.";
+  })();
+
+  const text = settings.marquee_message?.trim() || autoText;
 
   return (
     <div
