@@ -8,6 +8,7 @@ export interface MaintenanceSettings {
   id: number;
   mode: MaintenanceMode;
   message: string | null;
+  marquee_message: string | null;
   scheduled_start: string | null;
   scheduled_end: string | null;
   post_news: boolean;
