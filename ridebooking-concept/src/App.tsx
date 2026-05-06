@@ -968,7 +968,10 @@ const MaintenanceBanner = ({
   }
 
   return (
-    <div className="fixed inset-x-0 z-[300] bg-amber-400 overflow-hidden h-8 flex items-center" style={{ top: topOffset }}>
+    <div
+      className="fixed inset-x-0 z-[300] bg-amber-400 overflow-hidden h-8 flex items-center"
+      style={{ top: topOffset }}
+    >
       <div className="flex animate-[marquee_30s_linear_infinite] whitespace-nowrap">
         {[0, 1, 2].map((i) => (
           <span key={i} className="text-amber-950 text-xs font-bold px-12">
@@ -1259,21 +1262,35 @@ const OnboardingScreen = ({
             disabled={!!loading || userDisabled}
             className={`w-full rounded-2xl p-5 text-left flex items-center gap-4 transition-colors duration-150 group ${userDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-950 text-white hover:bg-gray-800 disabled:opacity-50"}`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${userDisabled ? "bg-gray-200" : "bg-white/10"}`}>
-              <MapPin size={20} className={userDisabled ? "text-gray-400" : "text-white"} />
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${userDisabled ? "bg-gray-200" : "bg-white/10"}`}
+            >
+              <MapPin
+                size={20}
+                className={userDisabled ? "text-gray-400" : "text-white"}
+              />
             </div>
             <div className="flex-1">
               <p className="font-bold text-[15px] leading-tight">
                 I'm a Passenger
               </p>
-              <p className={`text-xs mt-0.5 ${userDisabled ? "text-red-400 font-semibold" : "text-gray-400"}`}>
-                {userDisabled ? "Registration currently closed" : "Book rides around the city"}
+              <p
+                className={`text-xs mt-0.5 ${userDisabled ? "text-red-400 font-semibold" : "text-gray-400"}`}
+              >
+                {userDisabled
+                  ? "Registration currently closed"
+                  : "Book rides around the city"}
               </p>
             </div>
             {loading === "user" ? (
               <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
-            ) : !userDisabled && (
-              <ChevronLeft size={16} className="text-gray-500 rotate-180 shrink-0" />
+            ) : (
+              !userDisabled && (
+                <ChevronLeft
+                  size={16}
+                  className="text-gray-500 rotate-180 shrink-0"
+                />
+              )
             )}
           </motion.button>
 
@@ -1283,21 +1300,37 @@ const OnboardingScreen = ({
             disabled={!!loading || riderDisabled}
             className={`w-full rounded-2xl p-5 text-left flex items-center gap-4 transition-all duration-150 ${riderDisabled ? "bg-gray-100 cursor-not-allowed" : "bg-white border border-gray-100 shadow-sm text-gray-900 hover:border-gray-200 hover:shadow-md disabled:opacity-50"}`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${riderDisabled ? "bg-gray-200" : "bg-emerald-50"}`}>
-              <Navigation size={20} className={riderDisabled ? "text-gray-400" : "text-emerald-600"} />
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${riderDisabled ? "bg-gray-200" : "bg-emerald-50"}`}
+            >
+              <Navigation
+                size={20}
+                className={riderDisabled ? "text-gray-400" : "text-emerald-600"}
+              />
             </div>
             <div className="flex-1">
-              <p className={`font-bold text-[15px] leading-tight ${riderDisabled ? "text-gray-400" : ""}`}>
+              <p
+                className={`font-bold text-[15px] leading-tight ${riderDisabled ? "text-gray-400" : ""}`}
+              >
                 I'm a Driver
               </p>
-              <p className={`text-xs mt-0.5 ${riderDisabled ? "text-red-400 font-semibold" : "text-gray-400"}`}>
-                {riderDisabled ? "Registration currently closed" : "Accept trips and earn money"}
+              <p
+                className={`text-xs mt-0.5 ${riderDisabled ? "text-red-400 font-semibold" : "text-gray-400"}`}
+              >
+                {riderDisabled
+                  ? "Registration currently closed"
+                  : "Accept trips and earn money"}
               </p>
             </div>
             {loading === "rider" ? (
               <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin shrink-0" />
-            ) : !riderDisabled && (
-              <ChevronLeft size={16} className="text-gray-300 rotate-180 shrink-0" />
+            ) : (
+              !riderDisabled && (
+                <ChevronLeft
+                  size={16}
+                  className="text-gray-300 rotate-180 shrink-0"
+                />
+              )
             )}
           </motion.button>
         </div>
@@ -1362,8 +1395,8 @@ const ProfileSetupScreen = ({
       setError("Last name is required.");
       return;
     }
-    const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('09')) {
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith("09")) {
       setError("Phone number must be 11 digits and start with 09.");
       return;
     }
@@ -1378,7 +1411,12 @@ const ProfileSetupScreen = ({
 
     setSaving(true);
     setError("");
-    const { data: dup } = await supabase.from('profiles').select('id').eq('phone', phoneDigits).neq('id', profile.id).maybeSingle();
+    const { data: dup } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("phone", phoneDigits)
+      .neq("id", profile.id)
+      .maybeSingle();
     if (dup) {
       setError("This phone number is already registered to another account.");
       setSaving(false);
@@ -1511,7 +1549,9 @@ const ProfileSetupScreen = ({
                 />
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  onChange={(e) =>
+                    setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))
+                  }
                   placeholder="09XXXXXXXXX"
                   type="tel"
                   inputMode="numeric"
@@ -1651,14 +1691,19 @@ const UserProfileScreen = ({
       setError("All fields are required.");
       return;
     }
-    const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('09')) {
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith("09")) {
       setError("Phone number must be 11 digits and start with 09.");
       return;
     }
     setSaving(true);
     setError("");
-    const { data: dup } = await supabase.from('profiles').select('id').eq('phone', phoneDigits).neq('id', profile.id).maybeSingle();
+    const { data: dup } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("phone", phoneDigits)
+      .neq("id", profile.id)
+      .maybeSingle();
     if (dup) {
       setError("This phone number is already registered to another account.");
       setSaving(false);
@@ -1880,7 +1925,9 @@ const UserProfileScreen = ({
                   />
                   <input
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    onChange={(e) =>
+                      setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))
+                    }
                     placeholder="09XXXXXXXXX"
                     type="tel"
                     inputMode="numeric"
@@ -2288,16 +2335,34 @@ const UserApp = ({
   const [showMenu, setShowMenu] = useState(false);
   const _newsReadKey = `biyahero_news_read_${currentProfile.id}`;
   const [newsReadIds, setNewsReadIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) || "[]")); }
-    catch { return new Set(); }
+    try {
+      return new Set(
+        JSON.parse(
+          localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) ||
+            "[]",
+        ),
+      );
+    } catch {
+      return new Set();
+    }
   });
   const [newsUnreadCount, setNewsUnreadCount] = useState(0);
   useEffect(() => {
     fetchNewsPosts(false).then((posts) => {
-      const visible = posts.filter((p) => p.visible_to === "all" || p.visible_to === "user");
+      const visible = posts.filter(
+        (p) => p.visible_to === "all" || p.visible_to === "user",
+      );
       const stored: Set<string> = (() => {
-        try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${currentProfile.id}`) || "[]")); }
-        catch { return new Set(); }
+        try {
+          return new Set(
+            JSON.parse(
+              localStorage.getItem(`biyahero_news_read_${currentProfile.id}`) ||
+                "[]",
+            ),
+          );
+        } catch {
+          return new Set();
+        }
       })();
       setNewsUnreadCount(visible.filter((p) => !stored.has(p.id)).length);
     });
@@ -2560,13 +2625,11 @@ const UserApp = ({
 
   const handleCancelBooking = (broadcast = false) => {
     if (broadcast && currentRideId) {
-      supabase
-        .channel("rides")
-        .send({
-          type: "broadcast",
-          event: "CANCEL_RIDE",
-          payload: { rideId: currentRideId },
-        });
+      supabase.channel("rides").send({
+        type: "broadcast",
+        event: "CANCEL_RIDE",
+        payload: { rideId: currentRideId },
+      });
       // Use admin client to guarantee the write bypasses RLS
       supabaseAdmin
         .from("rides")
@@ -3003,7 +3066,15 @@ const UserApp = ({
   }
 
   if (showNews) {
-    return <NewsFeedViewer onClose={() => setShowNews(false)} viewerRole="user" readIds={newsReadIds} onMarkRead={markUserNewsRead} onMarkAllRead={markAllUserNewsRead} />;
+    return (
+      <NewsFeedViewer
+        onClose={() => setShowNews(false)}
+        viewerRole="user"
+        readIds={newsReadIds}
+        onMarkRead={markUserNewsRead}
+        onMarkAllRead={markAllUserNewsRead}
+      />
+    );
   }
 
   if (showRideHistory) {
@@ -3018,7 +3089,10 @@ const UserApp = ({
   return (
     <>
       {getEffectiveMode(maintenanceSettings ?? null) === "half" && (
-        <MaintenanceBanner settings={maintenanceSettings ?? null} topOffset={maintenanceBannerOffset} />
+        <MaintenanceBanner
+          settings={maintenanceSettings ?? null}
+          topOffset={maintenanceBannerOffset}
+        />
       )}
       <div
         className={`w-full h-[100dvh] overflow-hidden relative md:flex md:flex-row font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-8" : ""}`}
@@ -3346,28 +3420,32 @@ const UserApp = ({
                       </div>
                     </motion.div>
                   )}
-                  {!currentRideId && !isImpersonating && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone) && (
-                    <div className="mx-3 mb-2 rounded-2xl bg-orange-50 border border-orange-200 px-4 py-3 flex items-start gap-3">
-                      <AlertCircle
-                        size={18}
-                        className="text-orange-500 shrink-0 mt-0.5"
-                      />
-                      <div className="flex-1">
-                        <p className="text-[13px] font-bold text-orange-800">
-                          Profile incomplete
-                        </p>
-                        <p className="text-[12px] text-orange-600 mt-0.5">
-                          Complete your profile to book a ride.
-                        </p>
+                  {!currentRideId &&
+                    !isImpersonating &&
+                    (!currentProfile.first_name ||
+                      !currentProfile.last_name ||
+                      !currentProfile.phone) && (
+                      <div className="mx-3 mb-2 rounded-2xl bg-orange-50 border border-orange-200 px-4 py-3 flex items-start gap-3">
+                        <AlertCircle
+                          size={18}
+                          className="text-orange-500 shrink-0 mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <p className="text-[13px] font-bold text-orange-800">
+                            Profile incomplete
+                          </p>
+                          <p className="text-[12px] text-orange-600 mt-0.5">
+                            Complete your profile to book a ride.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowProfile(true)}
+                          className="shrink-0 text-[11px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Complete
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setShowProfile(true)}
-                        className="shrink-0 text-[11px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        Complete
-                      </button>
-                    </div>
-                  )}
+                    )}
                   {!currentRideId && locationDenied && (
                     <div className="mx-3 mb-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3">
                       <MapPin
@@ -3396,7 +3474,13 @@ const UserApp = ({
                     <HomePanel
                       key="home"
                       setStep={(s) => {
-                        if (s === "select" && !isImpersonating && (!currentProfile.first_name || !currentProfile.last_name || !currentProfile.phone)) {
+                        if (
+                          s === "select" &&
+                          !isImpersonating &&
+                          (!currentProfile.first_name ||
+                            !currentProfile.last_name ||
+                            !currentProfile.phone)
+                        ) {
                           showNotification(
                             "Please complete your profile before booking a ride.",
                           );
@@ -3598,13 +3682,11 @@ const UserApp = ({
               setPendingRider(null);
               setStep("matched");
               if (currentRideId) {
-                supabase
-                  .channel("rides")
-                  .send({
-                    type: "broadcast",
-                    event: "USER_CONFIRMED_RIDER",
-                    payload: { rideId: currentRideId },
-                  });
+                supabase.channel("rides").send({
+                  type: "broadcast",
+                  event: "USER_CONFIRMED_RIDER",
+                  payload: { rideId: currentRideId },
+                });
               }
               pushAppNotification(
                 "Rider on the way 🛵",
@@ -3613,13 +3695,11 @@ const UserApp = ({
             }}
             onCancel={() => {
               if (currentRideId) {
-                supabase
-                  .channel("rides")
-                  .send({
-                    type: "broadcast",
-                    event: "CANCEL_RIDE",
-                    payload: { rideId: currentRideId },
-                  });
+                supabase.channel("rides").send({
+                  type: "broadcast",
+                  event: "CANCEL_RIDE",
+                  payload: { rideId: currentRideId },
+                });
                 supabase
                   .from("rides")
                   .update({ status: "cancelled" })
@@ -3840,14 +3920,19 @@ const RiderProfileScreen = ({
   };
 
   const handleSave = async () => {
-    const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('09')) {
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith("09")) {
       setError("Phone number must be 11 digits and start with 09.");
       return;
     }
     setSaving(true);
     setError("");
-    const { data: dup } = await supabase.from('profiles').select('id').eq('phone', phoneDigits).neq('id', profile.id).maybeSingle();
+    const { data: dup } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("phone", phoneDigits)
+      .neq("id", profile.id)
+      .maybeSingle();
     if (dup) {
       setError("This phone number is already registered to another account.");
       setSaving(false);
@@ -3959,14 +4044,21 @@ const RiderProfileScreen = ({
         )}
       </div>
       {url ? (
-        url.toLowerCase().includes('.pdf') ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-5 bg-gray-50 hover:bg-gray-100 transition-colors">
+        url.toLowerCase().includes(".pdf") ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-4 py-5 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
             <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
               <FileText size={18} className="text-red-500" />
             </div>
             <div>
               <p className="text-sm font-bold text-gray-800">PDF Document</p>
-              <p className="text-xs text-emerald-600 font-semibold mt-0.5">Tap to view ↗</p>
+              <p className="text-xs text-emerald-600 font-semibold mt-0.5">
+                Tap to view ↗
+              </p>
             </div>
           </a>
         ) : (
@@ -4066,7 +4158,7 @@ const RiderProfileScreen = ({
                   </div>
                 )}
               </div>
-              {editing && profile.rider_status !== 'approved' && (
+              {editing && profile.rider_status !== "approved" && (
                 <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-emerald-600 transition-colors">
                   <input
                     type="file"
@@ -4296,7 +4388,9 @@ const RiderProfileScreen = ({
                     />
                     <input
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                      onChange={(e) =>
+                        setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))
+                      }
                       placeholder="09XXXXXXXXX"
                       type="tel"
                       inputMode="numeric"
@@ -4579,14 +4673,19 @@ const RiderActiveRide = ({
     const poll = setInterval(() => {
       if (isChatOpenRef.current) return;
       fetchMessages(request.rideId).then(({ messages: msgs }) => {
-        const otherCount = msgs.filter((m) => m.sender_id !== profile.id).length;
+        const otherCount = msgs.filter(
+          (m) => m.sender_id !== profile.id,
+        ).length;
         if (otherCount > lastOtherCount) {
           setUnreadCount((prev) => prev + (otherCount - lastOtherCount));
         }
         lastOtherCount = otherCount;
       });
     }, 3000);
-    return () => { unsub(); clearInterval(poll); };
+    return () => {
+      unsub();
+      clearInterval(poll);
+    };
   }, [request.rideId, profile.id]);
 
   useEffect(() => {
@@ -4619,13 +4718,11 @@ const RiderActiveRide = ({
         };
         if (now - lastBroadcast.time >= 2000) {
           lastBroadcast.time = now;
-          supabase
-            .channel("rides")
-            .send({
-              type: "broadcast",
-              event: "RIDER_LOCATION",
-              payload: locationPayload,
-            });
+          supabase.channel("rides").send({
+            type: "broadcast",
+            event: "RIDER_LOCATION",
+            payload: locationPayload,
+          });
           if (channelReady) {
             ch.send({
               type: "broadcast",
@@ -4946,7 +5043,11 @@ const RiderActiveRide = ({
           <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
           <div className="flex items-center gap-3">
             {request.user?.avatar_url ? (
-              <img src={request.user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+              <img
+                src={request.user.avatar_url}
+                alt=""
+                className="w-10 h-10 rounded-full object-cover shrink-0"
+              />
             ) : (
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
                 {request.user?.first_name?.[0] || "U"}
@@ -4969,7 +5070,11 @@ const RiderActiveRide = ({
               {/* Chat button */}
               <div className="relative">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); setUnreadCount(0); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsChatOpen(true);
+                    setUnreadCount(0);
+                  }}
                   className="w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center text-gray-600 transition-colors"
                 >
                   <MessageSquare size={15} />
@@ -4982,8 +5087,13 @@ const RiderActiveRide = ({
               </div>
               {/* Call button */}
               <a
-                href={request.user?.phone ? `tel:${request.user.phone}` : undefined}
-                onClick={(e) => { e.stopPropagation(); if (!request.user?.phone) e.preventDefault(); }}
+                href={
+                  request.user?.phone ? `tel:${request.user.phone}` : undefined
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!request.user?.phone) e.preventDefault();
+                }}
                 className="w-9 h-9 bg-emerald-50 hover:bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 transition-colors"
               >
                 <Phone size={15} />
@@ -5019,7 +5129,11 @@ const RiderActiveRide = ({
                 {/* Passenger details */}
                 <div className="bg-gray-50 rounded-2xl p-4 mb-4 flex items-center gap-3">
                   {request.user?.avatar_url ? (
-                    <img src={request.user.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
+                    <img
+                      src={request.user.avatar_url}
+                      alt=""
+                      className="w-12 h-12 rounded-full object-cover shrink-0"
+                    />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 text-lg shrink-0">
                       {request.user?.first_name?.[0] || "U"}
@@ -5030,11 +5144,16 @@ const RiderActiveRide = ({
                       {request.user?.first_name} {request.user?.last_name || ""}
                     </p>
                     {request.user?.phone ? (
-                      <a href={`tel:${request.user.phone}`} className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                      <a
+                        href={`tel:${request.user.phone}`}
+                        className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-0.5"
+                      >
                         <Phone size={11} /> {request.user.phone}
                       </a>
                     ) : (
-                      <p className="text-xs text-gray-400 mt-0.5">No phone number</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        No phone number
+                      </p>
                     )}
                   </div>
                 </div>
@@ -5263,17 +5382,35 @@ const RiderDashboard = ({
   >("home");
   const _riderNewsReadKey = `biyahero_news_read_${initialProfile.id}`;
   const [riderNewsReadIds, setRiderNewsReadIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) || "[]")); }
-    catch { return new Set(); }
+    try {
+      return new Set(
+        JSON.parse(
+          localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) ||
+            "[]",
+        ),
+      );
+    } catch {
+      return new Set();
+    }
   });
   const [riderNewsUnreadCount, setRiderNewsUnreadCount] = useState(0);
   useEffect(() => {
     const approved = initialProfile.rider_status === "approved";
     fetchNewsPosts(false).then((posts) => {
-      const visible = posts.filter((p) => p.visible_to === "all" || (p.visible_to === "rider" && approved));
+      const visible = posts.filter(
+        (p) => p.visible_to === "all" || (p.visible_to === "rider" && approved),
+      );
       const stored: Set<string> = (() => {
-        try { return new Set(JSON.parse(localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) || "[]")); }
-        catch { return new Set(); }
+        try {
+          return new Set(
+            JSON.parse(
+              localStorage.getItem(`biyahero_news_read_${initialProfile.id}`) ||
+                "[]",
+            ),
+          );
+        } catch {
+          return new Set();
+        }
       })();
       setRiderNewsUnreadCount(visible.filter((p) => !stored.has(p.id)).length);
     });
@@ -5931,7 +6068,10 @@ const RiderDashboard = ({
     return (
       <RiderProfileScreen
         profile={currentProfile}
-        onBack={() => { setShowProfile(false); setOpenProfileEditing(false); }}
+        onBack={() => {
+          setShowProfile(false);
+          setOpenProfileEditing(false);
+        }}
         onUpdate={setCurrentProfile}
         initialEditing={openProfileEditing}
       />
@@ -5994,13 +6134,11 @@ const RiderDashboard = ({
             .eq("id", doneId);
 
           // 2. Broadcast to passenger so they see the review screen
-          supabase
-            .channel("rides")
-            .send({
-              type: "broadcast",
-              event: "RIDE_COMPLETED",
-              payload: { rideId: doneId },
-            });
+          supabase.channel("rides").send({
+            type: "broadcast",
+            event: "RIDE_COMPLETED",
+            payload: { rideId: doneId },
+          });
 
           // 3. Clean up local state
           localStorage.removeItem(RIDER_RIDE_KEY);
@@ -6014,13 +6152,11 @@ const RiderDashboard = ({
           setShowActiveRide(false);
         }}
         onArrive={() => {
-          supabase
-            .channel("rides")
-            .send({
-              type: "broadcast",
-              event: "RIDER_ARRIVED",
-              payload: { rideId: currentRequest.rideId },
-            });
+          supabase.channel("rides").send({
+            type: "broadcast",
+            event: "RIDER_ARRIVED",
+            payload: { rideId: currentRequest.rideId },
+          });
         }}
       />
     );
@@ -6029,7 +6165,10 @@ const RiderDashboard = ({
   return (
     <>
       {getEffectiveMode(maintenanceSettings ?? null) === "half" && (
-        <MaintenanceBanner settings={maintenanceSettings ?? null} topOffset={maintenanceBannerOffset} />
+        <MaintenanceBanner
+          settings={maintenanceSettings ?? null}
+          topOffset={maintenanceBannerOffset}
+        />
       )}
       <div
         className={`w-full min-h-[100dvh] bg-gray-50 font-sans text-gray-900 ${getEffectiveMode(maintenanceSettings ?? null) === "half" ? "pt-8" : ""}`}
@@ -6594,528 +6733,541 @@ const RiderDashboard = ({
             })()}
 
           {/* ── Home Tab ── */}
-          {riderTab === "home" && (() => {
-            const missingDocs = [
-              !currentProfile.avatar_url && "Profile photo",
-              !currentProfile.phone && "Contact number",
-              !currentProfile.drivers_license_url && "Driver's license",
-              !currentProfile.or_url && "OR (Official Receipt)",
-              !currentProfile.cr_url && "CR (Certificate of Registration)",
-              !currentProfile.vehicle_image_url && "Vehicle photo",
-              !currentProfile.vehicle_type && "Vehicle type",
-              !currentProfile.vehicle_make && "Vehicle make/brand",
-              !currentProfile.vehicle_model && "Vehicle model",
-              !currentProfile.vehicle_plate && "Plate number",
-            ].filter(Boolean) as string[];
+          {riderTab === "home" &&
+            (() => {
+              const missingDocs = [
+                !currentProfile.avatar_url && "Profile photo",
+                !currentProfile.phone && "Contact number",
+                !currentProfile.drivers_license_url && "Driver's license",
+                !currentProfile.or_url && "OR (Official Receipt)",
+                !currentProfile.cr_url && "CR (Certificate of Registration)",
+                !currentProfile.vehicle_image_url && "Vehicle photo",
+                !currentProfile.vehicle_type && "Vehicle type",
+                !currentProfile.vehicle_make && "Vehicle make/brand",
+                !currentProfile.vehicle_model && "Vehicle model",
+                !currentProfile.vehicle_plate && "Plate number",
+              ].filter(Boolean) as string[];
 
-            return (
-            <>
-              {/* Missing documents reminder */}
-              {missingDocs.length > 0 && !isImpersonating && (
-                <button
-                  onClick={() => { setOpenProfileEditing(true); setShowProfile(true); }}
-                  className="w-full text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-amber-100 transition-colors"
-                >
-                  <div className="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertCircle size={16} className="text-amber-950" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-amber-900 mb-1">Complete your profile</p>
-                    <p className="text-xs text-amber-700 leading-relaxed">
-                      Missing: {missingDocs.join(", ")}
-                    </p>
-                    <p className="text-xs font-bold text-amber-900 mt-1.5">Tap to upload →</p>
-                  </div>
-                </button>
-              )}
-
-              {/* Go Online / Not Approved */}
-              {currentProfile.rider_status !== "approved" ? (
-                <div className="rounded-2xl p-6 text-center bg-white border border-gray-100">
-                  <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <AlertCircle
-                      size={22}
-                      className={
-                        currentProfile.rider_status === "pending"
-                          ? "text-amber-500"
-                          : currentProfile.rider_status === "rejected"
-                            ? "text-red-500"
-                            : "text-gray-400"
-                      }
-                    />
-                  </div>
-                  <h2 className="text-gray-950 font-black text-[1.1rem] tracking-tight mb-1">
-                    Account Not Approved
-                  </h2>
-                  <p className="text-gray-400 text-sm mb-4 leading-relaxed">
-                    {currentProfile.rider_status === "pending"
-                      ? "Your account is under review. Please wait for admin approval."
-                      : currentProfile.rider_status === "rejected"
-                        ? "Your application was rejected. Please update your documents and resubmit."
-                        : "Submit your documents to get verified before going online."}
-                  </p>
-                  <button
-                    onClick={() => setShowProfile(true)}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                  >
-                    {currentProfile.rider_status === "rejected"
-                      ? "Update & Resubmit"
-                      : "View Profile"}
-                  </button>
-                </div>
-              ) : !requestAccepted ? (
-                <motion.div
-                  className={`rounded-2xl p-6 text-center border transition-colors ${isOnline ? "bg-gray-950 border-gray-900" : "bg-white border-gray-100"}`}
-                  layout
-                >
-                  {isOnline ? (
-                    <>
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mx-auto mb-4" />
-                      <h2 className="text-white font-black text-[1.1rem] tracking-tight mb-1">
-                        You're Online
-                      </h2>
-                      <p className="text-gray-400 text-sm mb-5">
-                        Waiting for ride requests nearby...
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <Navigation size={20} className="text-gray-400" />
-                      </div>
-                      <h2 className="text-gray-950 font-black text-[1.1rem] tracking-tight mb-1">
-                        You're Offline
-                      </h2>
-                      <p className="text-gray-400 text-sm mb-5">
-                        Go online to start receiving ride requests.
-                      </p>
-                    </>
-                  )}
-                  {remittanceRequired && hasPendingRemit && !isOnline ? (
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
-                      <AlertCircle
-                        size={16}
-                        className="text-amber-500 shrink-0 mt-0.5"
-                      />
-                      <div>
-                        <p className="text-[12px] font-bold text-amber-800">
-                          Remittance Pending
-                        </p>
-                        <p className="text-[11px] text-amber-600 mt-0.5">
-                          Please submit your remittance from a previous day
-                          before going online.
-                        </p>
-                      </div>
-                    </div>
-                  ) : riderLocationDenied && !isOnline ? (
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
-                      <MapPin
-                        size={16}
-                        className="text-amber-500 shrink-0 mt-0.5"
-                      />
-                      <div>
-                        <p className="text-[12px] font-bold text-amber-800">
-                          Location access is off
-                        </p>
-                        <p className="text-[11px] text-amber-600 mt-0.5">
-                          Enable location in your device settings to go online.
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
-                  <button
-                    onClick={() => {
-                      if (maintenanceMode === "half" && !isOnline) return;
-                      if (
-                        !isOnline &&
-                        (riderLocationDenied ||
-                          (remittanceRequired && hasPendingRemit))
-                      )
-                        return;
-                      setIsOnline((prev) => !prev);
-                    }}
-                    className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
-                      isOnline
-                        ? "bg-white text-gray-950 hover:bg-gray-100"
-                        : maintenanceMode === "half" ||
-                            riderLocationDenied ||
-                            (remittanceRequired && hasPendingRemit)
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-gray-950 text-white hover:bg-gray-800"
-                    }`}
-                  >
-                    {isOnline
-                      ? "Go Offline"
-                      : maintenanceMode === "half"
-                        ? "Unavailable — Maintenance"
-                        : "Go Online"}
-                  </button>
-                </motion.div>
-              ) : null}
-
-              {/* Team membership card */}
-              {riderTeam && (
-                <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-950 flex items-center justify-center shrink-0">
-                    <Users2 size={18} className="text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 text-sm">
-                      {riderTeam.name}
-                    </p>
-                    {(riderTeam.schedule_days ?? []).length > 0 ? (
-                      <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(
-                          (d, i) =>
-                            (riderTeam.schedule_days ?? []).includes(i) ? (
-                              <span
-                                key={i}
-                                className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-black rounded"
-                              >
-                                {d}
-                              </span>
-                            ) : (
-                              <span
-                                key={i}
-                                className="px-1.5 py-0.5 bg-gray-100 text-gray-300 text-[9px] font-black rounded"
-                              >
-                                {d}
-                              </span>
-                            ),
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        No schedule set
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Incoming Request — only shown when NOT already on a trip */}
-              <AnimatePresence>
-                {hasRequest && !requestAccepted && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="bg-white rounded-2xl p-5 border border-gray-900 shadow-xl shadow-black/10"
-                  >
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-1.5 h-1.5 bg-gray-950 rounded-full animate-pulse" />
-                      <span className="text-[10px] font-black text-gray-950 uppercase tracking-widest">
-                        New Ride Request
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center font-black text-gray-600 text-base shrink-0">
-                        {currentRequest?.user?.first_name?.[0] || "U"}
+              return (
+                <>
+                  {/* Missing documents reminder */}
+                  {missingDocs.length > 0 && !isImpersonating && (
+                    <button
+                      onClick={() => {
+                        setOpenProfileEditing(true);
+                        setShowProfile(true);
+                      }}
+                      className="w-full text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-amber-100 transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertCircle size={16} className="text-amber-950" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-black text-[15px] text-gray-950 truncate">
-                          {currentRequest?.user?.first_name}{" "}
-                          {currentRequest?.user?.last_name || ""}
-                        </h3>
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <Star
-                            size={11}
-                            className="text-amber-400 fill-amber-400"
-                          />{" "}
-                          4.8 · 24 trips
-                        </div>
+                        <p className="text-sm font-black text-amber-900 mb-1">
+                          Complete your profile
+                        </p>
+                        <p className="text-xs text-amber-700 leading-relaxed">
+                          Missing: {missingDocs.join(", ")}
+                        </p>
+                        <p className="text-xs font-bold text-amber-900 mt-1.5">
+                          Tap to upload →
+                        </p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-black text-xl text-gray-950">
-                          ₱{currentRequest?.fare}
+                    </button>
+                  )}
+
+                  {/* Go Online / Not Approved */}
+                  {currentProfile.rider_status !== "approved" ? (
+                    <div className="rounded-2xl p-6 text-center bg-white border border-gray-100">
+                      <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle
+                          size={22}
+                          className={
+                            currentProfile.rider_status === "pending"
+                              ? "text-amber-500"
+                              : currentProfile.rider_status === "rejected"
+                                ? "text-red-500"
+                                : "text-gray-400"
+                          }
+                        />
+                      </div>
+                      <h2 className="text-gray-950 font-black text-[1.1rem] tracking-tight mb-1">
+                        Account Not Approved
+                      </h2>
+                      <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                        {currentProfile.rider_status === "pending"
+                          ? "Your account is under review. Please wait for admin approval."
+                          : currentProfile.rider_status === "rejected"
+                            ? "Your application was rejected. Please update your documents and resubmit."
+                            : "Submit your documents to get verified before going online."}
+                      </p>
+                      <button
+                        onClick={() => setShowProfile(true)}
+                        className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                      >
+                        {currentProfile.rider_status === "rejected"
+                          ? "Update & Resubmit"
+                          : "View Profile"}
+                      </button>
+                    </div>
+                  ) : !requestAccepted ? (
+                    <motion.div
+                      className={`rounded-2xl p-6 text-center border transition-colors ${isOnline ? "bg-gray-950 border-gray-900" : "bg-white border-gray-100"}`}
+                      layout
+                    >
+                      {isOnline ? (
+                        <>
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mx-auto mb-4" />
+                          <h2 className="text-white font-black text-[1.1rem] tracking-tight mb-1">
+                            You're Online
+                          </h2>
+                          <p className="text-gray-400 text-sm mb-5">
+                            Waiting for ride requests nearby...
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <Navigation size={20} className="text-gray-400" />
+                          </div>
+                          <h2 className="text-gray-950 font-black text-[1.1rem] tracking-tight mb-1">
+                            You're Offline
+                          </h2>
+                          <p className="text-gray-400 text-sm mb-5">
+                            Go online to start receiving ride requests.
+                          </p>
+                        </>
+                      )}
+                      {remittanceRequired && hasPendingRemit && !isOnline ? (
+                        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
+                          <AlertCircle
+                            size={16}
+                            className="text-amber-500 shrink-0 mt-0.5"
+                          />
+                          <div>
+                            <p className="text-[12px] font-bold text-amber-800">
+                              Remittance Pending
+                            </p>
+                            <p className="text-[11px] text-amber-600 mt-0.5">
+                              Please submit your remittance from a previous day
+                              before going online.
+                            </p>
+                          </div>
+                        </div>
+                      ) : riderLocationDenied && !isOnline ? (
+                        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 mb-3">
+                          <MapPin
+                            size={16}
+                            className="text-amber-500 shrink-0 mt-0.5"
+                          />
+                          <div>
+                            <p className="text-[12px] font-bold text-amber-800">
+                              Location access is off
+                            </p>
+                            <p className="text-[11px] text-amber-600 mt-0.5">
+                              Enable location in your device settings to go
+                              online.
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+                      <button
+                        onClick={() => {
+                          if (maintenanceMode === "half" && !isOnline) return;
+                          if (
+                            !isOnline &&
+                            (riderLocationDenied ||
+                              (remittanceRequired && hasPendingRemit))
+                          )
+                            return;
+                          setIsOnline((prev) => !prev);
+                        }}
+                        className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
+                          isOnline
+                            ? "bg-white text-gray-950 hover:bg-gray-100"
+                            : maintenanceMode === "half" ||
+                                riderLocationDenied ||
+                                (remittanceRequired && hasPendingRemit)
+                              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              : "bg-gray-950 text-white hover:bg-gray-800"
+                        }`}
+                      >
+                        {isOnline
+                          ? "Go Offline"
+                          : maintenanceMode === "half"
+                            ? "Unavailable — Maintenance"
+                            : "Go Online"}
+                      </button>
+                    </motion.div>
+                  ) : null}
+
+                  {/* Team membership card */}
+                  {riderTeam && (
+                    <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-gray-950 flex items-center justify-center shrink-0">
+                        <Users2 size={18} className="text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-900 text-sm">
+                          {riderTeam.name}
                         </p>
-                        <p className="text-[11px] text-gray-400">
-                          {(() => {
-                            const loc = riderCurrentLoc;
-                            const coords = currentRequest?.pickup?.coords;
-                            if (loc && coords) {
-                              const d = haversineKm(
-                                loc[0],
-                                loc[1],
-                                coords[0],
-                                coords[1],
-                              );
-                              return `${d < 1 ? (d * 1000).toFixed(0) + " m" : d.toFixed(1) + " km"} away`;
-                            }
-                            return "Calculating…";
-                          })()}
-                        </p>
+                        {(riderTeam.schedule_days ?? []).length > 0 ? (
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(
+                              (d, i) =>
+                                (riderTeam.schedule_days ?? []).includes(i) ? (
+                                  <span
+                                    key={i}
+                                    className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-black rounded"
+                                  >
+                                    {d}
+                                  </span>
+                                ) : (
+                                  <span
+                                    key={i}
+                                    className="px-1.5 py-0.5 bg-gray-100 text-gray-300 text-[9px] font-black rounded"
+                                  >
+                                    {d}
+                                  </span>
+                                ),
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            No schedule set
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="space-y-2 mb-4 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-1.5 h-1.5 bg-gray-900 rounded-full shrink-0" />
-                        <span className="text-[13px] text-gray-600 truncate">
-                          {currentRequest?.pickup?.label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
-                        <span className="text-[13px] text-gray-600 truncate">
-                          {currentRequest?.dropoff?.label}
-                        </span>
-                      </div>
-                      {(() => {
-                        const fareKm =
-                          currentRequest?.fareBreakdown?.distanceKm;
-                        const distM = currentRequest?.routeDistance ?? 0;
-                        const d =
-                          fareKm != null
-                            ? fareKm
-                            : distM > 0
-                              ? distM / 1000
-                              : currentRequest?.pickup?.coords &&
-                                  currentRequest?.dropoff?.coords
-                                ? haversineKm(
-                                    currentRequest.pickup.coords[0],
-                                    currentRequest.pickup.coords[1],
-                                    currentRequest.dropoff.coords[0],
-                                    currentRequest.dropoff.coords[1],
-                                  )
-                                : null;
-                        if (d === null) return null;
-                        return (
-                          <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
-                            <span className="text-[11px] font-semibold text-gray-400">
-                              {d < 1
-                                ? (d * 1000).toFixed(0) + " m"
-                                : d.toFixed(1) + " km"}{" "}
-                              trip
+                  )}
+
+                  {/* Incoming Request — only shown when NOT already on a trip */}
+                  <AnimatePresence>
+                    {hasRequest && !requestAccepted && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        className="bg-white rounded-2xl p-5 border border-gray-900 shadow-xl shadow-black/10"
+                      >
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-1.5 h-1.5 bg-gray-950 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-black text-gray-950 uppercase tracking-widest">
+                            New Ride Request
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center font-black text-gray-600 text-base shrink-0">
+                            {currentRequest?.user?.first_name?.[0] || "U"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-black text-[15px] text-gray-950 truncate">
+                              {currentRequest?.user?.first_name}{" "}
+                              {currentRequest?.user?.last_name || ""}
+                            </h3>
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                              <Star
+                                size={11}
+                                className="text-amber-400 fill-amber-400"
+                              />{" "}
+                              4.8 · 24 trips
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-black text-xl text-gray-950">
+                              ₱{currentRequest?.fare}
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              {(() => {
+                                const loc = riderCurrentLoc;
+                                const coords = currentRequest?.pickup?.coords;
+                                if (loc && coords) {
+                                  const d = haversineKm(
+                                    loc[0],
+                                    loc[1],
+                                    coords[0],
+                                    coords[1],
+                                  );
+                                  return `${d < 1 ? (d * 1000).toFixed(0) + " m" : d.toFixed(1) + " km"} away`;
+                                }
+                                return "Calculating…";
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2 mb-4 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-1.5 h-1.5 bg-gray-900 rounded-full shrink-0" />
+                            <span className="text-[13px] text-gray-600 truncate">
+                              {currentRequest?.pickup?.label}
                             </span>
                           </div>
-                        );
-                      })()}
-                    </div>
-                    <div className="flex gap-2.5">
-                      <button
-                        onClick={async () => {
-                          const rid = currentRequest.rideId;
-                          setHasRequest(false);
-                          setCurrentRequest(null);
-                          usedRideIdsRef.current.add(rid);
-                          await supabase.channel("user-rides-dispatch").send({
-                            type: "broadcast",
-                            event: "RIDE_DECLINED",
-                            payload: {
-                              rideId: rid,
-                              riderId: currentProfile.id,
-                            },
-                          });
-                        }}
-                        className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
-                      >
-                        Decline
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const rid = currentRequest.rideId;
-
-                          // Atomically attempt to claim the ride in the database.
-                          // The .eq('status', 'pending') ensures only the first rider to reach the DB wins.
-                          const { data, error } = await supabase
-                            .from("rides")
-                            .update({
-                              status: "accepted",
-                              rider_id: (await supabase.auth.getUser()).data
-                                .user?.id,
-                              rider_name: (
-                                `${currentProfile?.first_name || ""} ${currentProfile?.last_name || ""}`.trim() ||
-                                currentProfile?.full_name ||
-                                "Rider"
-                              ).substring(0, 100),
-                              rider_avatar: currentProfile?.avatar_url || null,
-                              vehicle_info: (
-                                `${currentProfile?.vehicle_make || ""} ${currentProfile?.vehicle_model || ""} • ${currentProfile?.vehicle_plate || ""}`.trim() ||
-                                "Vehicle Info"
-                              ).substring(0, 150),
-                            })
-                            .eq("id", rid)
-                            .eq("status", "pending")
-                            .select();
-
-                          let isSuccess = data && data.length > 0;
-
-                          // If update returned no rows, it might be heavily restricted RLS or someone else won.
-                          // Verification step: check who currently owns the ride.
-                          if (!isSuccess && !error) {
-                            const { data: verified } = await supabase
-                              .from("rides")
-                              .select("status, rider_id")
-                              .eq("id", rid)
-                              .maybeSingle();
-
-                            if (
-                              verified?.status === "accepted" &&
-                              verified?.rider_id ===
-                                (await supabase.auth.getUser()).data.user?.id
-                            ) {
-                              isSuccess = true;
-                            }
-                          }
-
-                          if (error) {
-                            if (error.code === "42501") {
-                              // 42501 in a race condition simply means the status is no longer 'pending'
-                              // so the RLS policy 'USING (status = 'pending')' filtered the row out.
-                              showRiderNotification(
-                                "Someone else already took this ride!",
-                              );
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
+                            <span className="text-[13px] text-gray-600 truncate">
+                              {currentRequest?.dropoff?.label}
+                            </span>
+                          </div>
+                          {(() => {
+                            const fareKm =
+                              currentRequest?.fareBreakdown?.distanceKm;
+                            const distM = currentRequest?.routeDistance ?? 0;
+                            const d =
+                              fareKm != null
+                                ? fareKm
+                                : distM > 0
+                                  ? distM / 1000
+                                  : currentRequest?.pickup?.coords &&
+                                      currentRequest?.dropoff?.coords
+                                    ? haversineKm(
+                                        currentRequest.pickup.coords[0],
+                                        currentRequest.pickup.coords[1],
+                                        currentRequest.dropoff.coords[0],
+                                        currentRequest.dropoff.coords[1],
+                                      )
+                                    : null;
+                            if (d === null) return null;
+                            return (
+                              <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
+                                <span className="text-[11px] font-semibold text-gray-400">
+                                  {d < 1
+                                    ? (d * 1000).toFixed(0) + " m"
+                                    : d.toFixed(1) + " km"}{" "}
+                                  trip
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className="flex gap-2.5">
+                          <button
+                            onClick={async () => {
+                              const rid = currentRequest.rideId;
                               setHasRequest(false);
                               setCurrentRequest(null);
                               usedRideIdsRef.current.add(rid);
-                              return;
-                            }
-                            showRiderNotification(
-                              `Database error: ${error.message} (${error.code})`,
-                            );
-                            return;
-                          }
+                              await supabase
+                                .channel("user-rides-dispatch")
+                                .send({
+                                  type: "broadcast",
+                                  event: "RIDE_DECLINED",
+                                  payload: {
+                                    rideId: rid,
+                                    riderId: currentProfile.id,
+                                  },
+                                });
+                            }}
+                            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const rid = currentRequest.rideId;
 
-                          if (!isSuccess) {
-                            // Fetch who actually took it to be extremely clear
-                            const { data: winnerData } = await supabase
-                              .from("rides")
-                              .select("status, rider_id, rider_name")
-                              .eq("id", rid)
-                              .maybeSingle();
-                            const winnerName =
-                              (winnerData as any)?.rider_name ||
-                              "Another Rider";
-                            const currentStatus =
-                              (winnerData as any)?.status || "Unknown";
+                              // Atomically attempt to claim the ride in the database.
+                              // The .eq('status', 'pending') ensures only the first rider to reach the DB wins.
+                              const { data, error } = await supabase
+                                .from("rides")
+                                .update({
+                                  status: "accepted",
+                                  rider_id: (await supabase.auth.getUser()).data
+                                    .user?.id,
+                                  rider_name: (
+                                    `${currentProfile?.first_name || ""} ${currentProfile?.last_name || ""}`.trim() ||
+                                    currentProfile?.full_name ||
+                                    "Rider"
+                                  ).substring(0, 100),
+                                  rider_avatar:
+                                    currentProfile?.avatar_url || null,
+                                  vehicle_info: (
+                                    `${currentProfile?.vehicle_make || ""} ${currentProfile?.vehicle_model || ""} • ${currentProfile?.vehicle_plate || ""}`.trim() ||
+                                    "Vehicle Info"
+                                  ).substring(0, 150),
+                                })
+                                .eq("id", rid)
+                                .eq("status", "pending")
+                                .select();
 
-                            if (currentStatus === "pending") {
-                              showRiderNotification(
-                                "Ride is still pending but update failed. Check RLS policies.",
-                              );
-                            } else {
-                              showRiderNotification(
-                                `Ride was already taken by ${winnerName}. Status: ${currentStatus}`,
-                              );
-                            }
+                              let isSuccess = data && data.length > 0;
 
-                            setHasRequest(false);
-                            setCurrentRequest(null);
-                            usedRideIdsRef.current.add(rid);
-                            return;
-                          }
+                              // If update returned no rows, it might be heavily restricted RLS or someone else won.
+                              // Verification step: check who currently owns the ride.
+                              if (!isSuccess && !error) {
+                                const { data: verified } = await supabase
+                                  .from("rides")
+                                  .select("status, rider_id")
+                                  .eq("id", rid)
+                                  .maybeSingle();
 
-                          // Success! We won the race.
-                          usedRideIdsRef.current.add(rid);
-                          myAcceptedRideIdRef.current = rid;
-                          setRequestAccepted(true);
-                          setWaitingForUserConfirm(true);
-                          setHasRequest(false);
-                          supabase
-                            .channel("rides")
-                            .send({
-                              type: "broadcast",
-                              event: "RIDE_ACCEPTED",
-                              payload: { rideId: rid, rider: currentProfile },
-                            });
-                        }}
-                        className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+                                if (
+                                  verified?.status === "accepted" &&
+                                  verified?.rider_id ===
+                                    (await supabase.auth.getUser()).data.user
+                                      ?.id
+                                ) {
+                                  isSuccess = true;
+                                }
+                              }
+
+                              if (error) {
+                                if (error.code === "42501") {
+                                  // 42501 in a race condition simply means the status is no longer 'pending'
+                                  // so the RLS policy 'USING (status = 'pending')' filtered the row out.
+                                  showRiderNotification(
+                                    "Someone else already took this ride!",
+                                  );
+                                  setHasRequest(false);
+                                  setCurrentRequest(null);
+                                  usedRideIdsRef.current.add(rid);
+                                  return;
+                                }
+                                showRiderNotification(
+                                  `Database error: ${error.message} (${error.code})`,
+                                );
+                                return;
+                              }
+
+                              if (!isSuccess) {
+                                // Fetch who actually took it to be extremely clear
+                                const { data: winnerData } = await supabase
+                                  .from("rides")
+                                  .select("status, rider_id, rider_name")
+                                  .eq("id", rid)
+                                  .maybeSingle();
+                                const winnerName =
+                                  (winnerData as any)?.rider_name ||
+                                  "Another Rider";
+                                const currentStatus =
+                                  (winnerData as any)?.status || "Unknown";
+
+                                if (currentStatus === "pending") {
+                                  showRiderNotification(
+                                    "Ride is still pending but update failed. Check RLS policies.",
+                                  );
+                                } else {
+                                  showRiderNotification(
+                                    `Ride was already taken by ${winnerName}. Status: ${currentStatus}`,
+                                  );
+                                }
+
+                                setHasRequest(false);
+                                setCurrentRequest(null);
+                                usedRideIdsRef.current.add(rid);
+                                return;
+                              }
+
+                              // Success! We won the race.
+                              usedRideIdsRef.current.add(rid);
+                              myAcceptedRideIdRef.current = rid;
+                              setRequestAccepted(true);
+                              setWaitingForUserConfirm(true);
+                              setHasRequest(false);
+                              supabase.channel("rides").send({
+                                type: "broadcast",
+                                event: "RIDE_ACCEPTED",
+                                payload: { rideId: rid, rider: currentProfile },
+                              });
+                            }}
+                            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+                          >
+                            Accept
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Today's Stats */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      {
+                        label: "Today's Trips",
+                        value: todayStats ? todayStats.trips.toString() : "—",
+                      },
+                      {
+                        label: "Earnings",
+                        value: todayStats ? `₱${todayStats.earnings}` : "—",
+                      },
+                      {
+                        label: "Rating",
+                        value:
+                          todayStats?.rating != null
+                            ? todayStats.rating.toString()
+                            : "—",
+                      },
+                    ].map(({ label, value }) => (
+                      <div
+                        key={label}
+                        className="bg-white rounded-2xl p-4 border border-gray-100 text-center"
                       >
-                        Accept
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Today's Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  {
-                    label: "Today's Trips",
-                    value: todayStats ? todayStats.trips.toString() : "—",
-                  },
-                  {
-                    label: "Earnings",
-                    value: todayStats ? `₱${todayStats.earnings}` : "—",
-                  },
-                  {
-                    label: "Rating",
-                    value:
-                      todayStats?.rating != null
-                        ? todayStats.rating.toString()
-                        : "—",
-                  },
-                ].map(({ label, value }) => (
-                  <div
-                    key={label}
-                    className="bg-white rounded-2xl p-4 border border-gray-100 text-center"
-                  >
-                    <p className="font-black text-xl text-gray-950 tracking-tight">
-                      {value}
-                    </p>
-                    <p className="text-[11px] text-gray-400 font-medium mt-0.5">
-                      {label}
-                    </p>
+                        <p className="font-black text-xl text-gray-950 tracking-tight">
+                          {value}
+                        </p>
+                        <p className="text-[11px] text-gray-400 font-medium mt-0.5">
+                          {label}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {/* Recent Trips */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-50">
-                  <h3 className="font-bold text-sm text-gray-900">
-                    Recent Trips
-                  </h3>
-                </div>
-                {recentTrips.length === 0 ? (
-                  <p className="px-5 py-6 text-sm text-gray-400 text-center">
-                    No completed trips yet.
-                  </p>
-                ) : (
-                  recentTrips.map((t, i) => (
-                    <div
-                      key={t.id ?? i}
-                      className="px-5 py-3.5 flex items-center justify-between border-b border-gray-50 last:border-0"
-                    >
-                      <div className="flex-1 min-w-0 pr-3">
-                        <p className="font-semibold text-sm text-gray-900 truncate">
-                          {t.pickup_label} → {t.dropoff_label}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          {t.completed_at
-                            ? new Date(t.completed_at).toLocaleString([], {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-black text-sm text-gray-950">
-                          ₱{t.fare}
-                        </p>
-                        {t.rating != null && (
-                          <div className="flex justify-end mt-0.5 gap-0.5">
-                            {Array.from({ length: t.rating }).map((_, j) => (
-                              <Star
-                                key={j}
-                                size={9}
-                                className="text-amber-400 fill-amber-400"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                  {/* Recent Trips */}
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-50">
+                      <h3 className="font-bold text-sm text-gray-900">
+                        Recent Trips
+                      </h3>
                     </div>
-                  ))
-                )}
-              </div>
-            </>
-            );
-          })()}
+                    {recentTrips.length === 0 ? (
+                      <p className="px-5 py-6 text-sm text-gray-400 text-center">
+                        No completed trips yet.
+                      </p>
+                    ) : (
+                      recentTrips.map((t, i) => (
+                        <div
+                          key={t.id ?? i}
+                          className="px-5 py-3.5 flex items-center justify-between border-b border-gray-50 last:border-0"
+                        >
+                          <div className="flex-1 min-w-0 pr-3">
+                            <p className="font-semibold text-sm text-gray-900 truncate">
+                              {t.pickup_label} → {t.dropoff_label}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">
+                              {t.completed_at
+                                ? new Date(t.completed_at).toLocaleString([], {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : ""}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-black text-sm text-gray-950">
+                              ₱{t.fare}
+                            </p>
+                            {t.rating != null && (
+                              <div className="flex justify-end mt-0.5 gap-0.5">
+                                {Array.from({ length: t.rating }).map(
+                                  (_, j) => (
+                                    <Star
+                                      key={j}
+                                      size={9}
+                                      className="text-amber-400 fill-amber-400"
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              );
+            })()}
 
           {/* ── Remittance Tab ── */}
           {riderTab === "remit" && (
@@ -7919,7 +8071,15 @@ const RiderDashboard = ({
 
         {/* ── News Tab ── */}
         {riderTab === "news" && (
-          <NewsFeedViewer onClose={() => setRiderTab("home")} embedded viewerRole="rider" riderApproved={currentProfile.rider_status === "approved"} readIds={riderNewsReadIds} onMarkRead={markRiderNewsRead} onMarkAllRead={markAllRiderNewsRead} />
+          <NewsFeedViewer
+            onClose={() => setRiderTab("home")}
+            embedded
+            viewerRole="rider"
+            riderApproved={currentProfile.rider_status === "approved"}
+            readIds={riderNewsReadIds}
+            onMarkRead={markRiderNewsRead}
+            onMarkAllRead={markAllRiderNewsRead}
+          />
         )}
 
         {/* Universal Image Viewer Modal */}
@@ -8979,7 +9139,10 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                 <select
                   value={form.visible_to}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, visible_to: e.target.value as NewsAudience }))
+                    setForm((f) => ({
+                      ...f,
+                      visible_to: e.target.value as NewsAudience,
+                    }))
                   }
                   className="text-sm bg-transparent focus:outline-none text-gray-700 font-medium pr-1 py-2"
                 >
@@ -9091,8 +9254,12 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                         </span>
                       )}
                       {post.visible_to !== "all" && (
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${post.visible_to === "rider" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
-                          {post.visible_to === "rider" ? "Drivers only" : "Passengers only"}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${post.visible_to === "rider" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}
+                        >
+                          {post.visible_to === "rider"
+                            ? "Drivers only"
+                            : "Passengers only"}
                         </span>
                       )}
                       <span className="text-[11px] text-gray-400">
@@ -9168,14 +9335,25 @@ function parseInline(text: string): React.ReactNode[] {
   while ((match = INLINE_RE.exec(text)) !== null) {
     if (match.index > last) parts.push(text.slice(last, match.index));
     if (match[0].startsWith("**")) {
-      parts.push(<strong key={match.index} className="font-bold">{match[2]}</strong>);
+      parts.push(
+        <strong key={match.index} className="font-bold">
+          {match[2]}
+        </strong>,
+      );
     } else if (match[0].startsWith("*")) {
       parts.push(<em key={match.index}>{match[3]}</em>);
     } else {
       const url = match[0].replace(/[.,!?)]+$/, "");
       const trail = match[0].slice(url.length);
       parts.push(
-        <a key={match.index} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 break-all" onClick={(e) => e.stopPropagation()}>
+        <a
+          key={match.index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline underline-offset-2 break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
           {url}
         </a>,
       );
@@ -9221,11 +9399,14 @@ const NewsFeedViewer = ({
 
   useEffect(() => {
     fetchNewsPosts(false).then((data) => {
-      setPosts(data.filter((p) => {
-        if (p.visible_to === "rider") return viewerRole === "rider" && riderApproved;
-        if (p.visible_to === "user") return viewerRole === "user";
-        return true; // 'all'
-      }));
+      setPosts(
+        data.filter((p) => {
+          if (p.visible_to === "rider")
+            return viewerRole === "rider" && riderApproved;
+          if (p.visible_to === "user") return viewerRole === "user";
+          return true; // 'all'
+        }),
+      );
       setLoading(false);
     });
   }, [viewerRole, riderApproved]);
@@ -9243,7 +9424,9 @@ const NewsFeedViewer = ({
       </p>
     </div>
   ) : (
-    <div className={`space-y-4 ${embedded ? "pb-[calc(5rem+env(safe-area-inset-bottom))]" : "p-4 pb-[max(2rem,env(safe-area-inset-bottom))]"}`}>
+    <div
+      className={`space-y-4 ${embedded ? "pb-[calc(5rem+env(safe-area-inset-bottom))]" : "p-4 pb-[max(2rem,env(safe-area-inset-bottom))]"}`}
+    >
       {readIds && posts.some((p) => !readIds.has(p.id)) && (
         <button
           onClick={() => onMarkAllRead?.(posts.map((p) => p.id))}
@@ -9305,14 +9488,16 @@ const NewsFeedViewer = ({
                   {isOpen ? "Show less" : "Read more"}
                 </button>
               )}
-              {isUnread && !post.content.includes("\n") && post.content.length <= 200 && (
-                <button
-                  onClick={() => onMarkRead?.(post.id)}
-                  className="mt-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
-                >
-                  Mark as read
-                </button>
-              )}
+              {isUnread &&
+                !post.content.includes("\n") &&
+                post.content.length <= 200 && (
+                  <button
+                    onClick={() => onMarkRead?.(post.id)}
+                    className="mt-2 text-[11px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
+                  >
+                    Mark as read
+                  </button>
+                )}
             </div>
           </div>
         );
@@ -9340,7 +9525,9 @@ const NewsFeedViewer = ({
         </div>
         <Newspaper size={20} className="text-gray-300" />
       </div>
-      <div className="flex-1 overflow-y-auto p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">{postList}</div>
+      <div className="flex-1 overflow-y-auto p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {postList}
+      </div>
     </div>
   );
 };
@@ -9366,8 +9553,12 @@ const MaintenanceTab = ({
     settings?.scheduled_end ? settings.scheduled_end.slice(0, 16) : "",
   );
   const [postNews, setPostNews] = React.useState(settings?.post_news ?? false);
-  const [regUserDisabled, setRegUserDisabled] = React.useState(settings?.reg_user_disabled ?? false);
-  const [regRiderDisabled, setRegRiderDisabled] = React.useState(settings?.reg_rider_disabled ?? false);
+  const [regUserDisabled, setRegUserDisabled] = React.useState(
+    settings?.reg_user_disabled ?? false,
+  );
+  const [regRiderDisabled, setRegRiderDisabled] = React.useState(
+    settings?.reg_rider_disabled ?? false,
+  );
   const [saving, setSaving] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
 
@@ -9622,7 +9813,9 @@ const MaintenanceTab = ({
 
       {/* Registration controls */}
       <div className="space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Registration</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+          Registration
+        </p>
         <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
           <input
             type="checkbox"
@@ -9631,8 +9824,12 @@ const MaintenanceTab = ({
             className="w-4 h-4 rounded accent-red-500"
           />
           <div>
-            <p className="text-sm font-semibold text-gray-700">Disable passenger registration</p>
-            <p className="text-xs text-gray-400">New users cannot select the Passenger role</p>
+            <p className="text-sm font-semibold text-gray-700">
+              Disable passenger registration
+            </p>
+            <p className="text-xs text-gray-400">
+              New users cannot select the Passenger role
+            </p>
           </div>
         </label>
         <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
@@ -9643,8 +9840,12 @@ const MaintenanceTab = ({
             className="w-4 h-4 rounded accent-red-500"
           />
           <div>
-            <p className="text-sm font-semibold text-gray-700">Disable driver registration</p>
-            <p className="text-xs text-gray-400">New users cannot select the Driver role</p>
+            <p className="text-sm font-semibold text-gray-700">
+              Disable driver registration
+            </p>
+            <p className="text-xs text-gray-400">
+              New users cannot select the Driver role
+            </p>
           </div>
         </label>
       </div>
@@ -12364,11 +12565,19 @@ const AdminDashboard = ({
               {(() => {
                 const ITEMS_PER_PAGE = 7;
                 const filtered = riders.filter((r) => {
-                  if (verifyStatusFilter !== "all" && r.rider_status !== verifyStatusFilter) return false;
+                  if (
+                    verifyStatusFilter !== "all" &&
+                    r.rider_status !== verifyStatusFilter
+                  )
+                    return false;
                   if (!verifySearch) return true;
                   return (
-                    (r.full_name || "").toLowerCase().includes(verifySearch.toLowerCase()) ||
-                    (r.email || "").toLowerCase().includes(verifySearch.toLowerCase())
+                    (r.full_name || "")
+                      .toLowerCase()
+                      .includes(verifySearch.toLowerCase()) ||
+                    (r.email || "")
+                      .toLowerCase()
+                      .includes(verifySearch.toLowerCase())
                   );
                 });
                 const totalPages = Math.max(
@@ -13108,7 +13317,9 @@ const AdminDashboard = ({
                       </h3>
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-semibold text-gray-400 whitespace-nowrap">Show</span>
+                          <span className="text-[11px] font-semibold text-gray-400 whitespace-nowrap">
+                            Show
+                          </span>
                           <select
                             value={userPageSize}
                             onChange={(e) => {
@@ -13118,7 +13329,9 @@ const AdminDashboard = ({
                             className="text-[12px] font-semibold border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
                           >
                             {[5, 10, 20, 50, 100].map((n) => (
-                              <option key={n} value={n}>{n}</option>
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -13690,7 +13903,8 @@ const AdminDashboard = ({
                   {/* Header */}
                   <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
                     <h3 className="font-black text-gray-950 text-base">
-                      {userDetailModal.role === "rider" || userDetailModal.role === "team_leader"
+                      {userDetailModal.role === "rider" ||
+                      userDetailModal.role === "team_leader"
                         ? "Rider Details"
                         : "User Details"}
                     </h3>
@@ -13710,7 +13924,9 @@ const AdminDashboard = ({
                           src={userDetailModal.avatar_url}
                           alt=""
                           className="w-14 h-14 rounded-full object-cover cursor-pointer ring-2 ring-transparent hover:ring-blue-400 transition-all"
-                          onClick={() => setLightboxImage(userDetailModal.avatar_url)}
+                          onClick={() =>
+                            setLightboxImage(userDetailModal.avatar_url)
+                          }
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-black text-gray-400">
@@ -13733,13 +13949,20 @@ const AdminDashboard = ({
                           <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-600">
                             {userDetailModal.is_online ? "Online" : "Offline"}
                           </span>
-                          {(userDetailModal.role === "rider" || userDetailModal.role === "team_leader") && (
-                            <span className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                              userDetailModal.rider_status === "approved" ? "bg-emerald-50 text-emerald-700" :
-                              userDetailModal.rider_status === "pending" ? "bg-amber-50 text-amber-700" :
-                              userDetailModal.rider_status === "rejected" ? "bg-red-50 text-red-600" :
-                              "bg-gray-100 text-gray-500"
-                            }`}>
+                          {(userDetailModal.role === "rider" ||
+                            userDetailModal.role === "team_leader") && (
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                                userDetailModal.rider_status === "approved"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : userDetailModal.rider_status === "pending"
+                                    ? "bg-amber-50 text-amber-700"
+                                    : userDetailModal.rider_status ===
+                                        "rejected"
+                                      ? "bg-red-50 text-red-600"
+                                      : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
                               {userDetailModal.rider_status || "unsubmitted"}
                             </span>
                           )}
@@ -13749,79 +13972,190 @@ const AdminDashboard = ({
 
                     {/* Personal Info */}
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Personal Info</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                        Personal Info
+                      </p>
                       {[
-                        { label: "First Name", value: userDetailModal.first_name || "—" },
-                        { label: "Last Name", value: userDetailModal.last_name || "—" },
+                        {
+                          label: "First Name",
+                          value: userDetailModal.first_name || "—",
+                        },
+                        {
+                          label: "Last Name",
+                          value: userDetailModal.last_name || "—",
+                        },
                         { label: "Phone", value: userDetailModal.phone || "—" },
-                        { label: "Birthday", value: userDetailModal.birthday || "—" },
+                        {
+                          label: "Birthday",
+                          value: userDetailModal.birthday || "—",
+                        },
                         { label: "Sex", value: userDetailModal.sex || "—" },
                         { label: "Role", value: userDetailModal.role },
-                        { label: "Profile Complete", value: userDetailModal.profile_completed ? "Yes" : "No" },
-                        { label: "Joined", value: new Date(userDetailModal.created_at).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) },
-                        { label: "Last Seen", value: userDetailModal.last_seen_at ? new Date(userDetailModal.last_seen_at).toLocaleString("en-PH") : "—" },
+                        {
+                          label: "Profile Complete",
+                          value: userDetailModal.profile_completed
+                            ? "Yes"
+                            : "No",
+                        },
+                        {
+                          label: "Joined",
+                          value: new Date(
+                            userDetailModal.created_at,
+                          ).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          }),
+                        },
+                        {
+                          label: "Last Seen",
+                          value: userDetailModal.last_seen_at
+                            ? new Date(
+                                userDetailModal.last_seen_at,
+                              ).toLocaleString("en-PH")
+                            : "—",
+                        },
                       ].map(({ label, value }) => (
-                        <div key={label} className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0">
-                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
-                          <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                        <div
+                          key={label}
+                          className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0"
+                        >
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            {label}
+                          </span>
+                          <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
+                            {value}
+                          </span>
                         </div>
                       ))}
                     </div>
 
                     {/* Rider Vehicle Info */}
-                    {(userDetailModal.role === "rider" || userDetailModal.role === "team_leader") && (
+                    {(userDetailModal.role === "rider" ||
+                      userDetailModal.role === "team_leader") && (
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Vehicle Info</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                          Vehicle Info
+                        </p>
                         {[
-                          { label: "Type", value: userDetailModal.vehicle_type || "—" },
-                          { label: "Make", value: userDetailModal.vehicle_make || "—" },
-                          { label: "Model", value: userDetailModal.vehicle_model || "—" },
-                          { label: "Plate", value: userDetailModal.vehicle_plate || "—" },
-                          { label: "Color", value: userDetailModal.vehicle_color || "—" },
+                          {
+                            label: "Type",
+                            value: userDetailModal.vehicle_type || "—",
+                          },
+                          {
+                            label: "Make",
+                            value: userDetailModal.vehicle_make || "—",
+                          },
+                          {
+                            label: "Model",
+                            value: userDetailModal.vehicle_model || "—",
+                          },
+                          {
+                            label: "Plate",
+                            value: userDetailModal.vehicle_plate || "—",
+                          },
+                          {
+                            label: "Color",
+                            value: userDetailModal.vehicle_color || "—",
+                          },
                         ].map(({ label, value }) => (
-                          <div key={label} className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0">
-                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
-                            <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                          <div
+                            key={label}
+                            className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0"
+                          >
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                              {label}
+                            </span>
+                            <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
+                              {value}
+                            </span>
                           </div>
                         ))}
                         {userDetailModal.vehicle_image_url && (
                           <div className="mt-2">
-                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Vehicle Photo</p>
-                            <img src={userDetailModal.vehicle_image_url} alt="Vehicle" className="w-full rounded-xl object-cover max-h-40" />
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                              Vehicle Photo
+                            </p>
+                            <img
+                              src={userDetailModal.vehicle_image_url}
+                              alt="Vehicle"
+                              className="w-full rounded-xl object-cover max-h-40"
+                            />
                           </div>
                         )}
                       </div>
                     )}
 
                     {/* Rider Documents */}
-                    {(userDetailModal.role === "rider" || userDetailModal.role === "team_leader") && (
+                    {(userDetailModal.role === "rider" ||
+                      userDetailModal.role === "team_leader") && (
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Documents</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                          Documents
+                        </p>
                         <div className="space-y-2">
                           {[
-                            { label: "Driver's License", url: userDetailModal.drivers_license_url },
-                            { label: "OR (Official Receipt)", url: userDetailModal.or_url },
-                            { label: "CR (Certificate of Registration)", url: userDetailModal.cr_url },
+                            {
+                              label: "Driver's License",
+                              url: userDetailModal.drivers_license_url,
+                            },
+                            {
+                              label: "OR (Official Receipt)",
+                              url: userDetailModal.or_url,
+                            },
+                            {
+                              label: "CR (Certificate of Registration)",
+                              url: userDetailModal.cr_url,
+                            },
                           ].map(({ label, url }) => (
-                            <div key={label} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
-                              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                            <div
+                              key={label}
+                              className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0"
+                            >
+                              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                {label}
+                              </span>
                               {url ? (
-                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-[12px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[12px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                >
                                   <Eye size={12} /> View
                                 </a>
                               ) : (
-                                <span className="text-[13px] font-semibold text-gray-400">—</span>
+                                <span className="text-[13px] font-semibold text-gray-400">
+                                  —
+                                </span>
                               )}
                             </div>
                           ))}
                         </div>
                         {[
-                          { label: "Reviewed By", value: userDetailModal.reviewed_by_name || "—" },
-                          { label: "Reviewed At", value: userDetailModal.reviewed_at ? new Date(userDetailModal.reviewed_at).toLocaleString("en-PH") : "—" },
+                          {
+                            label: "Reviewed By",
+                            value: userDetailModal.reviewed_by_name || "—",
+                          },
+                          {
+                            label: "Reviewed At",
+                            value: userDetailModal.reviewed_at
+                              ? new Date(
+                                  userDetailModal.reviewed_at,
+                                ).toLocaleString("en-PH")
+                              : "—",
+                          },
                         ].map(({ label, value }) => (
-                          <div key={label} className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0">
-                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
-                            <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">{value}</span>
+                          <div
+                            key={label}
+                            className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0"
+                          >
+                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                              {label}
+                            </span>
+                            <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
+                              {value}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -15543,7 +15877,10 @@ const RealtimeChat = ({
         if (msgs.length) setMessages(msgs);
       });
     }, 3000);
-    return () => { unsub(); clearInterval(poll); };
+    return () => {
+      unsub();
+      clearInterval(poll);
+    };
   }, [rideId, senderId]);
 
   useEffect(() => {
@@ -16909,7 +17246,10 @@ const MatchedPanel = ({
         lastOtherCount = otherCount;
       });
     }, 3000);
-    return () => { unsub(); clearInterval(poll); };
+    return () => {
+      unsub();
+      clearInterval(poll);
+    };
   }, [rideId, userId]);
 
   useEffect(() => {
@@ -17112,8 +17452,16 @@ const MatchedPanel = ({
                       )}
                     </div>
                     <a
-                      href={activeRider?.phone ? `tel:${activeRider.phone}` : undefined}
-                      onClick={!activeRider?.phone ? (e) => e.preventDefault() : undefined}
+                      href={
+                        activeRider?.phone
+                          ? `tel:${activeRider.phone}`
+                          : undefined
+                      }
+                      onClick={
+                        !activeRider?.phone
+                          ? (e) => e.preventDefault()
+                          : undefined
+                      }
                       className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
                     >
                       <Phone size={16} />
@@ -17259,9 +17607,9 @@ const MatchedPanel = ({
                     </div>
                   ) : (
                     <div className="flex gap-3">
-                      <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">
+                      {/* <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">
                         Share ETA
-                      </button>
+                      </button> */}
                       <button
                         onClick={() => setShowCancelConfirm(true)}
                         className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors"
