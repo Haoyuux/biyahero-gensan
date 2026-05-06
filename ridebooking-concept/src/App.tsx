@@ -669,28 +669,6 @@ export default function App() {
     // Browser tab title
     document.title = globalSettings?.document_title || appName;
 
-    // Browser tab favicon
-    if (logoUrl) {
-      let favicon = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-      if (!favicon) {
-        favicon = document.createElement("link");
-        favicon.rel = "icon";
-        head.appendChild(favicon);
-      }
-      favicon.href = logoUrl;
-    }
-
-    // iOS home screen icon (apple-touch-icon)
-    if (logoUrl) {
-      let touchIcon = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
-      if (!touchIcon) {
-        touchIcon = document.createElement("link");
-        touchIcon.rel = "apple-touch-icon";
-        head.appendChild(touchIcon);
-      }
-      touchIcon.href = logoUrl;
-    }
-
     // iOS home screen app name
     let appTitleMeta = document.querySelector("meta[name='apple-mobile-web-app-title']") as HTMLMetaElement;
     if (!appTitleMeta) {
@@ -700,28 +678,58 @@ export default function App() {
     }
     appTitleMeta.content = appName;
 
-    // Web app manifest (Android/Chrome PWA — also read by iOS for display: standalone)
-    const manifest = {
-      name: appName,
-      short_name: appName,
-      start_url: "/",
-      display: "standalone",
-      background_color: "#000000",
-      theme_color: "#000000",
-      ...(logoUrl ? {
+    const applyIcons = (src: string) => {
+      // Browser tab favicon
+      let favicon = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!favicon) {
+        favicon = document.createElement("link");
+        favicon.rel = "icon";
+        head.appendChild(favicon);
+      }
+      favicon.href = src;
+
+      // iOS home screen icon
+      let touchIcon = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+      if (!touchIcon) {
+        touchIcon = document.createElement("link");
+        touchIcon.rel = "apple-touch-icon";
+        head.appendChild(touchIcon);
+      }
+      touchIcon.href = src;
+
+      // Web app manifest (Android/Chrome PWA)
+      const manifest = {
+        name: appName,
+        short_name: appName,
+        start_url: "/",
+        display: "standalone",
+        background_color: "#000000",
+        theme_color: "#000000",
         icons: [
-          { src: logoUrl, sizes: "192x192", type: "image/png", purpose: "any maskable" },
-          { src: logoUrl, sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src, sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
-      } : {}),
+      };
+      let manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
+      if (!manifestLink) {
+        manifestLink = document.createElement("link");
+        manifestLink.rel = "manifest";
+        head.appendChild(manifestLink);
+      }
+      manifestLink.href = `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}`;
     };
-    let manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
-    if (!manifestLink) {
-      manifestLink = document.createElement("link");
-      manifestLink.rel = "manifest";
-      head.appendChild(manifestLink);
-    }
-    manifestLink.href = `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}`;
+
+    if (!logoUrl) return;
+
+    // Fetch logo as data URL so apple-touch-icon works cross-origin on iOS
+    fetch(logoUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onload = () => applyIcons(reader.result as string);
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => applyIcons(logoUrl)); // fall back to direct URL if fetch fails
   }, [globalSettings]);
 
   useEffect(() => {
