@@ -2937,7 +2937,7 @@ const UserApp = ({
         await supabase.from("rides").upsert(
           {
             id: currentRideId,
-            user_id: (await supabase.auth.getUser()).data.user?.id,
+            user_id: currentProfile.id,
             rider_id: rider?.id ?? null,
             rider_name: rider
               ? `${rider.first_name || ""} ${rider.last_name || ""}`.trim() ||
@@ -3762,14 +3762,11 @@ const UserApp = ({
                     // Store payload so the re-broadcast interval can keep sending it
                     pendingRequestRef.current = requestPayload;
                     // Persist pending ride so riders coming online later can see it via DB
-                    const {
-                      data: { user },
-                    } = await supabase.auth.getUser();
                     const { error: insertError } = await supabase
                       .from("rides")
                       .insert({
                         id: rideId,
-                        user_id: user?.id,
+                        user_id: currentProfile.id,
                         user_name:
                           `${currentProfile.first_name || ""} ${currentProfile.last_name || ""}`.trim() ||
                           currentProfile.full_name ||
@@ -7312,8 +7309,7 @@ const RiderDashboard = ({
                                 .from("rides")
                                 .update({
                                   status: "accepted",
-                                  rider_id: (await supabase.auth.getUser()).data
-                                    .user?.id,
+                                  rider_id: currentProfile.id,
                                   rider_name: (
                                     `${currentProfile?.first_name || ""} ${currentProfile?.last_name || ""}`.trim() ||
                                     currentProfile?.full_name ||
@@ -7344,8 +7340,7 @@ const RiderDashboard = ({
                                 if (
                                   verified?.status === "accepted" &&
                                   verified?.rider_id ===
-                                    (await supabase.auth.getUser()).data.user
-                                      ?.id
+                                    currentProfile.id
                                 ) {
                                   isSuccess = true;
                                 }
@@ -19398,27 +19393,37 @@ const RideHistoryScreen = ({
   useEffect(() => {
     const fetchRides = async () => {
       setLoading(true);
-      let query = supabase
-        .from("rides")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("status", "completed")
-        .order("completed_at", { ascending: false });
+      try {
+        // Use supabaseAdmin to bypass RLS in case there's a policy issue for the user reading their own history
+        let query = supabaseAdmin
+          .from("rides")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false });
 
-      // If user specifically picked a date, filter by it. 
-      // Otherwise show everything (or last 50).
-      if (selectedDate) {
-        const dayStart = `${selectedDate}T00:00:00.000Z`;
-        const dayEnd = `${selectedDate}T23:59:59.999Z`;
-        query = query.gte("completed_at", dayStart).lte("completed_at", dayEnd);
-      } else {
-        query = query.limit(50);
+        if (selectedDate) {
+          const dayStart = `${selectedDate}T00:00:00.000Z`;
+          const dayEnd = `${selectedDate}T23:59:59.999Z`;
+          query = query.gte("completed_at", dayStart).lte("completed_at", dayEnd);
+        } else {
+          query = query.limit(50);
+        }
+
+        const { data: rideData, error } = await query;
+
+        if (error) {
+          console.error("History fetch error:", error);
+          setRides([]);
+        } else {
+          setRides(rideData ?? []);
+        }
+      } catch (err) {
+        console.error("History fetch catch:", err);
+        setRides([]);
+      } finally {
+        setLoading(false);
       }
-
-      const { data: rideData } = await query;
-
-      setRides(rideData ?? []);
-      setLoading(false);
     };
     fetchRides();
   }, [userId, selectedDate]);
