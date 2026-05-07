@@ -10161,9 +10161,6 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
   const [viewingVoucher, setViewingVoucher] = useState<Voucher | null>(null);
   const [voucherRideRows, setVoucherRideRows] = useState<any[]>([]);
   const [voucherRideLoading, setVoucherRideLoading] = useState(false);
-  const [voucherPaymentLoading, setVoucherPaymentLoading] = useState<
-    string | null
-  >(null);
   const [form, setForm] = useState({
     code: "",
     title: "",
@@ -10214,53 +10211,29 @@ const load = React.useCallback(async () => {
   useEffect(() => {
     if (!viewingVoucher) return;
     setVoucherRideLoading(true);
+    // Show who has CLAIMED the voucher (from user_vouchers), not just who used it
     supabase
-      .from("rides")
+      .from("user_vouchers")
       .select(
-        "id, user_name, rider_name, fare, original_fare, final_fare, voucher_code, voucher_discount, voucher_discount_paid, voucher_discount_paid_at, voucher_discount_paid_by, completed_at, status",
+        "id, user_id, code, status, added_at, used_at, ride_id, profiles(full_name, email)",
       )
       .eq("voucher_id", viewingVoucher.id)
-      .eq("status", "completed")
-      .order("completed_at", { ascending: false })
+      .order("added_at", { ascending: false })
       .then(({ data }) => {
-        setVoucherRideRows(data ?? []);
+        // Transform to match expected format
+        const rows = (data as any[] || []).map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          user_name: row.profiles?.full_name || row.profiles?.email || "Unknown",
+          status: row.status,
+          added_at: row.added_at,
+          used_at: row.used_at,
+          ride_id: row.ride_id,
+        }));
+        setVoucherRideRows(rows);
         setVoucherRideLoading(false);
       });
   }, [viewingVoucher]);
-
-  const markVoucherPaymentComplete = async (rideId: string) => {
-    setVoucherPaymentLoading(rideId);
-    const paidAt = new Date().toISOString();
-    const { error } = await supabaseAdmin
-      .from("rides")
-      .update({
-        voucher_discount_paid: true,
-        voucher_discount_paid_at: paidAt,
-        voucher_discount_paid_by:
-          `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
-          profile.full_name ||
-          "Admin",
-      })
-      .eq("id", rideId);
-    if (!error) {
-      setVoucherRideRows((rows) =>
-        rows.map((row) =>
-          row.id === rideId
-            ? {
-                ...row,
-                voucher_discount_paid: true,
-                voucher_discount_paid_at: paidAt,
-                voucher_discount_paid_by:
-                  `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
-                  profile.full_name ||
-                  "Admin",
-              }
-            : row,
-        ),
-      );
-    }
-    setVoucherPaymentLoading(null);
-  };
 
   const resetForm = () => {
     setEditing(null);
@@ -10639,12 +10612,10 @@ const load = React.useCallback(async () => {
                   <thead>
                     <tr className="border-b border-gray-100">
                       {[
-                        "Passenger",
-                        "Rider",
-                        "Fare",
-                        "Discount",
-                        "Payment",
-                        "Action",
+                        "User",
+                        "Status",
+                        "Claimed At",
+                        "Used At",
                       ].map((h) => (
                         <th
                           key={h}
@@ -10659,87 +10630,63 @@ const load = React.useCallback(async () => {
                     {voucherRideLoading ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={4}
                           className="px-5 py-8 text-center text-sm text-gray-400"
                         >
-                          Loading rides...
+                          Loading...
                         </td>
                       </tr>
                     ) : voucherRideRows.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={4}
                           className="px-5 py-8 text-center text-sm text-gray-400"
                         >
-                          No completed rides used this voucher yet.
+                          No one has claimed this voucher yet.
                         </td>
                       </tr>
                     ) : (
-                      voucherRideRows.map((ride) => (
+                      voucherRideRows.map((row) => (
                         <tr
-                          key={ride.id}
+                          key={row.id}
                           className="border-b border-gray-50 last:border-0"
                         >
                           <td className="px-5 py-4">
                             <p className="font-normal text-sm text-gray-900">
-                              {ride.user_name || "Passenger"}
+                              {row.user_name || "Unknown User"}
                             </p>
                             <p className="text-[11px] text-gray-400">
-                              {ride.completed_at
-                                ? new Date(ride.completed_at).toLocaleString(
-                                    "en-PH",
-                                  )
-                                : ""}
+                              {row.user_id}
                             </p>
-                          </td>
-                          <td className="px-5 py-4 text-sm font-normal text-gray-800">
-                            {ride.rider_name || "Rider"}
-                          </td>
-                          <td className="px-5 py-4 text-[12px] text-gray-500">
-                            <p>Original: ₱{ride.original_fare ?? ride.fare}</p>
-                            <p className="font-normal text-gray-900">
-                              Paid by passenger: ₱{ride.final_fare ?? ride.fare}
-                            </p>
-                          </td>
-                          <td className="px-5 py-4 text-sm font-bold text-emerald-600">
-                            ₱{ride.voucher_discount || 0}
                           </td>
                           <td className="px-5 py-4">
                             <span
                               className={`px-2.5 py-1 rounded-lg text-[11px] font-normal ${
-                                ride.voucher_discount_paid
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-amber-50 text-amber-700"
+                                row.status === "available"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : row.status === "used"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-gray-100 text-gray-500"
                               }`}
                             >
-                              {ride.voucher_discount_paid ? "Paid" : "Pending"}
+                              {row.status === "available"
+                                ? "Claimed"
+                                : row.status === "used"
+                                  ? "Used"
+                                  : "Expired"}
                             </span>
-                            {ride.voucher_discount_paid_at && (
-                              <p className="text-[11px] text-gray-400 mt-1">
-                                {new Date(
-                                  ride.voucher_discount_paid_at,
-                                ).toLocaleString("en-PH")}
-                              </p>
-                            )}
                           </td>
-                          <td className="px-5 py-4">
-                            <button
-                              onClick={() =>
-                                markVoucherPaymentComplete(ride.id)
-                              }
-                              disabled={
-                                ride.voucher_discount_paid ||
-                                voucherPaymentLoading === ride.id ||
-                                !ride.voucher_discount
-                              }
-                              className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-normal disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              {voucherPaymentLoading === ride.id
-                                ? "Saving..."
-                                : ride.voucher_discount_paid
-                                  ? "Completed"
-                                  : "Mark as Complete"}
-                            </button>
+                          <td className="px-5 py-4 text-sm text-gray-500">
+                            {row.added_at
+                              ? new Date(row.added_at).toLocaleString("en-PH")
+                              : "-"}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-gray-500">
+                            {row.used_at
+                              ? new Date(row.used_at).toLocaleString("en-PH")
+                              : row.status === "used"
+                                ? "-"
+                                : "Not used yet"}
                           </td>
                         </tr>
                       ))
