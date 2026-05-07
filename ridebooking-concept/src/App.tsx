@@ -56,6 +56,7 @@ import {
   Archive,
   ArchiveRestore,
   Wrench,
+  ArrowLeft,
 } from "lucide-react";
 import {
   MapContainer,
@@ -16917,6 +16918,14 @@ const SelectPanel = ({
             <div className="flex flex-col max-h-[72vh] md:max-h-none pt-5 px-5 md:px-6 md:pt-6">
               {/* Scrollable content */}
               <div className="flex-1 min-h-0 overflow-y-auto">
+                {/* Back button */}
+                <button
+                  onClick={() => setStep("home")}
+                  className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors mb-4 -mt-1"
+                >
+                  <ArrowLeft size={20} />
+                  <span className="text-sm font-medium">Back</span>
+                </button>
                 <h3 className="text-[1.5rem] font-black tracking-tight mb-5">
                   Choose a ride
                 </h3>
