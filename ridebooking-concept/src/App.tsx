@@ -19377,6 +19377,8 @@ interface RideRecord {
   status: string;
   completed_at: string;
   rating?: number | null;
+  voucher_code?: string | null;
+  voucher_discount?: number | null;
 }
 
 const RideHistoryScreen = ({
@@ -19667,16 +19669,27 @@ const RideHistoryScreen = ({
                                 ],
                                 ["Time Fee", ride.fare_breakdown.timeFee],
                                 ["Booking Fee", ride.fare_breakdown.bookingFee],
-                              ].map(([label, amount]) => (
+                                ...(ride.voucher_discount
+                                  ? [
+                                      [
+                                        `Voucher Discount (${ride.voucher_code})`,
+                                        -ride.voucher_discount,
+                                        true,
+                                      ],
+                                    ]
+                                  : []),
+                              ].map(([label, amount, isDiscount]: any) => (
                                 <div
-                                  key={label as string}
+                                  key={label}
                                   className="flex justify-between text-sm"
                                 >
                                   <span className="text-gray-500 font-medium">
                                     {label}
                                   </span>
-                                  <span className="text-gray-700 font-semibold">
-                                    ₱{amount}
+                                  <span
+                                    className={`font-semibold ${isDiscount ? "text-emerald-600" : "text-gray-700"}`}
+                                  >
+                                    {amount < 0 ? "-" : ""}₱{Math.abs(amount)}
                                   </span>
                                 </div>
                               ))}
@@ -19685,7 +19698,7 @@ const RideHistoryScreen = ({
                                   Total
                                 </span>
                                 <span className="font-bold text-emerald-600">
-                                  ₱{ride.fare_breakdown.totalFare}
+                                  ₱{ride.fare}
                                 </span>
                               </div>
                             </div>
