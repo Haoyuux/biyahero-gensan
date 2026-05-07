@@ -10161,6 +10161,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
   const [viewingVoucher, setViewingVoucher] = useState<Voucher | null>(null);
   const [voucherRideRows, setVoucherRideRows] = useState<any[]>([]);
   const [voucherRideLoading, setVoucherRideLoading] = useState(false);
+  const [voucherPaymentLoading, setVoucherPaymentLoading] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: "",
     title: "",
@@ -10211,7 +10212,7 @@ const load = React.useCallback(async () => {
   useEffect(() => {
     if (!viewingVoucher) return;
     setVoucherRideLoading(true);
-    // Show who has CLAIMED the voucher (from user_vouchers), not just who used it
+    // Fetch claimed vouchers with user info
     supabase
       .from("user_vouchers")
       .select(
@@ -10219,21 +10220,95 @@ const load = React.useCallback(async () => {
       )
       .eq("voucher_id", viewingVoucher.id)
       .order("added_at", { ascending: false })
-      .then(({ data }) => {
-        // Transform to match expected format
-        const rows = (data as any[] || []).map((row) => ({
-          id: row.id,
-          user_id: row.user_id,
-          user_name: row.profiles?.full_name || row.profiles?.email || "Unknown",
-          status: row.status,
-          added_at: row.added_at,
-          used_at: row.used_at,
-          ride_id: row.ride_id,
-        }));
-        setVoucherRideRows(rows);
-        setVoucherRideLoading(false);
+      .then(({ data: userVouchers }) => {
+        const vouchers = (userVouchers as any[] || []) || [];
+        
+        // For used vouchers, also fetch ride details to get rider name
+        const usedVouchers = vouchers.filter(v => v.status === "used" && v.ride_id);
+        
+        if (usedVouchers.length === 0) {
+          // No used vouchers, just map the data
+          const rows = vouchers.map((row) => ({
+            id: row.id,
+            user_id: row.user_id,
+            user_name: row.profiles?.full_name || row.profiles?.email || "Unknown",
+            status: row.status,
+            added_at: row.added_at,
+            used_at: row.used_at,
+            ride_id: row.ride_id,
+            rider_name: null,
+            fare: null,
+            original_fare: null,
+            final_fare: null,
+            voucher_discount: null,
+            voucher_discount_paid: false,
+          }));
+          setVoucherRideRows(rows);
+          setVoucherRideLoading(false);
+        } else {
+          // Fetch rides for used vouchers
+          supabase
+            .from("rides")
+            .select("id, rider_name, fare, original_fare, final_fare, voucher_discount, voucher_discount_paid")
+            .in("id", usedVouchers.map(v => v.ride_id))
+            .then(({ data: rides }) => {
+              const ridesMap = new Map((rides || []).map(r => [r.id, r]));
+              
+              const rows = vouchers.map((row) => {
+                const ride = row.ride_id ? ridesMap.get(row.ride_id) : null;
+                return {
+                  id: row.id,
+                  user_id: row.user_id,
+                  user_name: row.profiles?.full_name || row.profiles?.email || "Unknown",
+                  status: row.status,
+                  added_at: row.added_at,
+                  used_at: row.used_at,
+                  ride_id: row.ride_id,
+                  rider_name: ride?.rider_name || null,
+                  fare: ride?.fare ?? null,
+                  original_fare: ride?.original_fare ?? null,
+                  final_fare: ride?.final_fare ?? null,
+                  voucher_discount: ride?.voucher_discount ?? null,
+                  voucher_discount_paid: ride?.voucher_discount_paid ?? false,
+                };
+              });
+              setVoucherRideRows(rows);
+              setVoucherRideLoading(false);
+            });
+        }
       });
   }, [viewingVoucher]);
+
+  const markVoucherPaymentComplete = async (rowId: string, rideId: string) => {
+    if (!rideId) return;
+    setVoucherPaymentLoading(rowId);
+    const paidAt = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("rides")
+      .update({
+        voucher_discount_paid: true,
+        voucher_discount_paid_at: paidAt,
+        voucher_discount_paid_by:
+          `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
+          profile.full_name ||
+          "Admin",
+      })
+      .eq("id", rideId);
+    if (!error) {
+      setVoucherRideRows((rows) =>
+        rows.map((row) =>
+          row.id === rowId
+            ? {
+                ...row,
+                voucher_discount_paid: true,
+                voucher_discount_paid_at: paidAt,
+              }
+            : row,
+        ),
+      );
+    }
+    setVoucherPaymentLoading(null);
+  };
 
   const resetForm = () => {
     setEditing(null);
@@ -10613,9 +10688,11 @@ const load = React.useCallback(async () => {
                     <tr className="border-b border-gray-100">
                       {[
                         "User",
+                        "Rider",
                         "Status",
                         "Claimed At",
                         "Used At",
+                        "Action",
                       ].map((h) => (
                         <th
                           key={h}
@@ -10630,7 +10707,7 @@ const load = React.useCallback(async () => {
                     {voucherRideLoading ? (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={6}
                           className="px-5 py-8 text-center text-sm text-gray-400"
                         >
                           Loading...
@@ -10639,7 +10716,7 @@ const load = React.useCallback(async () => {
                     ) : voucherRideRows.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={6}
                           className="px-5 py-8 text-center text-sm text-gray-400"
                         >
                           No one has claimed this voucher yet.
@@ -10656,8 +10733,11 @@ const load = React.useCallback(async () => {
                               {row.user_name || "Unknown User"}
                             </p>
                             <p className="text-[11px] text-gray-400">
-                              {row.user_id}
+                              {row.user_id?.slice(0, 8)}...
                             </p>
+                          </td>
+                          <td className="px-5 py-4 text-sm text-gray-500">
+                            {row.rider_name || (row.status === "used" ? "Unknown Rider" : "-")}
                           </td>
                           <td className="px-5 py-4">
                             <span
@@ -10687,6 +10767,23 @@ const load = React.useCallback(async () => {
                               : row.status === "used"
                                 ? "-"
                                 : "Not used yet"}
+                          </td>
+                          <td className="px-5 py-4">
+                            {row.status === "used" && row.ride_id ? (
+                              <button
+                                onClick={() => markVoucherPaymentComplete(row.id, row.ride_id)}
+                                disabled={row.voucher_discount_paid || voucherPaymentLoading === row.id}
+                                className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-normal disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {voucherPaymentLoading === row.id
+                                  ? "Saving..."
+                                  : row.voucher_discount_paid
+                                    ? "Completed"
+                                    : "Mark Complete"}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-gray-400">-</span>
+                            )}
                           </td>
                         </tr>
                       ))
