@@ -145,7 +145,7 @@ export async function updateVoucher(
 }
 
 export async function fetchUserVouchers(userId: string): Promise<UserVoucher[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('user_vouchers')
     .select('*, voucher:vouchers(*)')
     .eq('user_id', userId)
