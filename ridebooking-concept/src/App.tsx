@@ -19400,25 +19400,30 @@ const RideHistoryScreen = ({
         let query = supabaseAdmin
           .from("rides")
           .select("*")
-          .or(`user_id.eq.${userId},user_name.eq.${userName}`)
           .eq("status", "completed")
-          .order("completed_at", { ascending: false });
+          .order("completed_at", { ascending: false })
+          .limit(200);
 
-        if (selectedDate) {
-          const dayStart = `${selectedDate}T00:00:00.000Z`;
-          const dayEnd = `${selectedDate}T23:59:59.999Z`;
-          query = query.gte("completed_at", dayStart).lte("completed_at", dayEnd);
-        } else {
-          query = query.limit(50);
-        }
-
-        const { data: rideData, error } = await query;
+        const { data: allRides, error } = await query;
 
         if (error) {
           console.error("History fetch error:", error);
           setRides([]);
         } else {
-          setRides(rideData ?? []);
+          // Perform filtering in JS for maximum robustness against case-sensitivity or whitespace issues
+          const filtered = (allRides ?? []).filter((r: any) => {
+            const matchesId = r.user_id === userId;
+            const matchesName = userName && r.user_name && 
+              r.user_name.trim().toLowerCase() === userName.trim().toLowerCase();
+            
+            if (selectedDate) {
+              const rDate = r.completed_at ? r.completed_at.slice(0, 10) : "";
+              return (matchesId || matchesName) && rDate === selectedDate;
+            }
+            return matchesId || matchesName;
+          });
+
+          setRides(filtered);
         }
       } catch (err) {
         console.error("History fetch catch:", err);
