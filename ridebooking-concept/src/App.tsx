@@ -17097,20 +17097,20 @@ const MyVouchersScreen = ({
             <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.1em] mb-4">
               Redeem Voucher code
             </p>
-            <div className="flex gap-2.5">
+            <div className="flex flex-col gap-3">
               <input
                 value={code}
                 onChange={(e) => setCode(normalizeVoucherCode(e.target.value))}
                 placeholder="PROMO123"
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm font-black uppercase placeholder:text-gray-300 placeholder:font-normal focus:outline-none focus:ring-4 focus:ring-gray-900/5 focus:bg-white focus:border-gray-900 transition-all"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm font-black uppercase placeholder:text-gray-300 placeholder:font-normal focus:outline-none focus:ring-4 focus:ring-gray-900/5 focus:bg-white focus:border-gray-900 transition-all"
               />
               <button
                 onClick={addVoucher}
                 disabled={adding || !code.trim()}
-                className="px-6 rounded-2xl bg-gray-950 text-white text-[15px] font-bold hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-lg shadow-black/5 shrink-0"
+                className="w-full py-4 rounded-2xl bg-gray-950 text-white text-[15px] font-bold hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-lg shadow-black/5"
               >
                 {adding ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
                 ) : (
                   "Redeem"
                 )}
