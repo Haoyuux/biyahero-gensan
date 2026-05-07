@@ -17075,26 +17075,26 @@ const MyVouchersScreen = ({
 return (
     <div className="w-full h-[100dvh] bg-gray-50 flex flex-col font-sans">
       {/* Header - responsive padding */}
-      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center gap-3 shrink-0">
+      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3 shrink-0">
         <button
           onClick={onBack}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors shrink-0"
         >
           <ChevronLeft size={22} />
         </button>
-        <div>
-          <h2 className="text-lg font-black text-gray-900">My Vouchers</h2>
-          <p className="text-xs text-gray-400 font-medium">
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-gray-900 truncate">My Vouchers</h2>
+          <p className="text-xs text-gray-400 font-medium truncate">
             Add codes and check voucher rules
           </p>
         </div>
       </div>
       
-      {/* Content - responsive max-width container */}
+      {/* Content - full width on mobile, max-width on desktop */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-4">
+        <div className="w-full px-4 py-4 md:max-w-2xl md:mx-auto md:py-6 space-y-4">
           {/* Add Voucher Section */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 md:p-5">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
               Add Voucher
             </p>
@@ -17108,7 +17108,7 @@ return (
               <button
                 onClick={addVoucher}
                 disabled={adding || !code}
-                className="px-5 rounded-xl bg-gray-950 text-white text-sm font-bold disabled:opacity-50"
+                className="px-5 rounded-xl bg-gray-950 text-white text-sm font-bold disabled:opacity-50 shrink-0"
               >
                 {adding ? "Adding..." : "Add"}
               </button>
@@ -17127,7 +17127,7 @@ return (
               <p className="font-semibold text-sm">No saved vouchers yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {vouchers.map((uv) => {
                 const voucher = uv.voucher;
                 const status = statusFor(uv);
@@ -17142,11 +17142,11 @@ return (
                 return (
                   <div
                     key={uv.id}
-                    className="bg-white rounded-2xl border border-gray-100 p-4 md:p-5"
+                    className="bg-white rounded-2xl border border-gray-100 p-4"
                   >
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <p className="font-black text-gray-950">
+                      <div className="min-w-0">
+                        <p className="font-black text-gray-950 truncate">
                           {voucher?.title || uv.code}
                         </p>
                         <p className="text-[11px] text-gray-400 mt-0.5">
@@ -17154,7 +17154,7 @@ return (
                         </p>
                       </div>
                       <span
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black ${toneClass}`}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black shrink-0 ${toneClass}`}
                       >
                         {status.label}
                       </span>
@@ -17179,14 +17179,14 @@ return (
                               : "No expiry",
                           },
                           {
-                            label: "Minimum KM",
+                            label: "Min Distance",
                             value:
                               voucher.minimum_distance_km > 0
                                 ? `${voucher.minimum_distance_km} km`
                                 : "None",
                           },
                           {
-                            label: "Minimum Fare",
+                            label: "Min Fare",
                             value:
                               voucher.minimum_fare > 0
                                 ? `₱${voucher.minimum_fare}`
@@ -17212,12 +17212,14 @@ return (
                       </p>
                     )}
                   </div>
-                );
+);
               })}
             </div>
           )}
         </div>
       </div>
+      {/* Safe area bottom padding for mobile */}
+      <div className="h-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0 md:hidden" />
     </div>
   );
 };
