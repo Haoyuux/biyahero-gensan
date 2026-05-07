@@ -3213,6 +3213,7 @@ const UserApp = ({
     return (
       <RideHistoryScreen
         userId={currentProfile.id}
+        userName={`${currentProfile.first_name || ""} ${currentProfile.last_name || ""}`.trim() || currentProfile.full_name || ""}
         onBack={() => setShowRideHistory(false)}
       />
     );
@@ -19383,6 +19384,7 @@ const RideHistoryScreen = ({
   onBack,
 }: {
   userId: string;
+  userName: string;
   onBack: () => void;
 }) => {
   const [rides, setRides] = useState<RideRecord[]>([]);
@@ -19398,7 +19400,7 @@ const RideHistoryScreen = ({
         let query = supabaseAdmin
           .from("rides")
           .select("*")
-          .eq("user_id", userId)
+          .or(`user_id.eq.${userId},user_name.eq.${userName}`)
           .eq("status", "completed")
           .order("completed_at", { ascending: false });
 
