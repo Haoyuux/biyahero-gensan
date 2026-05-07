@@ -5409,19 +5409,30 @@ const RiderActiveRide = ({
                             label: bookingFeeLabel,
                             value: request.fareBreakdown.bookingFee,
                           },
-                        ].map((row) => (
+                          ...(request.voucher
+                            ? [
+                                {
+                                  label: `Voucher Discount (${request.voucher.code})`,
+                                  value: -request.voucher.discount,
+                                  isDiscount: true,
+                                },
+                              ]
+                            : []),
+                        ].map((row: any) => (
                           <div
                             key={row.label}
                             className="flex justify-between text-[13px] text-gray-500"
                           >
                             <span>{row.label}</span>
-                            <span>₱{row.value}</span>
+                            <span className={row.isDiscount ? "text-emerald-600 font-medium" : ""}>
+                              {row.value < 0 ? "-" : ""}₱{Math.abs(row.value)}
+                            </span>
                           </div>
                         ))}
                         <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
                           <span>Total</span>
                           <span className="text-emerald-600">
-                            ₱{request.fareBreakdown.totalFare}
+                            ₱{request.fare}
                           </span>
                         </div>
                       </div>
