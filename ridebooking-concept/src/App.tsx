@@ -19393,23 +19393,29 @@ const RideHistoryScreen = ({
   const [rides, setRides] = useState<RideRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
     const fetchRides = async () => {
       setLoading(true);
-      const dayStart = `${selectedDate}T00:00:00.000Z`;
-      const dayEnd = `${selectedDate}T23:59:59.999Z`;
-      const { data: rideData } = await supabase
+      let query = supabase
         .from("rides")
         .select("*")
         .eq("user_id", userId)
         .eq("status", "completed")
-        .gte("completed_at", dayStart)
-        .lte("completed_at", dayEnd)
         .order("completed_at", { ascending: false });
+
+      // If user specifically picked a date, filter by it. 
+      // Otherwise show everything (or last 50).
+      if (selectedDate) {
+        const dayStart = `${selectedDate}T00:00:00.000Z`;
+        const dayEnd = `${selectedDate}T23:59:59.999Z`;
+        query = query.gte("completed_at", dayStart).lte("completed_at", dayEnd);
+      } else {
+        query = query.limit(50);
+      }
+
+      const { data: rideData } = await query;
 
       setRides(rideData ?? []);
       setLoading(false);
@@ -19472,13 +19478,17 @@ const RideHistoryScreen = ({
 
       {/* Date label */}
       <div className="bg-white border-b border-gray-100 px-4 py-2.5">
-        <p className="text-[12px] font-semibold text-gray-500">
-          {new Date(selectedDate + "T00:00:00").toLocaleDateString([], {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })}
+        <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">
+          {selectedDate ? (
+            new Date(selectedDate + "T00:00:00").toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })
+          ) : (
+            "All Completed Trips"
+          )}
         </p>
       </div>
 
