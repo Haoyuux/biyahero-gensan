@@ -3828,6 +3828,8 @@ const UserApp = ({
                   pricingConfig={pricingConfig}
                   rideId={currentRideId}
                   dropoffLabel={dropoff}
+                  voucherDiscount={voucherDiscount}
+                  voucherCode={selectedUserVoucher?.code}
                   userId={currentProfile.id}
                   userName={
                     currentProfile.first_name ||
@@ -18659,6 +18661,8 @@ const MatchedPanel = ({
   userId,
   userName,
   dropoffLabel,
+  voucherDiscount,
+  voucherCode,
 }: any) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -18806,7 +18810,7 @@ const MatchedPanel = ({
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className="bg-gray-950 text-white text-sm font-bold px-3 py-1.5 rounded-xl">
-                ₱{activeFare.totalFare}
+                ₱{Math.max(0, activeFare.totalFare - (voucherDiscount || 0))}
               </div>
               <ChevronLeft
                 size={18}
@@ -18843,7 +18847,7 @@ const MatchedPanel = ({
                     </p>
                   </div>
                   <div className="bg-gray-950 text-white text-sm font-bold px-4 py-2 rounded-xl shrink-0">
-                    ₱{activeFare.totalFare}
+                    ₱{Math.max(0, activeFare.totalFare - (voucherDiscount || 0))}
                   </div>
                 </div>
                 {/* Driver card */}
@@ -18967,22 +18971,30 @@ const MatchedPanel = ({
                             label: `Time (${durMin} min × ₱${cfg.perMinuteRate}/min)`,
                             value: activeFare.timeFee,
                           },
-                          {
-                            label: bookingFeeLabel,
-                            value: activeFare.bookingFee,
-                          },
-                        ].map((row) => (
+                          { label: bookingFeeLabel, value: activeFare.bookingFee },
+                          ...(voucherDiscount > 0
+                            ? [
+                                {
+                                  label: `Voucher Discount (${voucherCode})`,
+                                  value: -voucherDiscount,
+                                  isDiscount: true,
+                                },
+                              ]
+                            : []),
+                        ].map((row: any) => (
                           <div
                             key={row.label}
                             className="flex justify-between text-gray-500"
                           >
                             <span>{row.label}</span>
-                            <span>₱{row.value}</span>
+                            <span className={row.isDiscount ? "text-emerald-600 font-medium" : ""}>
+                              {row.value < 0 ? "-" : ""}₱{Math.abs(row.value)}
+                            </span>
                           </div>
                         ))}
                         <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
-                          <span>Total</span>
-                          <span>₱{activeFare.totalFare}</span>
+                          <span>Total Fare</span>
+                          <span>₱{Math.max(0, activeFare.totalFare - (voucherDiscount || 0))}</span>
                         </div>
                       </div>
                     </div>
