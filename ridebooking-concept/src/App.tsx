@@ -5740,7 +5740,7 @@ const RiderDashboard = ({
       const { data } = await supabase
         .from("rides")
         .select(
-          "id, pickup_label, dropoff_label, fare, fare_breakdown, ride_type, rating, comment, completed_at, user_name, user_avatar",
+          "id, pickup_label, dropoff_label, fare, fare_breakdown, ride_type, rating, comment, completed_at, user_name, user_avatar, voucher_code, voucher_discount, voucher_discount_paid, voucher_discount_paid_at",
         )
         .eq("rider_id", initialProfile.id)
         .eq("status", "completed")
@@ -6657,6 +6657,18 @@ const RiderDashboard = ({
                               <p className="font-black text-sm text-gray-950">
                                 ₱{t.fare}
                               </p>
+                              {(t.voucher_discount || 0) > 0 && (
+                                <p
+                                  className={`text-[10px] font-bold mt-0.5 ${
+                                    t.voucher_discount_paid
+                                      ? "text-emerald-600"
+                                      : "text-amber-600"
+                                  }`}
+                                >
+                                  ₱{t.voucher_discount} voucher{" "}
+                                  {t.voucher_discount_paid ? "paid" : "pending"}
+                                </p>
+                              )}
                               {t.rating != null && (
                                 <div className="flex justify-end mt-0.5 gap-0.5">
                                   {Array.from({ length: t.rating }).map(
@@ -6842,6 +6854,43 @@ const RiderDashboard = ({
                               )}
                             </div>
                           </div>
+
+                          {(selectedTrip.voucher_discount || 0) > 0 && (
+                            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 mb-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-1">
+                                    Voucher Reimbursement
+                                  </p>
+                                  <p className="font-black text-lg text-emerald-700">
+                                    ₱{selectedTrip.voucher_discount}
+                                  </p>
+                                  <p className="text-[12px] text-emerald-700/70 mt-0.5">
+                                    {selectedTrip.voucher_code || "Voucher"} discount covered by admin
+                                  </p>
+                                </div>
+                                <span
+                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black ${
+                                    selectedTrip.voucher_discount_paid
+                                      ? "bg-white text-emerald-700 border border-emerald-200"
+                                      : "bg-amber-100 text-amber-700"
+                                  }`}
+                                >
+                                  {selectedTrip.voucher_discount_paid
+                                    ? "Paid"
+                                    : "Pending"}
+                                </span>
+                              </div>
+                              {selectedTrip.voucher_discount_paid_at && (
+                                <p className="text-[11px] text-emerald-700/70 mt-2">
+                                  Paid on{" "}
+                                  {new Date(
+                                    selectedTrip.voucher_discount_paid_at,
+                                  ).toLocaleString("en-PH")}
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {/* Rating & Comment */}
                           {selectedTrip.rating != null && (
@@ -10078,6 +10127,12 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Voucher | null>(null);
+  const [viewingVoucher, setViewingVoucher] = useState<Voucher | null>(null);
+  const [voucherRideRows, setVoucherRideRows] = useState<any[]>([]);
+  const [voucherRideLoading, setVoucherRideLoading] = useState(false);
+  const [voucherPaymentLoading, setVoucherPaymentLoading] = useState<
+    string | null
+  >(null);
   const [form, setForm] = useState({
     code: "",
     title: "",
@@ -10124,6 +10179,57 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!viewingVoucher) return;
+    setVoucherRideLoading(true);
+    supabase
+      .from("rides")
+      .select(
+        "id, user_name, rider_name, fare, original_fare, final_fare, voucher_code, voucher_discount, voucher_discount_paid, voucher_discount_paid_at, voucher_discount_paid_by, completed_at, status",
+      )
+      .eq("voucher_id", viewingVoucher.id)
+      .eq("status", "completed")
+      .order("completed_at", { ascending: false })
+      .then(({ data }) => {
+        setVoucherRideRows(data ?? []);
+        setVoucherRideLoading(false);
+      });
+  }, [viewingVoucher]);
+
+  const markVoucherPaymentComplete = async (rideId: string) => {
+    setVoucherPaymentLoading(rideId);
+    const paidAt = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("rides")
+      .update({
+        voucher_discount_paid: true,
+        voucher_discount_paid_at: paidAt,
+        voucher_discount_paid_by:
+          `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
+          profile.full_name ||
+          "Admin",
+      })
+      .eq("id", rideId);
+    if (!error) {
+      setVoucherRideRows((rows) =>
+        rows.map((row) =>
+          row.id === rideId
+            ? {
+                ...row,
+                voucher_discount_paid: true,
+                voucher_discount_paid_at: paidAt,
+                voucher_discount_paid_by:
+                  `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
+                  profile.full_name ||
+                  "Admin",
+              }
+            : row,
+        ),
+      );
+    }
+    setVoucherPaymentLoading(null);
+  };
 
   const resetForm = () => {
     setEditing(null);
@@ -10423,6 +10529,12 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                         </td>
                         <td className="px-5 py-4">
                           <button
+                            onClick={() => setViewingVoucher(v)}
+                            className="text-[12px] font-bold text-emerald-600 hover:text-emerald-700 mr-3"
+                          >
+                            View
+                          </button>
+                          <button
                             onClick={() => editVoucher(v)}
                             className="text-[12px] font-bold text-gray-500 hover:text-gray-900"
                           >
@@ -10438,6 +10550,142 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {viewingVoucher && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/50 flex items-end md:items-center justify-center p-4"
+            onClick={() => setViewingVoucher(null)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full max-w-4xl max-h-[86vh] overflow-hidden rounded-t-[28px] md:rounded-2xl shadow-2xl flex flex-col"
+            >
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-gray-950">
+                    {viewingVoucher.code}
+                  </h3>
+                  <p className="text-[12px] text-gray-400">
+                    Passenger, rider, and discount payment monitoring
+                  </p>
+                </div>
+                <button
+                  onClick={() => setViewingVoucher(null)}
+                  className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-x-auto overflow-y-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      {[
+                        "Passenger",
+                        "Rider",
+                        "Fare",
+                        "Discount",
+                        "Payment",
+                        "Action",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {voucherRideLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                          Loading rides...
+                        </td>
+                      </tr>
+                    ) : voucherRideRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                          No completed rides used this voucher yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      voucherRideRows.map((ride) => (
+                        <tr key={ride.id} className="border-b border-gray-50 last:border-0">
+                          <td className="px-5 py-4">
+                            <p className="font-bold text-sm text-gray-900">
+                              {ride.user_name || "Passenger"}
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              {ride.completed_at
+                                ? new Date(ride.completed_at).toLocaleString("en-PH")
+                                : ""}
+                            </p>
+                          </td>
+                          <td className="px-5 py-4 text-sm font-bold text-gray-800">
+                            {ride.rider_name || "Rider"}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] text-gray-500">
+                            <p>Original: ₱{ride.original_fare ?? ride.fare}</p>
+                            <p className="font-bold text-gray-900">
+                              Paid by passenger: ₱{ride.final_fare ?? ride.fare}
+                            </p>
+                          </td>
+                          <td className="px-5 py-4 text-sm font-black text-emerald-600">
+                            ₱{ride.voucher_discount || 0}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                                ride.voucher_discount_paid
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {ride.voucher_discount_paid ? "Paid" : "Pending"}
+                            </span>
+                            {ride.voucher_discount_paid_at && (
+                              <p className="text-[11px] text-gray-400 mt-1">
+                                {new Date(
+                                  ride.voucher_discount_paid_at,
+                                ).toLocaleString("en-PH")}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-5 py-4">
+                            <button
+                              onClick={() => markVoucherPaymentComplete(ride.id)}
+                              disabled={
+                                ride.voucher_discount_paid ||
+                                voucherPaymentLoading === ride.id ||
+                                !ride.voucher_discount
+                              }
+                              className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {voucherPaymentLoading === ride.id
+                                ? "Saving..."
+                                : ride.voucher_discount_paid
+                                  ? "Completed"
+                                  : "Mark as Complete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

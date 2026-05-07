@@ -35,6 +35,9 @@ alter table public.rides add column if not exists voucher_code text;
 alter table public.rides add column if not exists voucher_discount numeric not null default 0;
 alter table public.rides add column if not exists original_fare numeric;
 alter table public.rides add column if not exists final_fare numeric;
+alter table public.rides add column if not exists voucher_discount_paid boolean not null default false;
+alter table public.rides add column if not exists voucher_discount_paid_at timestamptz;
+alter table public.rides add column if not exists voucher_discount_paid_by text;
 
 alter table public.vouchers enable row level security;
 alter table public.user_vouchers enable row level security;
