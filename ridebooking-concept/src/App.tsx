@@ -10184,7 +10184,7 @@ const load = React.useCallback(async () => {
     setVouchers(list);
     if (list.length > 0) {
       // Count from user_vouchers - when user adds voucher to their account
-      const { data } = await supabase
+      const { data } = await supabaseAdmin
         .from("user_vouchers")
         .select("voucher_id")
         .in(
@@ -10213,7 +10213,7 @@ const load = React.useCallback(async () => {
     if (!viewingVoucher) return;
     setVoucherRideLoading(true);
     // Fetch claimed vouchers with user info
-    supabase
+    supabaseAdmin
       .from("user_vouchers")
       .select(
         "id, user_id, code, status, added_at, used_at, ride_id, profiles(full_name, email)",
