@@ -2412,6 +2412,7 @@ const UserApp = ({
   );
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showRideHistory, setShowRideHistory] = useState(false);
+  const [showMyVouchers, setShowMyVouchers] = useState(false);
   const [favorites, setFavorites] = useState<FavoritePlace[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]");
@@ -3216,6 +3217,17 @@ const UserApp = ({
     );
   }
 
+  if (showMyVouchers) {
+    return (
+      <MyVouchersScreen
+        userId={currentProfile.id}
+        vouchers={userVouchers}
+        onBack={() => setShowMyVouchers(false)}
+        onChanged={refreshUserVouchers}
+      />
+    );
+  }
+
   return (
     <>
       {getEffectiveMode(maintenanceSettings ?? null) === "half" && (
@@ -3324,6 +3336,14 @@ const UserApp = ({
                       action: () => {
                         setShowMenu(false);
                         setShowRideHistory(true);
+                      },
+                    },
+                    {
+                      icon: Tag,
+                      label: "My Vouchers",
+                      action: () => {
+                        setShowMenu(false);
+                        setShowMyVouchers(true);
                       },
                     },
                     {
@@ -16964,6 +16984,192 @@ const RealtimeChat = ({
 };
 
 // ─── Chat History Screen ──────────────────────────────────────────────────────
+
+const MyVouchersScreen = ({
+  userId,
+  vouchers,
+  onBack,
+  onChanged,
+}: {
+  userId: string;
+  vouchers: UserVoucher[];
+  onBack: () => void;
+  onChanged: () => void;
+}) => {
+  const [code, setCode] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const addVoucher = async () => {
+    setAdding(true);
+    setMessage(null);
+    const result = await addVoucherToUser(userId, code);
+    setAdding(false);
+    if (result.error || !result.userVoucher) {
+      setMessage(result.error || "Unable to add voucher");
+      return;
+    }
+    setCode("");
+    setMessage("Voucher added");
+    onChanged();
+  };
+
+  const statusFor = (uv: UserVoucher) => {
+    const voucher = uv.voucher;
+    if (uv.status === "used") return { label: "Used", tone: "gray" };
+    if (!voucher) return { label: "Unavailable", tone: "gray" };
+    if (!voucher.is_active) return { label: "Inactive", tone: "gray" };
+    if (voucher.expires_at && new Date() > new Date(voucher.expires_at)) {
+      return { label: "Expired", tone: "red" };
+    }
+    if (voucher.starts_at && new Date() < new Date(voucher.starts_at)) {
+      return { label: "Not active yet", tone: "amber" };
+    }
+    return { label: "Available", tone: "emerald" };
+  };
+
+  return (
+    <div className="w-full h-[100dvh] bg-gray-50 flex flex-col font-sans">
+      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3 shrink-0">
+        <button
+          onClick={onBack}
+          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <div>
+          <h2 className="text-lg font-black text-gray-900">My Vouchers</h2>
+          <p className="text-xs text-gray-400 font-medium">
+            Add codes and check voucher rules
+          </p>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+            Add Voucher
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={code}
+              onChange={(e) => setCode(normalizeVoucherCode(e.target.value))}
+              placeholder="Enter code"
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-sm font-black uppercase focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <button
+              onClick={addVoucher}
+              disabled={adding || !code}
+              className="px-5 rounded-xl bg-gray-950 text-white text-sm font-bold disabled:opacity-50"
+            >
+              {adding ? "Adding..." : "Add"}
+            </button>
+          </div>
+          {message && (
+            <p className="text-[12px] font-semibold text-gray-500 mt-2">
+              {message}
+            </p>
+          )}
+        </div>
+
+        {vouchers.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <Tag size={30} className="mx-auto mb-3 opacity-30" />
+            <p className="font-semibold text-sm">No saved vouchers yet</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {vouchers.map((uv) => {
+              const voucher = uv.voucher;
+              const status = statusFor(uv);
+              const toneClass =
+                status.tone === "emerald"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : status.tone === "red"
+                    ? "bg-red-50 text-red-600"
+                    : status.tone === "amber"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-gray-100 text-gray-500";
+              return (
+                <div
+                  key={uv.id}
+                  className="bg-white rounded-2xl border border-gray-100 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="font-black text-gray-950">
+                        {voucher?.title || uv.code}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        Code: <span className="font-black">{uv.code}</span>
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black ${toneClass}`}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
+                  {voucher ? (
+                    <div className="grid grid-cols-2 gap-2 text-[12px]">
+                      {[
+                        {
+                          label: "Discount",
+                          value:
+                            voucher.discount_type === "fixed"
+                              ? `₱${voucher.discount_value} off`
+                              : `${voucher.discount_value}% off`,
+                        },
+                        {
+                          label: "Expires",
+                          value: voucher.expires_at
+                            ? new Date(voucher.expires_at).toLocaleDateString(
+                                "en-PH",
+                                { month: "short", day: "numeric", year: "numeric" },
+                              )
+                            : "No expiry",
+                        },
+                        {
+                          label: "Minimum KM",
+                          value:
+                            voucher.minimum_distance_km > 0
+                              ? `${voucher.minimum_distance_km} km`
+                              : "None",
+                        },
+                        {
+                          label: "Minimum Fare",
+                          value:
+                            voucher.minimum_fare > 0
+                              ? `₱${voucher.minimum_fare}`
+                              : "None",
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          className="bg-gray-50 rounded-xl p-3 border border-gray-100"
+                        >
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                            {item.label}
+                          </p>
+                          <p className="font-bold text-gray-900">
+                            {item.value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Voucher details are unavailable.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const ChatHistoryScreen = ({
   userId,
