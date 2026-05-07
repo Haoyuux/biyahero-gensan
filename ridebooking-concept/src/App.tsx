@@ -18045,7 +18045,7 @@ const SelectPanel = ({
         if (info.offset.y < -40 || info.velocity.y < -300)
           setIsCollapsed(false);
       }}
-      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:max-h-none md:flex-1 md:overflow-y-auto"
+      className="bg-white rounded-t-[28px] md:rounded-none shadow-[0_-1px_0_rgba(0,0,0,0.06),0_-20px_60px_rgba(0,0,0,0.08)] md:shadow-none pointer-events-auto flex flex-col md:max-h-none md:flex-1 md:overflow-hidden"
     >
       {/* Draggable handle */}
       <div
@@ -18085,9 +18085,9 @@ const SelectPanel = ({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
-            className="overflow-hidden"
+            className="overflow-hidden md:flex-1 md:flex md:flex-col"
           >
-            <div className="flex flex-col max-h-[72vh] md:max-h-none pt-5 px-5 md:px-6 md:pt-6">
+            <div className="flex flex-col flex-1 max-h-[72vh] md:max-h-none pt-5 px-5 md:px-6 md:pt-6">
               {/* Scrollable content */}
               <div className="flex-1 min-h-0 overflow-y-auto">
                 {/* Back button */}
