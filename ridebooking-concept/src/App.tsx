@@ -18118,9 +18118,28 @@ const SelectPanel = ({
                           <span className="font-normal text-[15px]">
                             {ride.name}
                           </span>
-                          <span className="font-bold text-[16px]">
-                            ₱{ride.breakdown.totalFare}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            {(() => {
+                              const quote = selectedUserVoucher?.voucher 
+                                ? quoteVoucher(selectedUserVoucher.voucher, ride.breakdown)
+                                : null;
+                              const discount = quote && !quote.reason ? quote.discount : 0;
+                              const finalPrice = Math.max(0, ride.breakdown.totalFare - discount);
+                              
+                              return (
+                                <>
+                                  <span className="font-bold text-[16px] text-gray-950">
+                                    ₱{finalPrice}
+                                  </span>
+                                  {discount > 0 && (
+                                    <span className="text-[10px] text-gray-400 line-through">
+                                      ₱{ride.breakdown.totalFare}
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
                         <div className="flex items-center text-xs text-gray-400 font-medium gap-1">
                           <Clock size={11} /> {ride.time} away
@@ -18178,17 +18197,28 @@ const SelectPanel = ({
                               label: bookingFeeLabel,
                               value: selectedBreakdown.bookingFee,
                             },
-                          ].map((row) => (
+                            ...(activeVoucherDiscount > 0
+                              ? [
+                                  {
+                                    label: `Voucher Discount (${selectedUserVoucher?.code})`,
+                                    value: -activeVoucherDiscount,
+                                    isDiscount: true,
+                                  },
+                                ]
+                              : []),
+                          ].map((row: any) => (
                             <div
                               key={row.label}
                               className="flex justify-between text-gray-500"
                             >
                               <span>{row.label}</span>
-                              <span>₱{row.value}</span>
+                              <span className={row.isDiscount ? "text-emerald-600 font-medium" : ""}>
+                                {row.value < 0 ? "-" : ""}₱{Math.abs(row.value)}
+                              </span>
                             </div>
                           ))}
                           <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
-                            <span>Total</span>
+                            <span>Total Fare</span>
                             <span>₱{activeTotalFare}</span>
                           </div>
                         </div>
