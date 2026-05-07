@@ -172,6 +172,21 @@ import {
   type NewsPost,
   type NewsAudience,
 } from "@/src/lib/newsService";
+import {
+  addVoucherToUser,
+  calculateVoucherDiscount,
+  createVoucher,
+  fetchUserVouchers,
+  fetchVouchers,
+  getVoucherRideIssue,
+  markVoucherUsed,
+  normalizeVoucherCode,
+  quoteVoucher,
+  updateVoucher,
+  type UserVoucher,
+  type Voucher,
+  type VoucherDiscountType,
+} from "@/src/lib/voucherService";
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
@@ -2379,6 +2394,12 @@ const UserApp = ({
   const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(
     () => _pr.current?.fareBreakdown ?? null,
   );
+  const [userVouchers, setUserVouchers] = useState<UserVoucher[]>([]);
+  const [selectedUserVoucher, setSelectedUserVoucher] =
+    useState<UserVoucher | null>(() => _pr.current?.selectedUserVoucher ?? null);
+  const [voucherDiscount, setVoucherDiscount] = useState<number>(
+    () => _pr.current?.voucherDiscount ?? 0,
+  );
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showRideHistory, setShowRideHistory] = useState(false);
   const [favorites, setFavorites] = useState<FavoritePlace[]>(() => {
@@ -2461,6 +2482,8 @@ const UserApp = ({
     pickup: "",
     dropoff: "",
     fareBreakdown: null as FareBreakdown | null,
+    selectedUserVoucher: null as UserVoucher | null,
+    voucherDiscount: 0,
     selectedRide: "eco",
     activeRider: null as any,
   });
@@ -2470,9 +2493,23 @@ const UserApp = ({
     pickup,
     dropoff,
     fareBreakdown,
+    selectedUserVoucher,
+    voucherDiscount,
     selectedRide,
     activeRider,
   };
+
+  const refreshUserVouchers = React.useCallback(async () => {
+    const list = await fetchUserVouchers(currentProfile.id);
+    setUserVouchers(list);
+    setSelectedUserVoucher((current) =>
+      current ? list.find((v) => v.id === current.id) ?? current : current,
+    );
+  }, [currentProfile.id]);
+
+  useEffect(() => {
+    refreshUserVouchers();
+  }, [refreshUserVouchers]);
 
   // Stores the current REQUEST_RIDE payload so the re-broadcast interval can access it
   const pendingRequestRef = React.useRef<any>(null);
@@ -2649,6 +2686,8 @@ const UserApp = ({
           destinationCoords,
           selectedRide,
           fareBreakdown,
+          selectedUserVoucher,
+          voucherDiscount,
           activeRider,
         }),
       );
@@ -2664,6 +2703,8 @@ const UserApp = ({
     destinationCoords,
     selectedRide,
     fareBreakdown,
+    selectedUserVoucher,
+    voucherDiscount,
     activeRider,
   ]);
 
@@ -2715,6 +2756,8 @@ const UserApp = ({
     setActiveRider(null);
     setCompletedRider(null);
     setFareBreakdown(null);
+    setSelectedUserVoucher(null);
+    setVoucherDiscount(0);
     setRiderLocation(null);
     setRouteCoords(null);
     setRouteInfo(null);
@@ -2894,14 +2937,30 @@ const UserApp = ({
               : null,
             pickup_label: d.pickup,
             dropoff_label: d.dropoff,
-            fare: d.fareBreakdown?.totalFare ?? 0,
+            fare: Math.max(
+              0,
+              (d.fareBreakdown?.totalFare ?? 0) - (d.voucherDiscount ?? 0),
+            ),
             fare_breakdown: d.fareBreakdown,
+            voucher_id: d.selectedUserVoucher?.voucher_id ?? null,
+            user_voucher_id: d.selectedUserVoucher?.id ?? null,
+            voucher_code: d.selectedUserVoucher?.code ?? null,
+            voucher_discount: d.voucherDiscount ?? 0,
+            original_fare: d.fareBreakdown?.totalFare ?? 0,
+            final_fare: Math.max(
+              0,
+              (d.fareBreakdown?.totalFare ?? 0) - (d.voucherDiscount ?? 0),
+            ),
             ride_type: d.selectedRide,
             status: "completed",
             completed_at: new Date().toISOString(),
           },
           { onConflict: "id" },
         );
+        if (d.selectedUserVoucher?.id) {
+          await markVoucherUsed(d.selectedUserVoucher.id, currentRideId);
+          refreshUserVouchers();
+        }
         pushNotification(
           "Ride completed ✅",
           "Hope you had a great ride! Please rate your experience.",
@@ -3592,10 +3651,17 @@ const UserApp = ({
                   pricingConfig={pricingConfig}
                   isBooking={isBooking}
                   maintenanceMode={maintenanceMode}
+                  userId={currentProfile.id}
+                  userVouchers={userVouchers}
+                  selectedUserVoucher={selectedUserVoucher}
+                  onSelectedUserVoucher={setSelectedUserVoucher}
+                  onUserVouchersChanged={refreshUserVouchers}
                   onBook={async (
                     rideId: string,
                     breakdown: FareBreakdown,
                     distanceM: number,
+                    voucher: UserVoucher | null,
+                    discount: number,
                   ) => {
                     if (currentRideId) {
                       showNotification(
@@ -3606,6 +3672,8 @@ const UserApp = ({
                     setStep("searching");
                     setCurrentRideId(rideId);
                     setFareBreakdown(breakdown);
+                    setSelectedUserVoucher(voucher);
+                    setVoucherDiscount(discount);
                     setIsBooking(true);
 
                     // Fetch online approved riders and sort by distance to pickup
@@ -3642,8 +3710,21 @@ const UserApp = ({
                       user: currentProfile,
                       pickup: { label: pickup, coords: pickupLL },
                       dropoff: { label: dropoff, coords: destinationCoords },
-                      fare: breakdown.totalFare,
-                      fareBreakdown: breakdown,
+                      fare: Math.max(0, breakdown.totalFare - discount),
+                      fareBreakdown: {
+                        ...breakdown,
+                        totalFare: Math.max(0, breakdown.totalFare - discount),
+                      },
+                      originalFare: breakdown.totalFare,
+                      voucher:
+                        voucher?.voucher
+                          ? {
+                              id: voucher.voucher.id,
+                              userVoucherId: voucher.id,
+                              code: voucher.code,
+                              discount,
+                            }
+                          : null,
                       rideType: selectedRide,
                       priorityRiderIds,
                       routeDistance: breakdown.distanceKm * 1000,
@@ -3667,8 +3748,14 @@ const UserApp = ({
                         status: "pending",
                         pickup_label: pickup,
                         dropoff_label: dropoff,
-                        fare: breakdown.totalFare,
+                        fare: Math.max(0, breakdown.totalFare - discount),
                         fare_breakdown: breakdown,
+                        voucher_id: voucher?.voucher_id ?? null,
+                        user_voucher_id: voucher?.id ?? null,
+                        voucher_code: voucher?.code ?? null,
+                        voucher_discount: discount,
+                        original_fare: breakdown.totalFare,
+                        final_fare: Math.max(0, breakdown.totalFare - discount),
                         ride_type: selectedRide,
                         request_data: requestPayload,
                       });
@@ -9962,7 +10049,8 @@ type AdminTab =
   | "teams"
   | "news"
   | "settings"
-  | "maintenance";
+  | "maintenance"
+  | "vouchers";
 
 const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: "live", label: "Live Operations" },
@@ -9979,7 +10067,386 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
   { id: "blocking", label: "User Blocking" },
   { id: "settings", label: "App Settings" },
   { id: "maintenance", label: "Maintenance" },
+  { id: "vouchers", label: "Vouchers" },
 ];
+
+const VouchersTab = ({ profile }: { profile: Profile }) => {
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<Voucher | null>(null);
+  const [form, setForm] = useState({
+    code: "",
+    title: "",
+    description: "",
+    discount_type: "fixed" as VoucherDiscountType,
+    discount_value: 100,
+    max_discount_amount: "",
+    minimum_fare: 0,
+    minimum_distance_km: 0,
+    usage_limit: "",
+    per_user_limit: 1,
+    starts_at: "",
+    expires_at: "",
+    is_active: true,
+  });
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    setVouchers(await fetchVouchers());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const resetForm = () => {
+    setEditing(null);
+    setForm({
+      code: "",
+      title: "",
+      description: "",
+      discount_type: "fixed",
+      discount_value: 100,
+      max_discount_amount: "",
+      minimum_fare: 0,
+      minimum_distance_km: 0,
+      usage_limit: "",
+      per_user_limit: 1,
+      starts_at: "",
+      expires_at: "",
+      is_active: true,
+    });
+  };
+
+  const editVoucher = (v: Voucher) => {
+    setEditing(v);
+    setForm({
+      code: v.code,
+      title: v.title,
+      description: v.description ?? "",
+      discount_type: v.discount_type,
+      discount_value: v.discount_value,
+      max_discount_amount: v.max_discount_amount?.toString() ?? "",
+      minimum_fare: v.minimum_fare,
+      minimum_distance_km: v.minimum_distance_km,
+      usage_limit: v.usage_limit?.toString() ?? "",
+      per_user_limit: v.per_user_limit,
+      starts_at: v.starts_at ? v.starts_at.slice(0, 16) : "",
+      expires_at: v.expires_at ? v.expires_at.slice(0, 16) : "",
+      is_active: v.is_active,
+    });
+  };
+
+  const save = async () => {
+    if (!form.code || !form.title) return;
+    setSaving(true);
+    const payload = {
+      code: normalizeVoucherCode(form.code),
+      title: form.title,
+      description: form.description || null,
+      discount_type: form.discount_type,
+      discount_value: Number(form.discount_value) || 0,
+      max_discount_amount:
+        form.max_discount_amount === "" ? null : Number(form.max_discount_amount),
+      minimum_fare: Number(form.minimum_fare) || 0,
+      minimum_distance_km: Number(form.minimum_distance_km) || 0,
+      usage_limit: form.usage_limit === "" ? null : Number(form.usage_limit),
+      per_user_limit: Number(form.per_user_limit) || 1,
+      starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
+      expires_at: form.expires_at
+        ? new Date(form.expires_at).toISOString()
+        : null,
+      is_active: form.is_active,
+      created_by: profile.id,
+    };
+    const saved = editing
+      ? await updateVoucher(editing.id, payload)
+      : await createVoucher(payload);
+    setSaving(false);
+    if (saved) {
+      resetForm();
+      load();
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-8">
+        <h2 className="text-2xl font-black tracking-tight text-gray-950">
+          Vouchers
+        </h2>
+        <p className="text-gray-400 text-sm mt-1">
+          Create discount codes with expiry, fare, and distance rules.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-5">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 h-fit">
+          <h3 className="font-black text-gray-950 mb-4">
+            {editing ? "Edit Voucher" : "Create Voucher"}
+          </h3>
+          <div className="space-y-3">
+            {[
+              ["code", "Code"],
+              ["title", "Title"],
+              ["description", "Description"],
+            ].map(([key, label]) => (
+              <div key={key}>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  {label}
+                </label>
+                <input
+                  value={(form as any)[key]}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      [key]:
+                        key === "code"
+                          ? normalizeVoucherCode(e.target.value)
+                          : e.target.value,
+                    }))
+                  }
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  Discount Type
+                </label>
+                <select
+                  value={form.discount_type}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      discount_type: e.target.value as VoucherDiscountType,
+                    }))
+                  }
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold bg-white"
+                >
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+              </div>
+              <NumberField
+                label={form.discount_type === "fixed" ? "Amount" : "Percent"}
+                value={form.discount_value}
+                onChange={(v: number) =>
+                  setForm((f) => ({ ...f, discount_value: v }))
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField
+                label="Min KM"
+                value={form.minimum_distance_km}
+                onChange={(v: number) =>
+                  setForm((f) => ({ ...f, minimum_distance_km: v }))
+                }
+              />
+              <NumberField
+                label="Min Fare"
+                value={form.minimum_fare}
+                onChange={(v: number) =>
+                  setForm((f) => ({ ...f, minimum_fare: v }))
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="datetime-local"
+                value={form.starts_at}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, starts_at: e.target.value }))
+                }
+                className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+              />
+              <input
+                type="datetime-local"
+                value={form.expires_at}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, expires_at: e.target.value }))
+                }
+                className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <TextNumberField
+                label="Max Cap"
+                value={form.max_discount_amount}
+                onChange={(v: string) =>
+                  setForm((f) => ({ ...f, max_discount_amount: v }))
+                }
+              />
+              <TextNumberField
+                label="Total Limit"
+                value={form.usage_limit}
+                onChange={(v: string) =>
+                  setForm((f) => ({ ...f, usage_limit: v }))
+                }
+              />
+              <NumberField
+                label="Per User"
+                value={form.per_user_limit}
+                onChange={(v: number) =>
+                  setForm((f) => ({ ...f, per_user_limit: v }))
+                }
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, is_active: e.target.checked }))
+                }
+              />
+              Active
+            </label>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={save}
+                disabled={saving}
+                className="flex-1 bg-gray-950 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50"
+              >
+                {saving ? "Saving..." : editing ? "Save Changes" : "Create"}
+              </button>
+              {editing && (
+                <button
+                  onClick={resetForm}
+                  className="px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+            <h3 className="font-bold text-sm text-gray-900">
+              Voucher Codes
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  {["Code", "Discount", "Rules", "Status", "Actions"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider"
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : vouchers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                      No vouchers yet.
+                    </td>
+                  </tr>
+                ) : (
+                  vouchers.map((v) => (
+                    <tr key={v.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-5 py-4">
+                        <p className="font-black text-gray-950">{v.code}</p>
+                        <p className="text-[11px] text-gray-400">{v.title}</p>
+                      </td>
+                      <td className="px-5 py-4 text-sm font-bold text-gray-800">
+                        {v.discount_type === "fixed"
+                          ? `₱${v.discount_value} off`
+                          : `${v.discount_value}% off`}
+                      </td>
+                      <td className="px-5 py-4 text-[12px] text-gray-500">
+                        {v.minimum_distance_km > 0 && `${v.minimum_distance_km}km+ `}
+                        {v.minimum_fare > 0 && `₱${v.minimum_fare}+ `}
+                        {v.expires_at &&
+                          `until ${new Date(v.expires_at).toLocaleDateString("en-PH")}`}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${v.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                          {v.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button
+                          onClick={() => editVoucher(v)}
+                          className="text-[12px] font-bold text-gray-500 hover:text-gray-900"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+const NumberField = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) => (
+  <div>
+    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+      {label}
+    </label>
+    <input
+      type="number"
+      min={0}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value) || 0)}
+      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold"
+    />
+  </div>
+);
+
+const TextNumberField = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <div>
+    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+      {label}
+    </label>
+    <input
+      type="number"
+      min={0}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold"
+    />
+  </div>
+);
 
 const AdminDashboard = ({
   profile,
@@ -10545,6 +11012,7 @@ const AdminDashboard = ({
     { id: "blocking" as AdminTab, label: "User Blocking", icon: Ban },
     { id: "settings" as AdminTab, label: "App Settings", icon: Cog },
     { id: "maintenance" as AdminTab, label: "Maintenance", icon: Wrench },
+    { id: "vouchers" as AdminTab, label: "Vouchers", icon: Tag },
   ];
 
   // Super admin sees everything + Roles tab; regular admin sees union of all assigned roles' modules
@@ -15882,6 +16350,8 @@ const AdminDashboard = ({
             profile={profile}
           />
         )}
+
+        {activeTab === "vouchers" && <VouchersTab profile={profile} />}
       </div>
     </div>
   );
@@ -16830,6 +17300,11 @@ const SelectPanel = ({
   pricingConfig,
   isBooking,
   maintenanceMode,
+  userId,
+  userVouchers = [],
+  selectedUserVoucher,
+  onSelectedUserVoucher,
+  onUserVouchersChanged,
 }: any) => {
   const distanceM = routeInfo?.distance ?? 0;
   const durationS = routeInfo?.duration ?? 0;
@@ -16854,8 +17329,37 @@ const SelectPanel = ({
   const selectedBreakdown = dynamicRides.find(
     (r) => r.id === selectedRide,
   )?.breakdown;
+  const [showVoucherPicker, setShowVoucherPicker] = useState(false);
+  const [voucherCodeInput, setVoucherCodeInput] = useState("");
+  const [voucherMessage, setVoucherMessage] = useState<string | null>(null);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const selectedVoucherQuote =
+    selectedBreakdown && selectedUserVoucher?.voucher
+      ? quoteVoucher(selectedUserVoucher.voucher, selectedBreakdown)
+      : null;
+  const activeVoucherDiscount = selectedVoucherQuote?.reason
+    ? 0
+    : selectedVoucherQuote?.discount ?? 0;
+  const activeTotalFare = selectedBreakdown
+    ? Math.max(0, selectedBreakdown.totalFare - activeVoucherDiscount)
+    : 0;
   const selectedRideLabel =
     dynamicRides.find((r) => r.id === selectedRide)?.name ?? "Select a ride";
+
+  const handleAddVoucher = async () => {
+    setVoucherLoading(true);
+    setVoucherMessage(null);
+    const result = await addVoucherToUser(userId, voucherCodeInput);
+    setVoucherLoading(false);
+    if (result.error || !result.userVoucher) {
+      setVoucherMessage(result.error || "Unable to add voucher");
+      return;
+    }
+    onSelectedUserVoucher?.(result.userVoucher);
+    onUserVouchersChanged?.();
+    setVoucherCodeInput("");
+    setVoucherMessage("Voucher added");
+  };
 
   return (
     <motion.div
@@ -16895,7 +17399,7 @@ const SelectPanel = ({
             <div className="flex items-center gap-2">
               {selectedBreakdown && (
                 <span className="font-black text-[15px] text-gray-950">
-                  ₱{selectedBreakdown.totalFare}
+                  ₱{activeTotalFare}
                 </span>
               )}
               <ChevronLeft size={18} className="text-gray-400 -rotate-90" />
@@ -17017,12 +17521,54 @@ const SelectPanel = ({
                           ))}
                           <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
                             <span>Total</span>
-                            <span>₱{selectedBreakdown.totalFare}</span>
+                            <span>₱{activeTotalFare}</span>
                           </div>
                         </div>
                       </div>
                     );
                   })()}
+
+                {selectedBreakdown && (
+                  <div className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                          <Tag size={16} className="text-emerald-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">
+                            {selectedUserVoucher?.voucher?.title || "Voucher"}
+                          </p>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {selectedVoucherQuote?.reason
+                              ? selectedVoucherQuote.reason
+                              : activeVoucherDiscount > 0
+                                ? `${selectedUserVoucher?.code} saves ₱${activeVoucherDiscount}`
+                                : "Add or select a voucher"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVoucherMessage(null);
+                          setShowVoucherPicker(true);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-bold"
+                      >
+                        {selectedUserVoucher ? "Change" : "Add"}
+                      </button>
+                    </div>
+                    {activeVoucherDiscount > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[13px]">
+                        <span className="text-gray-500">Voucher discount</span>
+                        <span className="font-black text-emerald-600">
+                          -₱{activeVoucherDiscount}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between px-4 py-3.5 bg-gray-50 rounded-2xl border border-gray-100 mb-1">
                   <div className="flex items-center gap-2.5">
@@ -17040,7 +17586,16 @@ const SelectPanel = ({
                       (r) => r.id === selectedRide,
                     )?.breakdown;
                     if (bd) {
-                      if (onBook) await onBook(genId(), bd, distanceM);
+                      if (onBook)
+                        await onBook(
+                          genId(),
+                          bd,
+                          distanceM,
+                          selectedVoucherQuote?.reason
+                            ? null
+                            : selectedUserVoucher ?? null,
+                          activeVoucherDiscount,
+                        );
                       else {
                         setStep("searching");
                         setTimeout(() => setStep("matched"), 3500);
@@ -17061,6 +17616,109 @@ const SelectPanel = ({
           </motion.div>
         )}
       </AnimatePresence>
+      {showVoucherPicker && selectedBreakdown && (
+        <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowVoucherPicker(false)}
+          />
+          <div className="relative w-full max-w-md bg-white rounded-t-[28px] md:rounded-2xl p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-black text-gray-950">Vouchers</h3>
+              <button
+                onClick={() => setShowVoucherPicker(false)}
+                className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex gap-2 mb-3">
+              <input
+                value={voucherCodeInput}
+                onChange={(e) =>
+                  setVoucherCodeInput(normalizeVoucherCode(e.target.value))
+                }
+                placeholder="Enter code"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <button
+                onClick={handleAddVoucher}
+                disabled={voucherLoading}
+                className="px-4 rounded-xl bg-gray-950 text-white text-sm font-bold disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+            {voucherMessage && (
+              <p className="text-[12px] font-semibold text-gray-500 mb-3">
+                {voucherMessage}
+              </p>
+            )}
+            <div className="max-h-[46vh] overflow-y-auto space-y-2">
+              {userVouchers.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">
+                  No saved vouchers yet.
+                </div>
+              ) : (
+                userVouchers.map((uv: UserVoucher) => {
+                  const voucher = uv.voucher;
+                  const issue = voucher
+                    ? getVoucherRideIssue(
+                        voucher,
+                        selectedBreakdown.totalFare,
+                        selectedBreakdown.distanceKm,
+                      )
+                    : "Voucher details unavailable";
+                  const discount = voucher
+                    ? calculateVoucherDiscount(voucher, selectedBreakdown.totalFare)
+                    : 0;
+                  const disabled = uv.status !== "available" || !!issue;
+                  return (
+                    <button
+                      key={uv.id}
+                      disabled={disabled}
+                      onClick={() => {
+                        onSelectedUserVoucher?.(uv);
+                        setShowVoucherPicker(false);
+                      }}
+                      className={`w-full text-left p-3.5 rounded-2xl border transition-colors ${
+                        selectedUserVoucher?.id === uv.id
+                          ? "border-gray-950 bg-gray-50"
+                          : "border-gray-100 bg-white"
+                      } disabled:opacity-50`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-gray-950">
+                            {voucher?.title || uv.code}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {issue || `Save ₱${discount} on this ride`}
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-black bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg">
+                          {uv.code}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            {selectedUserVoucher && (
+              <button
+                onClick={() => {
+                  onSelectedUserVoucher?.(null);
+                  setShowVoucherPicker(false);
+                }}
+                className="w-full mt-3 py-3 rounded-xl bg-gray-100 text-gray-600 text-sm font-bold"
+              >
+                Remove voucher
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
