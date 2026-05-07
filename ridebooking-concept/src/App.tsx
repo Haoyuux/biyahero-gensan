@@ -17027,8 +17027,6 @@ const RealtimeChat = ({
   );
 };
 
-// ─── Chat History Screen ──────────────────────────────────────────────────────
-
 const MyVouchersScreen = ({
   userId,
   vouchers,
@@ -17045,6 +17043,7 @@ const MyVouchersScreen = ({
   const [adding, setAdding] = useState(false);
 
   const addVoucher = async () => {
+    if (!code.trim()) return;
     setAdding(true);
     setMessage(null);
     const result = await addVoucherToUser(userId, code);
@@ -17054,7 +17053,7 @@ const MyVouchersScreen = ({
       return;
     }
     setCode("");
-    setMessage("Voucher added");
+    setMessage("Voucher added successfully!");
     onChanged();
   };
 
@@ -17072,158 +17071,195 @@ const MyVouchersScreen = ({
     return { label: "Available", tone: "emerald" };
   };
 
-return (
-    <div className="w-full h-[100dvh] bg-gray-50 flex flex-col font-sans">
-      {/* Header - responsive padding */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3 shrink-0">
+  return (
+    <div className="fixed inset-0 bg-gray-50 flex flex-col font-sans z-[100] overscroll-none">
+      {/* Header - Premium Glassmorphism */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-5 flex items-center gap-4 shrink-0">
         <button
           onClick={onBack}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors shrink-0"
+          className="w-11 h-11 rounded-2xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-all active:scale-95 shrink-0"
         >
-          <ChevronLeft size={22} />
+          <ChevronLeft size={24} className="text-gray-900" />
         </button>
         <div className="min-w-0">
-          <h2 className="text-lg font-black text-gray-900 truncate">My Vouchers</h2>
-          <p className="text-xs text-gray-400 font-medium truncate">
-            Add codes and check voucher rules
+          <h2 className="text-xl font-black text-gray-950 tracking-tight leading-tight">My Vouchers</h2>
+          <p className="text-[13px] text-gray-400 font-medium truncate mt-0.5">
+            Collect rewards and save on your rides
           </p>
         </div>
       </div>
       
-      {/* Content - full width on mobile, max-width on desktop */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="w-full px-4 py-4 md:max-w-2xl md:mx-auto md:py-6 space-y-4">
-          {/* Add Voucher Section */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-              Add Voucher
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="w-full px-5 py-6 md:max-w-2xl md:mx-auto space-y-6">
+          {/* Add Voucher Section - Premium Card */}
+          <div className="bg-white rounded-[24px] border border-gray-100 p-5 shadow-sm">
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.1em] mb-4">
+              Redeem Voucher code
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-2.5">
               <input
                 value={code}
                 onChange={(e) => setCode(normalizeVoucherCode(e.target.value))}
-                placeholder="Enter code"
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-sm font-black uppercase focus:outline-none focus:ring-2 focus:ring-gray-900"
+                placeholder="PROMO123"
+                className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm font-black uppercase placeholder:text-gray-300 placeholder:font-normal focus:outline-none focus:ring-4 focus:ring-gray-900/5 focus:bg-white focus:border-gray-900 transition-all"
               />
               <button
                 onClick={addVoucher}
-                disabled={adding || !code}
-                className="px-5 rounded-xl bg-gray-950 text-white text-sm font-bold disabled:opacity-50 shrink-0"
+                disabled={adding || !code.trim()}
+                className="px-6 rounded-2xl bg-gray-950 text-white text-[15px] font-bold hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-lg shadow-black/5 shrink-0"
               >
-                {adding ? "Adding..." : "Add"}
+                {adding ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  "Redeem"
+                )}
               </button>
             </div>
             {message && (
-              <p className="text-[12px] font-semibold text-gray-500 mt-2">
+              <p className={`text-[12px] font-bold mt-4 px-1 ${message.includes("success") ? "text-emerald-600" : "text-gray-500"}`}>
                 {message}
               </p>
             )}
           </div>
 
-          {/* Voucher List */}
-          {vouchers.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
-              <Tag size={30} className="mx-auto mb-3 opacity-30" />
-              <p className="font-semibold text-sm">No saved vouchers yet</p>
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-5 px-1">
+              <h3 className="text-sm font-black text-gray-950 uppercase tracking-widest">Available Vouchers</h3>
+              <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+                {vouchers.length} Total
+              </span>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {vouchers.map((uv) => {
-                const voucher = uv.voucher;
-                const status = statusFor(uv);
-                const toneClass =
-                  status.tone === "emerald"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : status.tone === "red"
-                      ? "bg-red-50 text-red-600"
-                      : status.tone === "amber"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-gray-100 text-gray-500";
-                return (
-                  <div
-                    key={uv.id}
-                    className="bg-white rounded-2xl border border-gray-100 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="min-w-0">
-                        <p className="font-black text-gray-950 truncate">
-                          {voucher?.title || uv.code}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          Code: <span className="font-black">{uv.code}</span>
-                        </p>
-                      </div>
-                      <span
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black shrink-0 ${toneClass}`}
-                      >
-                        {status.label}
-                      </span>
-                    </div>
-                    {voucher ? (
-                      <div className="grid grid-cols-2 gap-2 text-[12px]">
-                        {[
-                          {
-                            label: "Discount",
-                            value:
-                              voucher.discount_type === "fixed"
-                                ? `₱${voucher.discount_value} off`
-                                : `${voucher.discount_value}% off`,
-                          },
-                          {
-                            label: "Expires",
-                            value: voucher.expires_at
-                              ? new Date(voucher.expires_at).toLocaleDateString(
-                                  "en-PH",
-                                  { month: "short", day: "numeric", year: "numeric" },
-                                )
-                              : "No expiry",
-                          },
-                          {
-                            label: "Min Distance",
-                            value:
-                              voucher.minimum_distance_km > 0
-                                ? `${voucher.minimum_distance_km} km`
-                                : "None",
-                          },
-                          {
-                            label: "Min Fare",
-                            value:
-                              voucher.minimum_fare > 0
-                                ? `₱${voucher.minimum_fare}`
-                                : "None",
-                          },
-                        ].map((item) => (
-                          <div
-                            key={item.label}
-                            className="bg-gray-50 rounded-xl p-3 border border-gray-100"
-                          >
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                              {item.label}
-                            </p>
-                            <p className="font-bold text-gray-900">
-                              {item.value}
-                            </p>
+
+            {/* Voucher List */}
+            {vouchers.length === 0 ? (
+              <div className="bg-white rounded-[24px] border border-gray-100 border-dashed py-20 flex flex-col items-center justify-center text-gray-300">
+                <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+                  <Tag size={32} className="opacity-20" />
+                </div>
+                <p className="font-bold text-[15px] text-gray-400">No saved vouchers yet</p>
+                <p className="text-xs font-medium mt-1">Add a code above to get started</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vouchers.map((uv) => {
+                  const voucher = uv.voucher;
+                  const status = statusFor(uv);
+                  const isAvailable = status.label === "Available";
+                  
+                  const toneStyles = 
+                    status.tone === "emerald" 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                      : status.tone === "red"
+                        ? "bg-red-50 text-red-600 border-red-100"
+                        : status.tone === "amber"
+                          ? "bg-amber-50 text-amber-700 border-amber-100"
+                          : "bg-gray-100 text-gray-500 border-gray-200";
+
+                  return (
+                    <div
+                      key={uv.id}
+                      className={`group relative bg-white rounded-[24px] border transition-all duration-300 ${isAvailable ? "border-gray-100 hover:border-gray-900 shadow-sm hover:shadow-xl hover:shadow-gray-900/5 hover:-translate-y-0.5" : "border-gray-100 opacity-80"}`}
+                    >
+                      {/* Ticket Cutout Effect */}
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[7px] w-3.5 h-7 bg-gray-50 rounded-r-full border-r border-t border-b border-gray-100 md:hidden" />
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[7px] w-3.5 h-7 bg-gray-50 rounded-l-full border-l border-t border-b border-gray-100 md:hidden" />
+
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-4 mb-5">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-black text-gray-950 text-[17px] leading-tight mb-1 truncate group-hover:text-gray-900">
+                              {voucher?.title || uv.code}
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">CODE:</span>
+                              <span className="text-[11px] font-black text-gray-900 px-2 py-0.5 bg-gray-100 rounded-md">
+                                {uv.code}
+                              </span>
+                            </div>
                           </div>
-                        ))}
+                          <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 border ${toneStyles}`}>
+                            {status.label}
+                          </span>
+                        </div>
+
+                        {voucher ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              {
+                                label: "Discount",
+                                icon: 'Tag',
+                                value: voucher.discount_type === "fixed"
+                                  ? `₱${voucher.discount_value}`
+                                  : `${voucher.discount_value}%`,
+                                detail: "OFF",
+                              },
+                              {
+                                label: "Expires on",
+                                icon: 'Calendar',
+                                value: voucher.expires_at
+                                  ? new Date(voucher.expires_at).toLocaleDateString("en-PH", { month: "short", day: "numeric" })
+                                  : "Never",
+                                detail: voucher.expires_at ? new Date(voucher.expires_at).getFullYear().toString() : "Expires",
+                              },
+                              {
+                                label: "Min Dist.",
+                                icon: 'Navigation',
+                                value: voucher.minimum_distance_km > 0 ? `${voucher.minimum_distance_km}km` : "None",
+                                detail: "REQUIRED",
+                              },
+                              {
+                                label: "Min Fare",
+                                icon: 'CreditCard',
+                                value: voucher.minimum_fare > 0 ? `₱${voucher.minimum_fare}` : "None",
+                                detail: "REQUIRED",
+                              },
+                            ].map((item) => (
+                              <div
+                                key={item.label}
+                                className="bg-gray-50/50 rounded-2xl p-3 border border-gray-50 flex flex-col justify-center"
+                              >
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                    {item.label}
+                                  </p>
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                  <p className="font-black text-gray-900 text-sm leading-none">
+                                    {item.value}
+                                  </p>
+                                  <p className="text-[9px] font-bold text-gray-400 uppercase">
+                                    {item.detail}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                            <p className="text-[13px] text-gray-400 font-medium">Voucher details unavailable</p>
+                          </div>
+                        )}
+                        
+                        {voucher?.description && (
+                          <p className="mt-4 text-[12px] text-gray-500 font-medium leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100/50">
+                            {voucher.description}
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-sm text-gray-400">
-                        Voucher details are unavailable.
-                      </p>
-                    )}
-                  </div>
-);
-              })}
-            </div>
-          )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      {/* Safe area bottom padding for mobile */}
-      <div className="h-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0 md:hidden" />
+      {/* Bottom Padding for Safe Areas */}
+      <div className="h-[max(1rem,env(safe-area-inset-bottom))] bg-gray-50 shrink-0" />
     </div>
   );
 };
-
 const ChatHistoryScreen = ({
   userId,
   userName,
