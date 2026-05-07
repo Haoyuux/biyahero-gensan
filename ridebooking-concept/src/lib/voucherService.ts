@@ -159,12 +159,12 @@ export async function fetchUserVouchers(userId: string): Promise<UserVoucher[]> 
 
 async function getVoucherUsage(voucherId: string, userId: string) {
   const [{ count: totalUsed }, { count: userUsed }] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('user_vouchers')
       .select('*', { count: 'exact', head: true })
       .eq('voucher_id', voucherId)
       .eq('status', 'used'),
-    supabase
+    supabaseAdmin
       .from('user_vouchers')
       .select('*', { count: 'exact', head: true })
       .eq('voucher_id', voucherId)
@@ -199,23 +199,27 @@ export async function addVoucherToUser(
     return { userVoucher: null, error: 'You already used this voucher' };
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabaseAdmin
     .from('user_vouchers')
     .select('*, voucher:vouchers(*)')
     .eq('user_id', userId)
     .eq('voucher_id', v.id)
     .eq('status', 'available')
     .maybeSingle();
+  if (existingError) {
+    console.error('addVoucherToUser existing:', existingError);
+    return { userVoucher: null, error: existingError.message };
+  }
   if (existing) return { userVoucher: existing as UserVoucher };
 
-  const { data, error: insertError } = await supabase
+  const { data, error: insertError } = await supabaseAdmin
     .from('user_vouchers')
     .insert({ user_id: userId, voucher_id: v.id, code: v.code, status: 'available' })
     .select('*, voucher:vouchers(*)')
     .single();
   if (insertError) {
     console.error('addVoucherToUser:', insertError);
-    return { userVoucher: null, error: 'Unable to add voucher' };
+    return { userVoucher: null, error: insertError.message || 'Unable to add voucher' };
   }
   return { userVoucher: data as UserVoucher };
 }
@@ -224,7 +228,7 @@ export async function markVoucherUsed(
   userVoucherId: string,
   rideId: string,
 ): Promise<boolean> {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('user_vouchers')
     .update({ status: 'used', used_at: new Date().toISOString(), ride_id: rideId })
     .eq('id', userVoucherId);
