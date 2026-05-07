@@ -10180,19 +10180,19 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
     is_active: true,
   });
 
-  const load = React.useCallback(async () => {
+const load = React.useCallback(async () => {
     setLoading(true);
     const list = await fetchVouchers();
     setVouchers(list);
     if (list.length > 0) {
+      // Count from user_vouchers - when user adds voucher to their account
       const { data } = await supabase
-        .from("rides")
+        .from("user_vouchers")
         .select("voucher_id")
         .in(
           "voucher_id",
           list.map((v) => v.id),
-        )
-        .eq("status", "completed");
+        );
       const counts = ((data as { voucher_id: string }[]) || []).reduce(
         (acc, row) => {
           acc[row.voucher_id] = (acc[row.voucher_id] || 0) + 1;
