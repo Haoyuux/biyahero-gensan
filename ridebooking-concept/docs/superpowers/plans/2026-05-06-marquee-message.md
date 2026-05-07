@@ -13,6 +13,7 @@
 ### Task 1: Add `marquee_message` column to Supabase
 
 **Files:**
+
 - No code file — SQL migration run in Supabase SQL editor
 
 - [ ] **Step 1: Run migration in Supabase dashboard SQL editor**
@@ -30,6 +31,7 @@ In Supabase Table Editor, open the `maintenance` table and confirm `marquee_mess
 ### Task 2: Extend `MaintenanceSettings` interface
 
 **Files:**
+
 - Modify: `src/lib/maintenanceService.ts`
 
 - [ ] **Step 1: Add field to interface**
@@ -41,7 +43,7 @@ export interface MaintenanceSettings {
   id: number;
   mode: MaintenanceMode;
   message: string | null;
-  marquee_message: string | null;   // ← add this line
+  marquee_message: string | null; // ← add this line
   scheduled_start: string | null;
   scheduled_end: string | null;
   post_news: boolean;
@@ -74,6 +76,7 @@ git commit -m "feat: add marquee_message to MaintenanceSettings interface"
 ### Task 3: Add marquee input to `MaintenanceTab`
 
 **Files:**
+
 - Modify: `src/App.tsx` (around lines 9544–9862)
 
 - [ ] **Step 1: Add local state for `marqueeMessage`**
@@ -91,9 +94,11 @@ const [marqueeMessage, setMarqueeMessage] = React.useState(
 In the JSX, after the closing `</div>` of the Message section (around line 9792, just before the `{mode !== "off" && (` post-news block), insert:
 
 ```tsx
-{/* Marquee Text */}
+{
+  /* Marquee Text */
+}
 <div>
-  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+  <p className="text-xs font-normal text-gray-400 uppercase tracking-widest mb-3">
     Marquee Text
   </p>
   <input
@@ -104,9 +109,10 @@ In the JSX, after the closing `</div>` of the Message section (around line 9792,
     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
   />
   <p className="text-[11px] text-gray-400 mt-1.5 ml-1">
-    Shown in the scrolling banner during half maintenance. Leave blank to use the default.
+    Shown in the scrolling banner during half maintenance. Leave blank to use
+    the default.
   </p>
-</div>
+</div>;
 ```
 
 - [ ] **Step 3: Include `marquee_message` in `handleSave`**
@@ -117,7 +123,7 @@ In `handleSave`, update the `updateMaintenanceSettings` call (around line 9662) 
 const ok = await updateMaintenanceSettings({
   mode,
   message: message || null,
-  marquee_message: marqueeMessage || null,   // ← add this line
+  marquee_message: marqueeMessage || null, // ← add this line
   scheduled_start: startIso,
   scheduled_end: endIso,
   post_news: mode !== "off" && postNews,
@@ -136,7 +142,7 @@ const updated: MaintenanceSettings = {
   id: 1,
   mode,
   message: message || null,
-  marquee_message: marqueeMessage || null,   // ← add this line
+  marquee_message: marqueeMessage || null, // ← add this line
   scheduled_start: startIso,
   scheduled_end: endIso,
   post_news: mode !== "off" && postNews,
@@ -167,6 +173,7 @@ git commit -m "feat: add marquee text input to MaintenanceTab"
 ### Task 4: Update `MaintenanceBanner` to use custom text
 
 **Files:**
+
 - Modify: `src/App.tsx` (around lines 941–990)
 
 - [ ] **Step 1: Replace `text` resolution in `MaintenanceBanner`**

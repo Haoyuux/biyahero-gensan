@@ -627,7 +627,7 @@ const MapLegend = React.memo(function MapLegend({
               style={{ backgroundColor: item.color }}
             />
           )}
-          <span className="text-[11px] font-bold text-gray-700 leading-tight whitespace-nowrap">
+          <span className="text-[11px] font-normal text-gray-700 leading-tight whitespace-nowrap">
             {item.label}
           </span>
         </div>
@@ -686,7 +686,9 @@ export default function App() {
     document.title = globalSettings?.document_title || appName;
 
     // iOS home screen app name
-    let appTitleMeta = document.querySelector("meta[name='apple-mobile-web-app-title']") as HTMLMetaElement;
+    let appTitleMeta = document.querySelector(
+      "meta[name='apple-mobile-web-app-title']",
+    ) as HTMLMetaElement;
     if (!appTitleMeta) {
       appTitleMeta = document.createElement("meta");
       appTitleMeta.name = "apple-mobile-web-app-title";
@@ -696,7 +698,9 @@ export default function App() {
 
     const applyIcons = (src: string) => {
       // Browser tab favicon
-      let favicon = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      let favicon = document.querySelector(
+        "link[rel~='icon']",
+      ) as HTMLLinkElement;
       if (!favicon) {
         favicon = document.createElement("link");
         favicon.rel = "icon";
@@ -705,7 +709,9 @@ export default function App() {
       favicon.href = src;
 
       // iOS home screen icon
-      let touchIcon = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+      let touchIcon = document.querySelector(
+        "link[rel='apple-touch-icon']",
+      ) as HTMLLinkElement;
       if (!touchIcon) {
         touchIcon = document.createElement("link");
         touchIcon.rel = "apple-touch-icon";
@@ -726,7 +732,9 @@ export default function App() {
           { src, sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       };
-      let manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
+      let manifestLink = document.querySelector(
+        "link[rel='manifest']",
+      ) as HTMLLinkElement;
       if (!manifestLink) {
         manifestLink = document.createElement("link");
         manifestLink.rel = "manifest";
@@ -826,7 +834,7 @@ export default function App() {
 
   if (impersonating) {
     const exitBanner = (
-      <div className="fixed top-0 inset-x-0 z-[400] bg-gray-950 text-white px-4 py-2 flex items-center justify-between text-[13px] font-bold shadow-lg">
+      <div className="fixed top-0 inset-x-0 z-[400] bg-gray-950 text-white px-4 py-2 flex items-center justify-between text-[13px] font-normal shadow-lg">
         <span className="flex items-center gap-2 flex-wrap">
           👁 Viewing as{" "}
           <strong>{impersonating.full_name || impersonating.email}</strong> (
@@ -1002,10 +1010,10 @@ const MaintenanceScreen = ({
 
         {endLabel && (
           <div className="bg-white/10 rounded-2xl px-5 py-3 border border-white/10">
-            <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-1">
+            <p className="text-[11px] font-normal text-white/40 uppercase tracking-widest mb-1">
               Expected back
             </p>
-            <p className="text-white font-bold text-sm">{endLabel}</p>
+            <p className="text-white font-normal text-sm">{endLabel}</p>
           </div>
         )}
       </div>
@@ -1050,7 +1058,7 @@ const MaintenanceBanner = ({
     >
       <div className="flex animate-[marquee_30s_linear_infinite] whitespace-nowrap">
         {[0, 1, 2].map((i) => (
-          <span key={i} className="text-amber-950 text-xs font-bold px-12">
+          <span key={i} className="text-amber-950 text-xs font-normal px-12">
             🔧 {text}
           </span>
         ))}
@@ -1234,7 +1242,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
         <div className="w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl p-6 mb-6 space-y-4">
           {/* Reason */}
           <div>
-            <p className="text-[10px] font-bold text-red-400/70 uppercase tracking-widest mb-2">
+            <p className="text-[10px] font-normal text-red-400/70 uppercase tracking-widest mb-2">
               Reason
             </p>
             <p className="text-[15px] font-semibold text-white/90 leading-relaxed">
@@ -1245,7 +1253,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
           {/* Blocked by */}
           {profile.blocked_by && (
             <div>
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+              <p className="text-[10px] font-normal text-gray-500 uppercase tracking-widest mb-1">
                 Blocked by
               </p>
               <p className="text-sm font-medium text-gray-400">Admin</p>
@@ -1255,7 +1263,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
           {/* Date */}
           {profile.blocked_at && (
             <div>
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+              <p className="text-[10px] font-normal text-gray-500 uppercase tracking-widest mb-1">
                 Date
               </p>
               <p className="text-sm font-medium text-gray-400">
@@ -1347,7 +1355,7 @@ const OnboardingScreen = ({
               />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-[15px] leading-tight">
+              <p className="font-normal text-[15px] leading-tight">
                 I'm a Passenger
               </p>
               <p
@@ -1386,7 +1394,7 @@ const OnboardingScreen = ({
             </div>
             <div className="flex-1">
               <p
-                className={`font-bold text-[15px] leading-tight ${riderDisabled ? "text-gray-400" : ""}`}
+                className={`font-normal text-[15px] leading-tight ${riderDisabled ? "text-gray-400" : ""}`}
               >
                 I'm a Driver
               </p>
@@ -1533,7 +1541,7 @@ const ProfileSetupScreen = ({
               className="hidden"
               onChange={(e) => handleImageUpload(e, "cover")}
             />
-            <div className="bg-black/40 group-hover:bg-black/60 transition-colors rounded-xl px-4 py-2 flex items-center gap-2 text-white text-sm font-bold">
+            <div className="bg-black/40 group-hover:bg-black/60 transition-colors rounded-xl px-4 py-2 flex items-center gap-2 text-white text-sm font-normal">
               {coverUploading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
@@ -1668,7 +1676,7 @@ const ProfileSetupScreen = ({
                     key={option}
                     type="button"
                     onClick={() => setSex(option)}
-                    className={`py-3 rounded-2xl text-sm font-bold border-2 transition-all ${sex === option ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-emerald-300"}`}
+                    className={`py-3 rounded-2xl text-sm font-normal border-2 transition-all ${sex === option ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-emerald-300"}`}
                   >
                     {option === "Prefer not to say" ? "Prefer not" : option}
                   </button>
@@ -1853,14 +1861,14 @@ const UserProfileScreen = ({
             {!editing && (
               <button
                 onClick={() => setEditing(true)}
-                className="bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-colors"
+                className="bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
               >
                 <Edit3 size={13} /> Edit Profile
               </button>
             )}
             <button
               onClick={() => signOut()}
-              className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-colors"
+              className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
             >
               <LogOut size={13} /> Sign out
             </button>
@@ -1874,7 +1882,7 @@ const UserProfileScreen = ({
                 className="hidden"
                 onChange={(e) => handleImageUpload(e, "cover")}
               />
-              <div className="bg-black/40 group-hover:bg-black/60 transition-colors rounded-xl px-4 py-2 flex items-center gap-2 text-white text-sm font-bold">
+              <div className="bg-black/40 group-hover:bg-black/60 transition-colors rounded-xl px-4 py-2 flex items-center gap-2 text-white text-sm font-normal">
                 {coverUploading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
@@ -1959,7 +1967,7 @@ const UserProfileScreen = ({
                   <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-1">
                     {label}
                   </p>
-                  <p className="font-bold text-gray-800">{value || "—"}</p>
+                  <p className="font-normal text-gray-800">{value || "—"}</p>
                 </div>
               ))}
             </div>
@@ -2040,7 +2048,7 @@ const UserProfileScreen = ({
                       key={option}
                       type="button"
                       onClick={() => setSex(option)}
-                      className={`py-3 rounded-2xl text-sm font-bold border-2 transition-all ${sex === option ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-emerald-300"}`}
+                      className={`py-3 rounded-2xl text-sm font-normal border-2 transition-all ${sex === option ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-emerald-300"}`}
                     >
                       {option === "Prefer not to say" ? "Prefer not" : option}
                     </button>
@@ -2065,7 +2073,7 @@ const UserProfileScreen = ({
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleCancel}
-                  className="flex-1 py-4 rounded-2xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-4 rounded-2xl border-2 border-gray-200 font-normal text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -2141,7 +2149,7 @@ const NotificationsPanel = ({
         {notifications.length > 0 && (
           <button
             onClick={onClear}
-            className="text-xs font-bold text-emerald-600 hover:text-emerald-700 px-3 py-1.5 rounded-full hover:bg-emerald-50 transition-colors"
+            className="text-xs font-normal text-emerald-600 hover:text-emerald-700 px-3 py-1.5 rounded-full hover:bg-emerald-50 transition-colors"
           >
             Clear all
           </button>
@@ -2175,7 +2183,7 @@ const NotificationsPanel = ({
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-900 text-sm">{n.title}</p>
+                  <p className="font-normal text-gray-900 text-sm">{n.title}</p>
                   <p className="text-gray-500 text-sm font-medium mt-0.5">
                     {n.body}
                   </p>
@@ -2283,7 +2291,7 @@ const ConnectionBanner = ({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: -40, opacity: 0 }}
       transition={{ type: "spring", damping: 20, stiffness: 300 }}
-      className={`fixed top-0 inset-x-0 z-[9999] ${cfg.bg} text-white text-sm font-bold flex items-center justify-center gap-2 py-2.5 px-4 shadow-lg`}
+      className={`fixed top-0 inset-x-0 z-[9999] ${cfg.bg} text-white text-sm font-normal flex items-center justify-center gap-2 py-2.5 px-4 shadow-lg`}
     >
       {cfg.spin ? (
         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
@@ -2396,7 +2404,9 @@ const UserApp = ({
   );
   const [userVouchers, setUserVouchers] = useState<UserVoucher[]>([]);
   const [selectedUserVoucher, setSelectedUserVoucher] =
-    useState<UserVoucher | null>(() => _pr.current?.selectedUserVoucher ?? null);
+    useState<UserVoucher | null>(
+      () => _pr.current?.selectedUserVoucher ?? null,
+    );
   const [voucherDiscount, setVoucherDiscount] = useState<number>(
     () => _pr.current?.voucherDiscount ?? 0,
   );
@@ -2503,7 +2513,7 @@ const UserApp = ({
     const list = await fetchUserVouchers(currentProfile.id);
     setUserVouchers(list);
     setSelectedUserVoucher((current) =>
-      current ? list.find((v) => v.id === current.id) ?? current : current,
+      current ? (list.find((v) => v.id === current.id) ?? current) : current,
     );
   }, [currentProfile.id]);
 
@@ -3352,7 +3362,7 @@ const UserApp = ({
                       setShowMenu(false);
                       signOut();
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-colors text-red-500 font-bold text-sm"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-colors text-red-500 font-normal text-sm"
                   >
                     <LogOut size={16} /> Sign out
                   </button>
@@ -3439,7 +3449,7 @@ const UserApp = ({
                 </h1>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                  <span className="text-[10px] text-gray-400 font-normal uppercase tracking-widest">
                     Premium Service
                   </span>
                 </div>
@@ -3520,7 +3530,7 @@ const UserApp = ({
                       <div className="bg-gray-950 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/40">
                         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-[13px] leading-tight">
+                          <p className="font-normal text-[13px] leading-tight">
                             Ongoing ride
                           </p>
                           <p className="text-gray-400 text-[11px] font-medium truncate mt-0.5">
@@ -3533,7 +3543,7 @@ const UserApp = ({
                           onClick={() =>
                             setStep(activeRider ? "matched" : "searching")
                           }
-                          className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                          className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-normal text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
                         >
                           View
                         </button>
@@ -3551,7 +3561,7 @@ const UserApp = ({
                           className="text-orange-500 shrink-0 mt-0.5"
                         />
                         <div className="flex-1">
-                          <p className="text-[13px] font-bold text-orange-800">
+                          <p className="text-[13px] font-normal text-orange-800">
                             Profile incomplete
                           </p>
                           <p className="text-[12px] text-orange-600 mt-0.5">
@@ -3560,7 +3570,7 @@ const UserApp = ({
                         </div>
                         <button
                           onClick={() => setShowProfile(true)}
-                          className="shrink-0 text-[11px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors"
+                          className="shrink-0 text-[11px] font-normal text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors"
                         >
                           Complete
                         </button>
@@ -3573,7 +3583,7 @@ const UserApp = ({
                         className="text-amber-500 shrink-0 mt-0.5"
                       />
                       <div className="flex-1">
-                        <p className="text-[13px] font-bold text-amber-800">
+                        <p className="text-[13px] font-normal text-amber-800">
                           Location access is off
                         </p>
                         <p className="text-[12px] text-amber-600 mt-0.5">
@@ -3716,15 +3726,14 @@ const UserApp = ({
                         totalFare: Math.max(0, breakdown.totalFare - discount),
                       },
                       originalFare: breakdown.totalFare,
-                      voucher:
-                        voucher?.voucher
-                          ? {
-                              id: voucher.voucher.id,
-                              userVoucherId: voucher.id,
-                              code: voucher.code,
-                              discount,
-                            }
-                          : null,
+                      voucher: voucher?.voucher
+                        ? {
+                            id: voucher.voucher.id,
+                            userVoucherId: voucher.id,
+                            code: voucher.code,
+                            discount,
+                          }
+                        : null,
                       rideType: selectedRide,
                       priorityRiderIds,
                       routeDistance: breakdown.distanceKm * 1000,
@@ -4175,7 +4184,7 @@ const RiderProfileScreen = ({
           {label}
         </span>
         {editing && (
-          <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 cursor-pointer hover:text-emerald-700">
+          <label className="flex items-center gap-1.5 text-xs font-normal text-emerald-600 cursor-pointer hover:text-emerald-700">
             <input
               type="file"
               accept="image/*,.pdf"
@@ -4203,7 +4212,7 @@ const RiderProfileScreen = ({
               <FileText size={18} className="text-red-500" />
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-800">PDF Document</p>
+              <p className="text-sm font-normal text-gray-800">PDF Document</p>
               <p className="text-xs text-emerald-600 font-semibold mt-0.5">
                 Tap to view ↗
               </p>
@@ -4257,14 +4266,14 @@ const RiderProfileScreen = ({
             {!editing && (
               <button
                 onClick={() => setEditing(true)}
-                className="bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-colors"
+                className="bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
               >
                 <Edit3 size={13} /> Edit
               </button>
             )}
             <button
               onClick={() => signOut()}
-              className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-colors"
+              className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
             >
               <LogOut size={13} /> Sign out
             </button>
@@ -4277,7 +4286,7 @@ const RiderProfileScreen = ({
                 className="hidden"
                 onChange={(e) => handleUpload(e, "cover")}
               />
-              <div className="bg-black/40 group-hover:bg-black/60 transition-colors rounded-xl px-4 py-2 flex items-center gap-2 text-white text-sm font-bold">
+              <div className="bg-black/40 group-hover:bg-black/60 transition-colors rounded-xl px-4 py-2 flex items-center gap-2 text-white text-sm font-normal">
                 {uploading === "cover" ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
@@ -4374,7 +4383,7 @@ const RiderProfileScreen = ({
                       <span className="text-xs font-black text-gray-400 uppercase tracking-wider">
                         {label}
                       </span>
-                      <span className="font-bold text-gray-800 text-sm">
+                      <span className="font-normal text-gray-800 text-sm">
                         {value || "—"}
                       </span>
                     </div>
@@ -4401,7 +4410,7 @@ const RiderProfileScreen = ({
                       <span className="text-xs font-black text-gray-400 uppercase tracking-wider">
                         {label}
                       </span>
-                      <span className="font-bold text-gray-800 text-sm">
+                      <span className="font-normal text-gray-800 text-sm">
                         {value || "—"}
                       </span>
                     </div>
@@ -4471,7 +4480,7 @@ const RiderProfileScreen = ({
                 </div>
               ) : profile.rider_status === "pending" ? (
                 <div className="bg-yellow-50 border border-yellow-100 rounded-2xl px-4 py-4 text-center">
-                  <p className="text-yellow-700 font-bold text-sm">
+                  <p className="text-yellow-700 font-normal text-sm">
                     Your documents are under review by our team.
                   </p>
                   <p className="text-yellow-600 text-xs mt-1">
@@ -4484,7 +4493,7 @@ const RiderProfileScreen = ({
                     size={20}
                     className="text-emerald-500 mx-auto mb-2"
                   />
-                  <p className="text-emerald-700 font-bold text-sm">
+                  <p className="text-emerald-700 font-normal text-sm">
                     Your account is verified and approved!
                   </p>
                   {profile.reviewed_at && (
@@ -4565,7 +4574,7 @@ const RiderProfileScreen = ({
                         key={o}
                         type="button"
                         onClick={() => setSex(o)}
-                        className={`py-3 rounded-2xl text-sm font-bold border-2 transition-all ${sex === o ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}
+                        className={`py-3 rounded-2xl text-sm font-normal border-2 transition-all ${sex === o ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}
                       >
                         {o === "Prefer not to say" ? "Prefer not" : o}
                       </button>
@@ -4585,7 +4594,7 @@ const RiderProfileScreen = ({
                         key={t}
                         type="button"
                         onClick={() => setVehicleType(t)}
-                        className={`py-3 rounded-2xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${vehicleType === t ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}
+                        className={`py-3 rounded-2xl text-sm font-normal border-2 transition-all flex items-center justify-center gap-2 ${vehicleType === t ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}
                       >
                         {t === "Motorcycle" ? (
                           <Bike size={16} />
@@ -4675,7 +4684,7 @@ const RiderProfileScreen = ({
                     setEditing(false);
                     setError("");
                   }}
-                  className="flex-1 py-4 rounded-2xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-4 rounded-2xl border-2 border-gray-200 font-normal text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -5077,7 +5086,7 @@ const RiderActiveRide = ({
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -50, opacity: 0 }}
-            className="absolute top-0 inset-x-0 z-[9999] bg-blue-600 text-white text-sm font-bold flex items-center justify-center gap-2 py-2.5 px-4 shadow-lg"
+            className="absolute top-0 inset-x-0 z-[9999] bg-blue-600 text-white text-sm font-normal flex items-center justify-center gap-2 py-2.5 px-4 shadow-lg"
           >
             <div className="w-2 h-2 rounded-full bg-blue-300 animate-pulse" />
             Resumed your active ride
@@ -5228,7 +5237,7 @@ const RiderActiveRide = ({
                   <MessageSquare size={15} />
                 </button>
                 {unreadCount > 0 && (
-                  <div className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 pointer-events-none">
+                  <div className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-normal rounded-full flex items-center justify-center px-0.5 pointer-events-none">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </div>
                 )}
@@ -5317,7 +5326,7 @@ const RiderActiveRide = ({
                       <p className="text-xs text-gray-400 font-medium">
                         Pick up
                       </p>
-                      <p className="text-sm font-bold text-gray-800">
+                      <p className="text-sm font-normal text-gray-800">
                         {request.pickup.label}
                       </p>
                     </div>
@@ -5333,7 +5342,7 @@ const RiderActiveRide = ({
                       <p className="text-xs text-gray-400 font-medium">
                         Drop off
                       </p>
-                      <p className="text-sm font-bold text-gray-800">
+                      <p className="text-sm font-normal text-gray-800">
                         {request.dropoff.label}
                       </p>
                     </div>
@@ -5357,7 +5366,7 @@ const RiderActiveRide = ({
                         : `Booking Fee`;
                     return (
                       <div className="bg-gray-50 rounded-2xl p-4 mb-2 space-y-2">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                        <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                           Fare Breakdown
                         </p>
                         {[
@@ -5414,7 +5423,7 @@ const RiderActiveRide = ({
                 <MessageSquare size={22} />
               </button>
               {unreadCount > 0 && (
-                <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none">
+                <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-normal rounded-full flex items-center justify-center px-1 pointer-events-none">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </div>
               )}
@@ -5442,13 +5451,13 @@ const RiderActiveRide = ({
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors"
+                className="flex-1 py-3 bg-gray-100 rounded-2xl text-sm font-normal text-gray-700 hover:bg-gray-200 transition-colors"
               >
                 Keep Ride
               </button>
               <button
                 onClick={handleRiderCancel}
-                className="flex-1 py-3 bg-red-500 rounded-2xl text-sm font-bold text-white hover:bg-red-600 transition-colors"
+                className="flex-1 py-3 bg-red-500 rounded-2xl text-sm font-normal text-white hover:bg-red-600 transition-colors"
               >
                 Yes, Cancel
               </button>
@@ -5456,7 +5465,7 @@ const RiderActiveRide = ({
           ) : (
             <button
               onClick={() => setShowCancelConfirm(true)}
-              className="w-full py-2.5 text-red-500 text-sm font-bold rounded-2xl hover:bg-red-50 transition-colors"
+              className="w-full py-2.5 text-red-500 text-sm font-normal rounded-2xl hover:bg-red-50 transition-colors"
             >
               Cancel Booking
             </button>
@@ -6423,7 +6432,7 @@ const RiderDashboard = ({
             <button
               key={tab}
               onClick={() => setRiderTab(tab)}
-              className={`py-3 px-4 text-[13px] font-bold border-b-2 transition-colors ${riderTab === tab ? "border-gray-950 text-gray-950" : "border-transparent text-gray-400 hover:text-gray-600"}`}
+              className={`py-3 px-4 text-[13px] font-normal border-b-2 transition-colors ${riderTab === tab ? "border-gray-950 text-gray-950" : "border-transparent text-gray-400 hover:text-gray-600"}`}
             >
               {tab === "home"
                 ? "Dashboard"
@@ -6489,7 +6498,7 @@ const RiderDashboard = ({
                   )}
                 </div>
                 <span
-                  className={`text-[10px] font-bold tracking-wide ${active ? "text-gray-950" : "text-gray-400"}`}
+                  className={`text-[10px] font-normal tracking-wide ${active ? "text-gray-950" : "text-gray-400"}`}
                 >
                   {label}
                 </span>
@@ -6515,7 +6524,7 @@ const RiderDashboard = ({
                     className={`w-2 h-2 rounded-full ${waitingForUserConfirm ? "bg-white animate-pulse" : "bg-emerald-400 animate-pulse"} shrink-0`}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[13px] leading-tight">
+                    <p className="font-normal text-[13px] leading-tight">
                       {waitingForUserConfirm
                         ? "Waiting for passenger..."
                         : "Ongoing trip"}
@@ -6528,7 +6537,7 @@ const RiderDashboard = ({
                   {!waitingForUserConfirm && (
                     <button
                       onClick={() => setShowActiveRide(true)}
-                      className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                      className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-normal text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
                     >
                       View
                     </button>
@@ -6558,7 +6567,7 @@ const RiderDashboard = ({
                   {/* Date picker */}
                   <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                      <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-0.5">
                         Viewing
                       </p>
                       <p className="font-black text-[15px] text-gray-950">
@@ -6631,7 +6640,7 @@ const RiderDashboard = ({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center font-bold text-xs text-gray-500">
+                              <div className="w-full h-full flex items-center justify-center font-normal text-xs text-gray-500">
                                 {(t.user_name || "P")[0].toUpperCase()}
                               </div>
                             )}
@@ -6659,7 +6668,7 @@ const RiderDashboard = ({
                               </p>
                               {(t.voucher_discount || 0) > 0 && (
                                 <p
-                                  className={`text-[10px] font-bold mt-0.5 ${
+                                  className={`text-[10px] font-normal mt-0.5 ${
                                     t.voucher_discount_paid
                                       ? "text-emerald-600"
                                       : "text-amber-600"
@@ -6718,7 +6727,7 @@ const RiderDashboard = ({
                           <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-6" />
                           <div className="flex items-start justify-between mb-5">
                             <div>
-                              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">
+                              <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-1">
                                 Completed
                               </p>
                               <p className="font-black text-[1.2rem] tracking-tight leading-tight">
@@ -6756,17 +6765,17 @@ const RiderDashboard = ({
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">
+                                <div className="w-full h-full flex items-center justify-center font-normal text-gray-400">
                                   {(selectedTrip.user_name ||
                                     "P")[0].toUpperCase()}
                                 </div>
                               )}
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest">
                                 Passenger
                               </p>
-                              <p className="font-bold text-[15px] text-gray-900">
+                              <p className="font-normal text-[15px] text-gray-900">
                                 {selectedTrip.user_name || "Passenger"}
                               </p>
                             </div>
@@ -6801,7 +6810,7 @@ const RiderDashboard = ({
 
                           {/* Fare Breakdown */}
                           <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-4">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                            <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                               Fare Breakdown
                             </p>
                             <div className="space-y-2 text-[13px]">
@@ -6859,14 +6868,15 @@ const RiderDashboard = ({
                             <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 mb-4">
                               <div className="flex items-center justify-between gap-3">
                                 <div>
-                                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-1">
+                                  <p className="text-[10px] font-normal text-emerald-700 uppercase tracking-widest mb-1">
                                     Voucher Reimbursement
                                   </p>
                                   <p className="font-black text-lg text-emerald-700">
                                     ₱{selectedTrip.voucher_discount}
                                   </p>
                                   <p className="text-[12px] text-emerald-700/70 mt-0.5">
-                                    {selectedTrip.voucher_code || "Voucher"} discount covered by admin
+                                    {selectedTrip.voucher_code || "Voucher"}{" "}
+                                    discount covered by admin
                                   </p>
                                 </div>
                                 <span
@@ -6895,7 +6905,7 @@ const RiderDashboard = ({
                           {/* Rating & Comment */}
                           {selectedTrip.rating != null && (
                             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-2">
                                 Passenger Rating
                               </p>
                               <div className="flex items-center gap-1.5">
@@ -6910,7 +6920,7 @@ const RiderDashboard = ({
                                     }
                                   />
                                 ))}
-                                <span className="ml-1 font-bold text-sm text-gray-700">
+                                <span className="ml-1 font-normal text-sm text-gray-700">
                                   {selectedTrip.rating}/5
                                 </span>
                               </div>
@@ -6966,7 +6976,7 @@ const RiderDashboard = ({
                         <p className="text-xs text-amber-700 leading-relaxed">
                           Missing: {missingDocs.join(", ")}
                         </p>
-                        <p className="text-xs font-bold text-amber-900 mt-1.5">
+                        <p className="text-xs font-normal text-amber-900 mt-1.5">
                           Tap to upload →
                         </p>
                       </div>
@@ -7000,7 +7010,7 @@ const RiderDashboard = ({
                       </p>
                       <button
                         onClick={() => setShowProfile(true)}
-                        className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                        className="w-full py-3.5 rounded-xl font-normal text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                       >
                         {currentProfile.rider_status === "rejected"
                           ? "Update & Resubmit"
@@ -7042,7 +7052,7 @@ const RiderDashboard = ({
                             className="text-amber-500 shrink-0 mt-0.5"
                           />
                           <div>
-                            <p className="text-[12px] font-bold text-amber-800">
+                            <p className="text-[12px] font-normal text-amber-800">
                               Remittance Pending
                             </p>
                             <p className="text-[11px] text-amber-600 mt-0.5">
@@ -7058,7 +7068,7 @@ const RiderDashboard = ({
                             className="text-amber-500 shrink-0 mt-0.5"
                           />
                           <div>
-                            <p className="text-[12px] font-bold text-amber-800">
+                            <p className="text-[12px] font-normal text-amber-800">
                               Location access is off
                             </p>
                             <p className="text-[11px] text-amber-600 mt-0.5">
@@ -7079,7 +7089,7 @@ const RiderDashboard = ({
                             return;
                           setIsOnline((prev) => !prev);
                         }}
-                        className={`w-full py-[15px] rounded-xl font-bold text-[15px] transition-colors ${
+                        className={`w-full py-[15px] rounded-xl font-normal text-[15px] transition-colors ${
                           isOnline
                             ? "bg-white text-gray-950 hover:bg-gray-100"
                             : maintenanceMode === "half" ||
@@ -7105,7 +7115,7 @@ const RiderDashboard = ({
                         <Users2 size={18} className="text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900 text-sm">
+                        <p className="font-normal text-gray-900 text-sm">
                           {riderTeam.name}
                         </p>
                         {(riderTeam.schedule_days ?? []).length > 0 ? (
@@ -7254,7 +7264,7 @@ const RiderDashboard = ({
                                   },
                                 });
                             }}
-                            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-normal text-sm text-gray-500 hover:bg-gray-50 transition-colors"
                           >
                             Decline
                           </button>
@@ -7366,7 +7376,7 @@ const RiderDashboard = ({
                                 payload: { rideId: rid, rider: currentProfile },
                               });
                             }}
-                            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+                            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-normal text-sm hover:bg-gray-800 transition-colors"
                           >
                             Accept
                           </button>
@@ -7411,7 +7421,7 @@ const RiderDashboard = ({
                   {/* Recent Trips */}
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-50">
-                      <h3 className="font-bold text-sm text-gray-900">
+                      <h3 className="font-normal text-sm text-gray-900">
                         Recent Trips
                       </h3>
                     </div>
@@ -7483,7 +7493,7 @@ const RiderDashboard = ({
                   value={remitDate}
                   onChange={(e) => setRemitDate(e.target.value)}
                   max={new Date().toISOString().slice(0, 10)}
-                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-[13px] font-bold outline-none text-gray-600 shrink-0 focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-[13px] font-normal outline-none text-gray-600 shrink-0 focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 />
               </div>
 
@@ -7494,7 +7504,7 @@ const RiderDashboard = ({
               ) : (
                 <>
                   <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                    <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                    <h3 className="text-[12px] font-normal text-gray-400 uppercase tracking-widest mb-4">
                       Summary for{" "}
                       {new Date(remitDate).toLocaleDateString([], {
                         month: "short",
@@ -7504,7 +7514,7 @@ const RiderDashboard = ({
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-gray-50 rounded-xl p-4">
-                        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        <p className="text-[11px] font-normal text-gray-500 uppercase tracking-wider mb-1">
                           Earnings
                         </p>
                         <p className="text-xl font-black text-gray-900">
@@ -7516,18 +7526,18 @@ const RiderDashboard = ({
                         </p>
                       </div>
                       <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                        <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                        <p className="text-[11px] font-normal text-emerald-600 uppercase tracking-wider mb-1">
                           Due Fee
                         </p>
                         {discountAmount > 0 ? (
                           <>
-                            <p className="text-sm font-bold text-emerald-400 line-through">
+                            <p className="text-sm font-normal text-emerald-400 line-through">
                               ₱{remitStats.bookingFee}
                             </p>
                             <p className="text-xl font-black text-emerald-700">
                               ₱{feeToRemit}
                             </p>
-                            <p className="text-[11px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                            <p className="text-[11px] text-emerald-600 font-normal mt-1 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                               Team {discountPct}% discount
                             </p>
@@ -7547,7 +7557,7 @@ const RiderDashboard = ({
 
                     {settings?.remittance_qr_url && (
                       <div className="mt-5 bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col items-center">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                        <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           Scan to Pay Booking Fees
                         </p>
                         <div
@@ -7578,7 +7588,7 @@ const RiderDashboard = ({
 
                     {remitStats.bookingFee > 0 && !hasPendingRemit && (
                       <div className="mt-5 border-t border-gray-100 pt-5">
-                        <h4 className="text-[13px] font-bold text-gray-900 mb-3">
+                        <h4 className="text-[13px] font-normal text-gray-900 mb-3">
                           Submit Remittance Record
                         </h4>
                         <input
@@ -7627,7 +7637,7 @@ const RiderDashboard = ({
                               setRemitting(false);
                             }
                           }}
-                          className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[13px] rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
+                          className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-normal text-[13px] rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
                         >
                           {remitting ? (
                             <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
@@ -7639,7 +7649,7 @@ const RiderDashboard = ({
                     )}
                     {hasPendingRemit && (
                       <div className="mt-5 border-t border-gray-100 pt-5 text-center">
-                        <p className="text-amber-600 font-bold text-[13px] bg-amber-50 px-4 py-3 rounded-xl border border-amber-100">
+                        <p className="text-amber-600 font-normal text-[13px] bg-amber-50 px-4 py-3 rounded-xl border border-amber-100">
                           You have a pending remittance waiting for admin
                           approval.
                         </p>
@@ -7666,7 +7676,7 @@ const RiderDashboard = ({
                         >
                           <div className="flex justify-between items-start mb-3">
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                                 {new Date(r.created_at).toLocaleString([], {
                                   month: "short",
                                   day: "numeric",
@@ -7724,7 +7734,7 @@ const RiderDashboard = ({
                           )}
                           {r.admin_notes && (
                             <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                                 Admin Note
                               </p>
                               <p className="text-[13px] text-gray-600 leading-relaxed">
@@ -7790,7 +7800,7 @@ const RiderDashboard = ({
                   </div>
                   {(myTeam.schedule_days ?? []).length > 0 ? (
                     <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <p className="text-[10px] font-normal text-gray-400 uppercase tracking-wider mb-1.5">
                         Schedule
                       </p>
                       <div className="flex gap-1 flex-wrap">
@@ -7825,7 +7835,7 @@ const RiderDashboard = ({
                     <button
                       key={t}
                       onClick={() => setTeamSubTab(t)}
-                      className={`flex-1 py-2 text-[13px] font-bold rounded-lg transition-colors capitalize ${teamSubTab === t ? "bg-white text-gray-950 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                      className={`flex-1 py-2 text-[13px] font-normal rounded-lg transition-colors capitalize ${teamSubTab === t ? "bg-white text-gray-950 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
                     >
                       {t === "members" ? "Members" : "Remittances"}
                     </button>
@@ -7836,7 +7846,7 @@ const RiderDashboard = ({
                 {teamSubTab === "members" && (
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-                      <p className="font-bold text-sm text-gray-900">
+                      <p className="font-normal text-sm text-gray-900">
                         Team Members
                       </p>
                       {(myTeam.members ?? []).length < myTeam.capacity && (
@@ -7845,7 +7855,7 @@ const RiderDashboard = ({
                             setAddingMember(true);
                             setTeamMemberSearch("");
                           }}
-                          className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                          className="flex items-center gap-1.5 text-[11px] font-normal text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                           <UserPlus size={12} /> Add Member
                         </button>
@@ -7989,7 +7999,7 @@ const RiderDashboard = ({
                   <div className="space-y-3">
                     {/* Date filter */}
                     <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold text-gray-900">
+                      <p className="text-sm font-normal text-gray-900">
                         Filter by Date
                       </p>
                       <input
@@ -8002,7 +8012,7 @@ const RiderDashboard = ({
 
                     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                       <div className="px-5 py-4 border-b border-gray-50">
-                        <p className="font-bold text-sm text-gray-900">
+                        <p className="font-normal text-sm text-gray-900">
                           Remittances
                           <span className="ml-2 text-[11px] text-gray-400 font-medium">
                             {new Date(
@@ -8076,7 +8086,7 @@ const RiderDashboard = ({
                                         <span className="text-[10px] text-gray-300">
                                           ·
                                         </span>
-                                        <span className="text-[10px] text-emerald-600 font-bold">
+                                        <span className="text-[10px] text-emerald-600 font-normal">
                                           {Math.round(
                                             (1 -
                                               r.amount_remitted /
@@ -8091,13 +8101,13 @@ const RiderDashboard = ({
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor}`}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-normal uppercase ${statusColor}`}
                                   >
                                     {r.status}
                                   </span>
                                   <button
                                     onClick={() => setViewingRemittance(r)}
-                                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] font-bold text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] font-normal text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                   >
                                     View
                                   </button>
@@ -8172,11 +8182,11 @@ const RiderDashboard = ({
                       </div>
                     )}
                     <div>
-                      <p className="font-bold text-gray-900">
+                      <p className="font-normal text-gray-900">
                         {viewingRemittance.rider_name || "Unknown Rider"}
                       </p>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${viewingRemittance.status === "approved" ? "bg-emerald-100 text-emerald-700" : viewingRemittance.status === "rejected" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-normal uppercase ${viewingRemittance.status === "approved" ? "bg-emerald-100 text-emerald-700" : viewingRemittance.status === "rejected" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}
                       >
                         {viewingRemittance.status}
                       </span>
@@ -8223,7 +8233,7 @@ const RiderDashboard = ({
                   {/* Receipt */}
                   {viewingRemittance.receipt_url ? (
                     <div>
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      <p className="text-[11px] font-normal text-gray-400 uppercase tracking-wider mb-2">
                         Receipt
                       </p>
                       <img
@@ -8247,7 +8257,7 @@ const RiderDashboard = ({
                   {/* Admin notes */}
                   {viewingRemittance.admin_notes && (
                     <div className="bg-amber-50 rounded-xl p-4">
-                      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">
+                      <p className="text-[10px] font-normal text-amber-600 uppercase tracking-wider mb-1">
                         Admin Note
                       </p>
                       <p className="text-[13px] text-amber-800">
@@ -8304,7 +8314,7 @@ const RiderDashboard = ({
                       <h3 className="font-black text-base text-gray-900 uppercase tracking-tight">
                         {viewerTitle}
                       </h3>
-                      <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mt-0.5 opacity-60">
+                      <p className="text-[11px] text-gray-400 font-normal uppercase tracking-wider mt-0.5 opacity-60">
                         {viewerTitle === "Payment QR Code"
                           ? "Scan to remit booking fees"
                           : "Remittance Receipt"}
@@ -8349,7 +8359,7 @@ const RiderDashboard = ({
                       </button>
                       <button
                         onClick={() => setViewerImage(null)}
-                        className="w-full py-4 bg-gray-100 text-gray-500 font-bold text-sm rounded-2xl hover:bg-gray-200 transition-all active:scale-[0.97]"
+                        className="w-full py-4 bg-gray-100 text-gray-500 font-normal text-sm rounded-2xl hover:bg-gray-200 transition-all active:scale-[0.97]"
                       >
                         DISMISS
                       </button>
@@ -8529,7 +8539,7 @@ const TeamManagementPanel = ({
         </div>
         <button
           onClick={() => setCreating(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-normal rounded-xl hover:bg-gray-800 transition-colors"
         >
           <Plus size={15} /> New Team
         </button>
@@ -8538,7 +8548,7 @@ const TeamManagementPanel = ({
       {/* Create form */}
       {creating && (
         <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
-          <h3 className="font-bold text-sm text-gray-900 mb-4">
+          <h3 className="font-normal text-sm text-gray-900 mb-4">
             Create New Team
           </h3>
           <div className="flex gap-3 flex-wrap">
@@ -8575,7 +8585,7 @@ const TeamManagementPanel = ({
               <button
                 onClick={handleCreate}
                 disabled={saving || !newName.trim()}
-                className="px-4 py-2 bg-gray-950 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                className="px-4 py-2 bg-gray-950 text-white rounded-xl text-sm font-normal hover:bg-gray-800 disabled:opacity-40 transition-colors"
               >
                 {saving ? "Creating…" : "Create"}
               </button>
@@ -8621,7 +8631,7 @@ const TeamManagementPanel = ({
                       <Users2 size={18} className="text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 text-sm">
+                      <p className="font-normal text-gray-900 text-sm">
                         {team.name}
                       </p>
                       <p className="text-[11px] text-gray-400 mt-0.5">
@@ -8653,7 +8663,7 @@ const TeamManagementPanel = ({
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[11px] font-bold text-gray-900">
+                      <p className="text-[11px] font-normal text-gray-900">
                         {memberCount} / {team.capacity}
                       </p>
                       <p className="text-[10px] text-gray-400">members</p>
@@ -8666,7 +8676,7 @@ const TeamManagementPanel = ({
                   </button>
                   <div className="flex items-center gap-2 shrink-0">
                     <span
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${team.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-normal ${team.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-400 border border-gray-200"}`}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${team.is_active ? "bg-emerald-500" : "bg-gray-400"}`}
@@ -8776,7 +8786,7 @@ const TeamManagementPanel = ({
                               : prev,
                           )
                         }
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors ${editingTeam.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"}`}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-normal border transition-colors ${editingTeam.is_active ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"}`}
                       >
                         <span
                           className={`w-2 h-2 rounded-full ${editingTeam.is_active ? "bg-emerald-500" : "bg-gray-400"}`}
@@ -8794,7 +8804,7 @@ const TeamManagementPanel = ({
                       <button
                         onClick={handleSaveEdit}
                         disabled={saving}
-                        className="px-3 py-2 bg-gray-950 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40"
+                        className="px-3 py-2 bg-gray-950 text-white rounded-xl text-sm font-normal hover:bg-gray-800 disabled:opacity-40"
                       >
                         Save
                       </button>
@@ -8813,7 +8823,7 @@ const TeamManagementPanel = ({
                       <>
                         {/* Assign leader */}
                         <div>
-                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                          <p className="text-[11px] font-normal text-gray-400 uppercase tracking-wider mb-2">
                             Team Leader
                           </p>
                           <div className="flex items-center gap-3">
@@ -8848,7 +8858,7 @@ const TeamManagementPanel = ({
 
                         {/* Schedule */}
                         <div>
-                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                          <p className="text-[11px] font-normal text-gray-400 uppercase tracking-wider mb-2">
                             Schedule Days
                           </p>
                           <div className="flex gap-1.5 flex-wrap">
@@ -8882,7 +8892,7 @@ const TeamManagementPanel = ({
                         {/* Members */}
                         <div>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <p className="text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               Members ({(teamDetail?.members ?? []).length}/
                               {team.capacity})
                             </p>
@@ -8893,7 +8903,7 @@ const TeamManagementPanel = ({
                                   setAddMemberTeamId(team.id);
                                   setMemberSearch("");
                                 }}
-                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                                className="flex items-center gap-1.5 text-[11px] font-normal text-gray-600 hover:text-gray-950 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 transition-colors"
                               >
                                 <UserPlus size={12} /> Add Member
                               </button>
@@ -9225,7 +9235,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white text-sm font-normal rounded-xl hover:bg-gray-800 transition-colors"
         >
           <Plus size={15} /> New Post
         </button>
@@ -9237,7 +9247,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
           <button
             key={t.key}
             onClick={() => setFilter(t.key)}
-            className={`flex-1 py-2 px-3 text-[12px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === t.key ? "bg-white text-gray-950 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+            className={`flex-1 py-2 px-3 text-[12px] font-normal rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === t.key ? "bg-white text-gray-950 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
           >
             {t.label}
             {t.count > 0 && (
@@ -9255,7 +9265,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <p className="font-bold text-gray-900 text-sm">
+            <p className="font-normal text-gray-900 text-sm">
               {editingPost ? "Edit Post" : "New Post"}
             </p>
             <button
@@ -9391,7 +9401,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                   disabled={
                     saving || !form.title.trim() || !form.content.trim()
                   }
-                  className="px-4 py-2 bg-gray-950 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                  className="px-4 py-2 bg-gray-950 text-white rounded-xl text-sm font-normal hover:bg-gray-800 disabled:opacity-40 transition-colors"
                 >
                   {saving ? "Saving…" : editingPost ? "Update" : "Publish"}
                 </button>
@@ -9467,7 +9477,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                         })}
                       </span>
                     </div>
-                    <p className="font-bold text-gray-900 text-sm leading-snug">
+                    <p className="font-normal text-gray-900 text-sm leading-snug">
                       {post.title}
                     </p>
                     <p className="text-[12px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">
@@ -9533,7 +9543,7 @@ function parseInline(text: string): React.ReactNode[] {
     if (match.index > last) parts.push(text.slice(last, match.index));
     if (match[0].startsWith("**")) {
       parts.push(
-        <strong key={match.index} className="font-bold">
+        <strong key={match.index} className="font-normal">
           {match[2]}
         </strong>,
       );
@@ -9627,7 +9637,7 @@ const NewsFeedViewer = ({
       {readIds && posts.some((p) => !readIds.has(p.id)) && (
         <button
           onClick={() => onMarkAllRead?.(posts.map((p) => p.id))}
-          className="w-full text-[12px] font-bold text-gray-500 hover:text-gray-900 py-2 text-right pr-1 transition-colors"
+          className="w-full text-[12px] font-normal text-gray-500 hover:text-gray-900 py-2 text-right pr-1 transition-colors"
         >
           Mark all as read
         </button>
@@ -9680,7 +9690,7 @@ const NewsFeedViewer = ({
                     setExpanded(opening ? post.id : null);
                     if (opening && isUnread) onMarkRead?.(post.id);
                   }}
-                  className="text-[12px] font-bold text-gray-950 mt-1.5 hover:underline"
+                  className="text-[12px] font-normal text-gray-950 mt-1.5 hover:underline"
                 >
                   {isOpen ? "Show less" : "Read more"}
                 </button>
@@ -9899,7 +9909,7 @@ const MaintenanceTab = ({
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
       {toast && (
-        <div className="fixed top-4 right-4 z-[500] bg-gray-950 text-white text-sm font-bold px-4 py-3 rounded-2xl shadow-xl">
+        <div className="fixed top-4 right-4 z-[500] bg-gray-950 text-white text-sm font-normal px-4 py-3 rounded-2xl shadow-xl">
           {toast}
         </div>
       )}
@@ -9914,7 +9924,7 @@ const MaintenanceTab = ({
 
       {/* Mode selector */}
       <div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+        <p className="text-xs font-normal text-gray-400 uppercase tracking-widest mb-3">
           Maintenance Mode
         </p>
         <div className="flex gap-2">
@@ -9922,7 +9932,7 @@ const MaintenanceTab = ({
             <button
               key={m}
               onClick={() => setMode(m)}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm capitalize transition-colors ${
+              className={`flex-1 py-3 rounded-xl font-normal text-sm capitalize transition-colors ${
                 mode === m
                   ? m === "off"
                     ? "bg-emerald-500 text-white"
@@ -9940,7 +9950,7 @@ const MaintenanceTab = ({
 
       {/* Timing */}
       <div className="space-y-4">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+        <p className="text-xs font-normal text-gray-400 uppercase tracking-widest">
           Schedule
         </p>
         <label className="flex items-center gap-3 cursor-pointer">
@@ -9981,7 +9991,7 @@ const MaintenanceTab = ({
 
       {/* Message */}
       <div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+        <p className="text-xs font-normal text-gray-400 uppercase tracking-widest mb-3">
           Message
         </p>
         <textarea
@@ -9995,7 +10005,7 @@ const MaintenanceTab = ({
 
       {/* Marquee Text */}
       <div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+        <p className="text-xs font-normal text-gray-400 uppercase tracking-widest mb-3">
           Marquee Text
         </p>
         <input
@@ -10006,7 +10016,8 @@ const MaintenanceTab = ({
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
         />
         <p className="text-[11px] text-gray-400 mt-1.5 ml-1">
-          Shown in the scrolling banner during half maintenance. Leave blank to use the default.
+          Shown in the scrolling banner during half maintenance. Leave blank to
+          use the default.
         </p>
       </div>
 
@@ -10032,7 +10043,7 @@ const MaintenanceTab = ({
 
       {/* Registration controls */}
       <div className="space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+        <p className="text-xs font-normal text-gray-400 uppercase tracking-widest">
           Registration
         </p>
         <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
@@ -10073,7 +10084,7 @@ const MaintenanceTab = ({
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full bg-gray-950 text-white font-bold text-[15px] py-4 rounded-2xl hover:bg-gray-800 transition-colors disabled:opacity-50"
+        className="w-full bg-gray-950 text-white font-normal text-[15px] py-4 rounded-2xl hover:bg-gray-800 transition-colors disabled:opacity-50"
       >
         {saving ? "Saving..." : "Save Maintenance Settings"}
       </button>
@@ -10279,7 +10290,9 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
       discount_type: form.discount_type,
       discount_value: Number(form.discount_value) || 0,
       max_discount_amount:
-        form.max_discount_amount === "" ? null : Number(form.max_discount_amount),
+        form.max_discount_amount === ""
+          ? null
+          : Number(form.max_discount_amount),
       minimum_fare: Number(form.minimum_fare) || 0,
       minimum_distance_km: Number(form.minimum_distance_km) || 0,
       usage_limit: form.usage_limit === "" ? null : Number(form.usage_limit),
@@ -10323,7 +10336,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
               ["description", "Description"],
             ].map(([key, label]) => (
               <div key={key}>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                   {label}
                 </label>
                 <input
@@ -10343,7 +10356,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
             ))}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                   Discount Type
                 </label>
                 <select
@@ -10425,7 +10438,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                 }
               />
             </div>
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+            <label className="flex items-center gap-2 text-sm font-normal text-gray-700">
               <input
                 type="checkbox"
                 checked={form.is_active}
@@ -10439,14 +10452,14 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
               <button
                 onClick={save}
                 disabled={saving}
-                className="flex-1 bg-gray-950 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-50"
+                className="flex-1 bg-gray-950 text-white rounded-xl py-3 text-sm font-normal disabled:opacity-50"
               >
                 {saving ? "Saving..." : editing ? "Save Changes" : "Create"}
               </button>
               {editing && (
                 <button
                   onClick={resetForm}
-                  className="px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold"
+                  className="px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-normal"
                 >
                   Cancel
                 </button>
@@ -10456,36 +10469,45 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h3 className="font-bold text-sm text-gray-900">
-              Voucher Codes
-            </h3>
+            <h3 className="font-normal text-sm text-gray-900">Voucher Codes</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {["Code", "Discount", "Rules", "Usage", "Status", "Actions"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+                  {[
+                    "Code",
+                    "Discount",
+                    "Rules",
+                    "Usage",
+                    "Status",
+                    "Actions",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td
+                      colSpan={6}
+                      className="px-5 py-8 text-center text-sm text-gray-400"
+                    >
                       Loading...
                     </td>
                   </tr>
                 ) : vouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td
+                      colSpan={6}
+                      className="px-5 py-8 text-center text-sm text-gray-400"
+                    >
                       No vouchers yet.
                     </td>
                   </tr>
@@ -10497,46 +10519,56 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                         ? null
                         : Math.max(0, v.usage_limit - used);
                     return (
-                      <tr key={v.id} className="border-b border-gray-50 last:border-0">
+                      <tr
+                        key={v.id}
+                        className="border-b border-gray-50 last:border-0"
+                      >
                         <td className="px-5 py-4">
                           <p className="font-black text-gray-950">{v.code}</p>
                           <p className="text-[11px] text-gray-400">{v.title}</p>
                         </td>
-                        <td className="px-5 py-4 text-sm font-bold text-gray-800">
+                        <td className="px-5 py-4 text-sm font-normal text-gray-800">
                           {v.discount_type === "fixed"
                             ? `₱${v.discount_value} off`
                             : `${v.discount_value}% off`}
                         </td>
                         <td className="px-5 py-4 text-[12px] text-gray-500">
-                          {v.minimum_distance_km > 0 && `${v.minimum_distance_km}km+ `}
+                          {v.minimum_distance_km > 0 &&
+                            `${v.minimum_distance_km}km+ `}
                           {v.minimum_fare > 0 && `₱${v.minimum_fare}+ `}
                           {v.expires_at &&
                             `until ${new Date(v.expires_at).toLocaleDateString("en-PH")}`}
                         </td>
                         <td className="px-5 py-4">
                           <p className="text-sm font-black text-gray-950">
-                            {remaining == null ? "Unlimited" : `${remaining} left`}
+                            {remaining == null
+                              ? "Unlimited"
+                              : `${remaining} left`}
                           </p>
                           <p className="text-[11px] text-gray-400">
                             {used} used
-                            {v.usage_limit != null ? ` / ${v.usage_limit} total` : ""}
+                            {v.usage_limit != null
+                              ? ` / ${v.usage_limit} total`
+                              : ""}
                           </p>
                         </td>
                         <td className="px-5 py-4">
-                          <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${v.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                          <span
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-normal ${v.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}
+                          >
                             {v.is_active ? "Active" : "Inactive"}
                           </span>
                         </td>
                         <td className="px-5 py-4">
                           <button
                             onClick={() => setViewingVoucher(v)}
-                            className="text-[12px] font-bold text-emerald-600 hover:text-emerald-700 mr-3"
+                            className="text-[12px] font-normal text-emerald-600 hover:text-emerald-700 mr-3"
                           >
                             View
                           </button>
                           <button
                             onClick={() => editVoucher(v)}
-                            className="text-[12px] font-bold text-gray-500 hover:text-gray-900"
+                            className="text-[12px] font-normal text-gray-500 hover:text-gray-900"
                           >
                             Edit
                           </button>
@@ -10596,7 +10628,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                       ].map((h) => (
                         <th
                           key={h}
-                          className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider"
+                          className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider"
                         >
                           {h}
                         </th>
@@ -10606,35 +10638,46 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                   <tbody>
                     {voucherRideLoading ? (
                       <tr>
-                        <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                        <td
+                          colSpan={6}
+                          className="px-5 py-8 text-center text-sm text-gray-400"
+                        >
                           Loading rides...
                         </td>
                       </tr>
                     ) : voucherRideRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                        <td
+                          colSpan={6}
+                          className="px-5 py-8 text-center text-sm text-gray-400"
+                        >
                           No completed rides used this voucher yet.
                         </td>
                       </tr>
                     ) : (
                       voucherRideRows.map((ride) => (
-                        <tr key={ride.id} className="border-b border-gray-50 last:border-0">
+                        <tr
+                          key={ride.id}
+                          className="border-b border-gray-50 last:border-0"
+                        >
                           <td className="px-5 py-4">
-                            <p className="font-bold text-sm text-gray-900">
+                            <p className="font-normal text-sm text-gray-900">
                               {ride.user_name || "Passenger"}
                             </p>
                             <p className="text-[11px] text-gray-400">
                               {ride.completed_at
-                                ? new Date(ride.completed_at).toLocaleString("en-PH")
+                                ? new Date(ride.completed_at).toLocaleString(
+                                    "en-PH",
+                                  )
                                 : ""}
                             </p>
                           </td>
-                          <td className="px-5 py-4 text-sm font-bold text-gray-800">
+                          <td className="px-5 py-4 text-sm font-normal text-gray-800">
                             {ride.rider_name || "Rider"}
                           </td>
                           <td className="px-5 py-4 text-[12px] text-gray-500">
                             <p>Original: ₱{ride.original_fare ?? ride.fare}</p>
-                            <p className="font-bold text-gray-900">
+                            <p className="font-normal text-gray-900">
                               Paid by passenger: ₱{ride.final_fare ?? ride.fare}
                             </p>
                           </td>
@@ -10643,7 +10686,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                           </td>
                           <td className="px-5 py-4">
                             <span
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-normal ${
                                 ride.voucher_discount_paid
                                   ? "bg-emerald-50 text-emerald-700"
                                   : "bg-amber-50 text-amber-700"
@@ -10661,13 +10704,15 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                           </td>
                           <td className="px-5 py-4">
                             <button
-                              onClick={() => markVoucherPaymentComplete(ride.id)}
+                              onClick={() =>
+                                markVoucherPaymentComplete(ride.id)
+                              }
                               disabled={
                                 ride.voucher_discount_paid ||
                                 voucherPaymentLoading === ride.id ||
                                 !ride.voucher_discount
                               }
-                              className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-normal disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               {voucherPaymentLoading === ride.id
                                 ? "Saving..."
@@ -10700,7 +10745,7 @@ const NumberField = ({
   onChange: (value: number) => void;
 }) => (
   <div>
-    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+    <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
       {label}
     </label>
     <input
@@ -10723,7 +10768,7 @@ const TextNumberField = ({
   onChange: (value: string) => void;
 }) => (
   <div>
-    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+    <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
       {label}
     </label>
     <input
@@ -11477,7 +11522,7 @@ const AdminDashboard = ({
                       />
                     ) : (
                       <div
-                        className={`w-full h-full flex items-center justify-center font-bold text-xs ${status === "on_trip" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                        className={`w-full h-full flex items-center justify-center font-normal text-xs ${status === "on_trip" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
                       >
                         {name[0]}
                       </div>
@@ -11492,7 +11537,7 @@ const AdminDashboard = ({
                     </p>
                   </div>
                   <span
-                    className={`flex items-center gap-1 text-[10px] font-bold shrink-0 ${status === "on_trip" ? "text-amber-500" : "text-emerald-600"}`}
+                    className={`flex items-center gap-1 text-[10px] font-normal shrink-0 ${status === "on_trip" ? "text-amber-500" : "text-emerald-600"}`}
                   >
                     <div
                       className={`w-1.5 h-1.5 rounded-full animate-pulse ${status === "on_trip" ? "bg-amber-400" : "bg-emerald-500"}`}
@@ -11544,7 +11589,7 @@ const AdminDashboard = ({
                             key={label}
                             className="bg-white p-5 rounded-2xl border border-gray-100"
                           >
-                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                            <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                               {label}
                             </p>
                             <h3 className="text-3xl font-black text-gray-950 tracking-tight">
@@ -11562,7 +11607,7 @@ const AdminDashboard = ({
                     <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-100 overflow-hidden">
                       <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
                         <div>
-                          <h3 className="font-bold text-sm text-gray-900">
+                          <h3 className="font-normal text-sm text-gray-900">
                             Live Rider Map
                           </h3>
                           <p className="text-[11px] text-gray-400 mt-0.5">
@@ -11578,7 +11623,7 @@ const AdminDashboard = ({
                           >
                             Refresh
                           </button>
-                          <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                          <span className="flex items-center gap-1.5 text-[11px] font-normal text-emerald-600">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />{" "}
                             LIVE
                           </span>
@@ -11647,7 +11692,7 @@ const AdminDashboard = ({
                                       <div
                                         className={`w-2 h-2 rounded-full shrink-0 ${loc.status === "on_trip" ? "bg-amber-400" : "bg-emerald-400"}`}
                                       />
-                                      <span className="font-bold text-[13px] text-gray-900">
+                                      <span className="font-normal text-[13px] text-gray-900">
                                         {loc.riderName || "Rider"}
                                       </span>
                                       <span
@@ -11660,7 +11705,7 @@ const AdminDashboard = ({
                                     </div>
                                     <button
                                       onClick={() => setSelectedLiveRiderId(id)}
-                                      className="w-full text-[11px] font-bold text-indigo-600 hover:text-indigo-700 text-left"
+                                      className="w-full text-[11px] font-normal text-indigo-600 hover:text-indigo-700 text-left"
                                     >
                                       View details →
                                     </button>
@@ -11723,7 +11768,7 @@ const AdminDashboard = ({
                       <div className="w-80 shrink-0 bg-white rounded-2xl border border-gray-100 overflow-hidden">
                         {/* Header */}
                         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                          <h3 className="font-bold text-sm text-gray-900">
+                          <h3 className="font-normal text-sm text-gray-900">
                             Rider Details
                           </h3>
                           <button
@@ -11771,7 +11816,7 @@ const AdminDashboard = ({
                                   {selectedRiderProfile.email}
                                 </p>
                                 <span
-                                  className={`inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${selectedRiderLoc?.status === "on_trip" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                                  className={`inline-flex items-center gap-1 mt-1 text-[10px] font-normal px-2 py-0.5 rounded-full ${selectedRiderLoc?.status === "on_trip" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
                                 >
                                   <div
                                     className={`w-1.5 h-1.5 rounded-full animate-pulse ${selectedRiderLoc?.status === "on_trip" ? "bg-amber-400" : "bg-emerald-500"}`}
@@ -11787,7 +11832,7 @@ const AdminDashboard = ({
 
                             {/* Contact */}
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-2">
                                 Contact
                               </p>
                               <div className="space-y-1.5">
@@ -11816,7 +11861,7 @@ const AdminDashboard = ({
 
                             {/* Vehicle */}
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-2">
                                 Vehicle
                               </p>
                               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
@@ -11860,7 +11905,7 @@ const AdminDashboard = ({
 
                             {/* Account */}
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-2">
                                 Account
                               </p>
                               <div className="space-y-1.5">
@@ -11926,7 +11971,7 @@ const AdminDashboard = ({
                                         <p className="font-black text-base text-gray-950">
                                           {name}
                                         </p>
-                                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-normal px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                                           <div className="w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500" />{" "}
                                           Online
                                         </span>
@@ -11968,7 +12013,7 @@ const AdminDashboard = ({
                       <button
                         onClick={loadOngoingRides}
                         disabled={ongoingLoading}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-950 text-white rounded-xl text-xs font-bold hover:bg-gray-800 transition-colors disabled:opacity-60"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-950 text-white rounded-xl text-xs font-normal hover:bg-gray-800 transition-colors disabled:opacity-60"
                       >
                         <Activity
                           size={12}
@@ -11985,7 +12030,7 @@ const AdminDashboard = ({
                     ) : ongoingRides.length === 0 ? (
                       <div className="bg-white rounded-2xl border border-gray-100 flex flex-col items-center justify-center py-20 text-center">
                         <Navigation size={36} className="text-gray-200 mb-3" />
-                        <p className="font-bold text-gray-400">
+                        <p className="font-normal text-gray-400">
                           No ongoing rides
                         </p>
                         <p className="text-gray-300 text-sm mt-1">
@@ -12009,14 +12054,14 @@ const AdminDashboard = ({
                               return (
                                 <span
                                   key={s}
-                                  className={`px-3 py-1.5 rounded-xl text-[12px] font-bold ${colors[s]}`}
+                                  className={`px-3 py-1.5 rounded-xl text-[12px] font-normal ${colors[s]}`}
                                 >
                                   {s} · {count}
                                 </span>
                               );
                             },
                           )}
-                          <span className="px-3 py-1.5 rounded-xl text-[12px] font-bold bg-gray-100 text-gray-600">
+                          <span className="px-3 py-1.5 rounded-xl text-[12px] font-normal bg-gray-100 text-gray-600">
                             Total · {ongoingRides.length}
                           </span>
                         </div>
@@ -12030,7 +12075,7 @@ const AdminDashboard = ({
                             >
                               <div className="flex items-center justify-between">
                                 <span
-                                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${ride.status === "pending" ? "bg-amber-50 text-amber-700" : ride.status === "accepted" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
+                                  className={`px-2 py-0.5 rounded-lg text-[11px] font-normal ${ride.status === "pending" ? "bg-amber-50 text-amber-700" : ride.status === "accepted" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
                                 >
                                   {ride.status}
                                 </span>
@@ -12096,7 +12141,7 @@ const AdminDashboard = ({
                                     setOngoingRiderProfile(r);
                                     setOngoingDetailLoading(false);
                                   }}
-                                  className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                  className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-normal border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                 >
                                   <Eye size={12} /> Details
                                 </button>
@@ -12123,7 +12168,7 @@ const AdminDashboard = ({
                                 ].map((h) => (
                                   <th
                                     key={h}
-                                    className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap"
+                                    className="px-4 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider whitespace-nowrap"
                                   >
                                     {h}
                                   </th>
@@ -12138,7 +12183,7 @@ const AdminDashboard = ({
                                 >
                                   <td className="px-4 py-3">
                                     <span
-                                      className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${ride.status === "pending" ? "bg-amber-50 text-amber-700" : ride.status === "accepted" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
+                                      className={`px-2 py-0.5 rounded-lg text-[11px] font-normal ${ride.status === "pending" ? "bg-amber-50 text-amber-700" : ride.status === "accepted" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
                                     >
                                       {ride.status}
                                     </span>
@@ -12196,7 +12241,7 @@ const AdminDashboard = ({
                                     </span>
                                   </td>
                                   <td className="px-4 py-3">
-                                    <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                                    <span className="text-[11px] font-normal text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
                                       {ride.ride_type || "—"}
                                     </span>
                                   </td>
@@ -12237,7 +12282,7 @@ const AdminDashboard = ({
                                         setOngoingRiderProfile(r);
                                         setOngoingDetailLoading(false);
                                       }}
-                                      className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors whitespace-nowrap"
+                                      className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-normal border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors whitespace-nowrap"
                                     >
                                       <Eye size={11} /> Details
                                     </button>
@@ -12279,7 +12324,7 @@ const AdminDashboard = ({
                               </div>
                               <div className="flex items-center gap-3">
                                 <span
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold ${ongoingDetail.status === "pending" ? "bg-amber-50 text-amber-700" : ongoingDetail.status === "accepted" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
+                                  className={`px-2 py-1 rounded-lg text-[11px] font-normal ${ongoingDetail.status === "pending" ? "bg-amber-50 text-amber-700" : ongoingDetail.status === "accepted" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}
                                 >
                                   {ongoingDetail.status}
                                 </span>
@@ -12303,7 +12348,7 @@ const AdminDashboard = ({
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* User */}
                                     <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                      <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                                         Passenger
                                       </p>
                                       <div className="flex items-center gap-3 mb-4">
@@ -12371,7 +12416,7 @@ const AdminDashboard = ({
                                     </div>
                                     {/* Rider */}
                                     <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                      <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                                         Rider
                                       </p>
                                       {ongoingRiderProfile ||
@@ -12475,7 +12520,7 @@ const AdminDashboard = ({
 
                                   {/* Ride info */}
                                   <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2.5 text-[13px]">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                                    <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                                       Trip Info
                                     </p>
                                     {[
@@ -12568,7 +12613,7 @@ const AdminDashboard = ({
                   </div>
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-gray-50/50">
-                      <h3 className="font-bold text-sm text-gray-900">
+                      <h3 className="font-normal text-sm text-gray-900">
                         Active Drivers{" "}
                         <span className="ml-2 text-[11px] text-gray-400 font-medium">
                           {filtered.length} total
@@ -12591,7 +12636,7 @@ const AdminDashboard = ({
                             className="pl-8 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 w-64 text-[13px]"
                           />
                         </div>
-                        <button className="px-3.5 py-1.5 bg-gray-950 text-white rounded-lg text-[12px] font-bold hover:bg-gray-800 transition-colors whitespace-nowrap">
+                        <button className="px-3.5 py-1.5 bg-gray-950 text-white rounded-lg text-[12px] font-normal hover:bg-gray-800 transition-colors whitespace-nowrap">
                           Add Driver
                         </button>
                       </div>
@@ -12600,19 +12645,19 @@ const AdminDashboard = ({
                       <table className="w-full text-left">
                         <thead>
                           <tr className="border-b border-gray-100">
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               Driver
                             </th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               Vehicle
                             </th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               Status
                             </th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               Rating
                             </th>
-                            <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
@@ -12652,7 +12697,7 @@ const AdminDashboard = ({
                                           className="w-full h-full object-cover"
                                         />
                                       ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400">
+                                        <div className="w-full h-full flex items-center justify-center text-xs font-normal text-gray-400">
                                           {
                                             (r.first_name ||
                                               r.full_name ||
@@ -12680,11 +12725,11 @@ const AdminDashboard = ({
                                     .join(" ") || "—"}
                                 </td>
                                 <td className="px-5 py-4">
-                                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-normal bg-emerald-50 text-emerald-700">
                                     Approved
                                   </span>
                                 </td>
-                                <td className="px-5 py-4 text-sm font-bold text-gray-900">
+                                <td className="px-5 py-4 text-sm font-normal text-gray-900">
                                   <span className="flex items-center gap-1">
                                     <Star
                                       size={12}
@@ -12696,7 +12741,7 @@ const AdminDashboard = ({
                                 <td className="px-5 py-4">
                                   <button
                                     onClick={() => setSelectedRider(r)}
-                                    className="text-[12px] font-bold text-gray-500 hover:text-gray-900 transition-colors"
+                                    className="text-[12px] font-normal text-gray-500 hover:text-gray-900 transition-colors"
                                   >
                                     View
                                   </button>
@@ -12719,7 +12764,7 @@ const AdminDashboard = ({
                           <button
                             disabled={safePage <= 1}
                             onClick={() => setDriverPage(1)}
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             «
                           </button>
@@ -12728,11 +12773,11 @@ const AdminDashboard = ({
                             onClick={() =>
                               setDriverPage((p) => Math.max(1, p - 1))
                             }
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             ‹
                           </button>
-                          <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">
+                          <span className="px-3 flex items-center text-[12px] font-normal text-gray-900">
                             {safePage} / {totalPages}
                           </span>
                           <button
@@ -12740,14 +12785,14 @@ const AdminDashboard = ({
                             onClick={() =>
                               setDriverPage((p) => Math.min(totalPages, p + 1))
                             }
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             ›
                           </button>
                           <button
                             disabled={safePage >= totalPages}
                             onClick={() => setDriverPage(totalPages)}
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             »
                           </button>
@@ -12789,7 +12834,7 @@ const AdminDashboard = ({
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                      <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                         Rides This Week
                       </p>
                       <p className="text-3xl font-black text-gray-950 tracking-tight mb-5">
@@ -12809,20 +12854,20 @@ const AdminDashboard = ({
                           </div>
                         ))}
                       </div>
-                      <div className="flex justify-between mt-3 text-[10px] font-bold text-gray-300">
+                      <div className="flex justify-between mt-3 text-[10px] font-normal text-gray-300">
                         {days.map((d) => (
                           <span key={d}>{d}</span>
                         ))}
                       </div>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                      <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-4">
                         Week-over-Week
                       </p>
                       <div className="mb-5">
                         <h4 className="text-4xl font-black text-gray-950 tracking-tight">
                           {analyticsData?.totalThisWeek ?? "—"}
-                          <span className="text-lg text-gray-300 font-bold ml-1.5">
+                          <span className="text-lg text-gray-300 font-normal ml-1.5">
                             rides
                           </span>
                         </h4>
@@ -12905,7 +12950,7 @@ const AdminDashboard = ({
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <div className="bg-gray-950 text-white p-5 rounded-2xl">
-                        <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">
+                        <p className="text-[11px] font-normal text-white/40 uppercase tracking-widest mb-3">
                           Total Gross Volume
                         </p>
                         <h3 className="text-3xl font-black tracking-tight mb-3">
@@ -12922,7 +12967,7 @@ const AdminDashboard = ({
                         )}
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                        <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           Platform Revenue (20%)
                         </p>
                         <h3 className="text-3xl font-black tracking-tight text-gray-950 mb-3">
@@ -12933,7 +12978,7 @@ const AdminDashboard = ({
                         </p>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                        <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           This Week Gross
                         </p>
                         <h3 className="text-3xl font-black tracking-tight text-gray-950 mb-3">
@@ -12946,7 +12991,7 @@ const AdminDashboard = ({
                     </div>
                     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                       <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                        <h3 className="font-bold text-sm text-gray-900">
+                        <h3 className="font-normal text-sm text-gray-900">
                           Recent Transactions
                         </h3>
                       </div>
@@ -13020,7 +13065,7 @@ const AdminDashboard = ({
                                       </div>
                                     </div>
                                     <div className="text-right">
-                                      <p className="font-bold text-sm text-gray-900">
+                                      <p className="font-normal text-sm text-gray-900">
                                         ₱{t.fare}
                                       </p>
                                       <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
@@ -13044,7 +13089,7 @@ const AdminDashboard = ({
                                     <button
                                       disabled={safeFPage <= 1}
                                       onClick={() => setFinancePage(1)}
-                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                                     >
                                       «
                                     </button>
@@ -13055,11 +13100,11 @@ const AdminDashboard = ({
                                           Math.max(1, p - 1),
                                         )
                                       }
-                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                                     >
                                       ‹
                                     </button>
-                                    <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">
+                                    <span className="px-3 flex items-center text-[12px] font-normal text-gray-900">
                                       {safeFPage} / {totalFinancePages}
                                     </span>
                                     <button
@@ -13069,7 +13114,7 @@ const AdminDashboard = ({
                                           Math.min(totalFinancePages, p + 1),
                                         )
                                       }
-                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                                     >
                                       ›
                                     </button>
@@ -13078,7 +13123,7 @@ const AdminDashboard = ({
                                       onClick={() =>
                                         setFinancePage(totalFinancePages)
                                       }
-                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                                     >
                                       »
                                     </button>
@@ -13204,7 +13249,7 @@ const AdminDashboard = ({
 
                         {/* Personal Info */}
                         <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                          <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                             Personal Information
                           </p>
                           <div className="grid grid-cols-2 gap-2">
@@ -13236,7 +13281,7 @@ const AdminDashboard = ({
                                 key={label}
                                 className="bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100"
                               >
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                                <p className="text-[10px] font-normal text-gray-400 uppercase tracking-wider mb-0.5">
                                   {label}
                                 </p>
                                 <p className="font-semibold text-gray-900 text-[13px]">
@@ -13249,7 +13294,7 @@ const AdminDashboard = ({
 
                         {/* Vehicle Info */}
                         <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                          <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                             Vehicle Information
                           </p>
                           <div className="grid grid-cols-2 gap-2">
@@ -13279,7 +13324,7 @@ const AdminDashboard = ({
                                 key={label}
                                 className="bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100"
                               >
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                                <p className="text-[10px] font-normal text-gray-400 uppercase tracking-wider mb-0.5">
                                   {label}
                                 </p>
                                 <p className="font-semibold text-gray-900 text-[13px]">
@@ -13292,7 +13337,7 @@ const AdminDashboard = ({
 
                         {/* Documents */}
                         <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                          <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                             Uploaded Documents
                           </p>
                           <div className="space-y-2">
@@ -13318,7 +13363,7 @@ const AdminDashboard = ({
                                 key={label}
                                 className="border border-gray-100 rounded-xl overflow-hidden"
                               >
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100">
+                                <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100">
                                   {label}
                                 </p>
                                 {url ? (
@@ -13354,7 +13399,7 @@ const AdminDashboard = ({
                                 handleStatusChange(selectedRider.id, "rejected")
                               }
                               disabled={statusUpdating}
-                              className="flex-1 py-3.5 rounded-xl border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+                              className="flex-1 py-3.5 rounded-xl border border-red-200 text-red-600 font-normal text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
                             >
                               Reject
                             </button>
@@ -13363,7 +13408,7 @@ const AdminDashboard = ({
                                 handleStatusChange(selectedRider.id, "approved")
                               }
                               disabled={statusUpdating}
-                              className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                              className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-normal text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                               {statusUpdating ? (
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -13378,7 +13423,7 @@ const AdminDashboard = ({
                               handleStatusChange(selectedRider.id, "rejected")
                             }
                             disabled={statusUpdating}
-                            className="w-full py-3.5 rounded-xl border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 transition-colors"
+                            className="w-full py-3.5 rounded-xl border border-red-200 text-red-600 font-normal text-sm hover:bg-red-50 transition-colors"
                           >
                             Revoke Approval
                           </button>
@@ -13389,7 +13434,7 @@ const AdminDashboard = ({
                               handleStatusChange(selectedRider.id, "approved")
                             }
                             disabled={statusUpdating}
-                            className="w-full py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+                            className="w-full py-3.5 rounded-xl bg-gray-950 text-white font-normal text-sm hover:bg-gray-800 transition-colors"
                           >
                             Approve Instead
                           </button>
@@ -13433,7 +13478,7 @@ const AdminDashboard = ({
                 return (
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-gray-50/50">
-                      <h3 className="font-bold text-sm text-gray-900">
+                      <h3 className="font-normal text-sm text-gray-900">
                         All Riders{" "}
                         <span className="ml-2 text-[11px] text-gray-400 font-medium">
                           {filtered.length} total
@@ -13482,19 +13527,19 @@ const AdminDashboard = ({
                           <table className="w-full text-left">
                             <thead>
                               <tr className="border-b border-gray-100">
-                                <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Rider
                                 </th>
-                                <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Vehicle
                                 </th>
-                                <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Docs
                                 </th>
-                                <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Status
                                 </th>
-                                <th className="px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-5 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Action
                                 </th>
                               </tr>
@@ -13571,7 +13616,7 @@ const AdminDashboard = ({
                                   </td>
                                   <td className="px-5 py-4">
                                     <span
-                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold ${
+                                      className={`px-2 py-1 rounded-lg text-[11px] font-normal ${
                                         r.rider_status === "approved"
                                           ? "bg-emerald-50 text-emerald-700"
                                           : r.rider_status === "pending"
@@ -13587,7 +13632,7 @@ const AdminDashboard = ({
                                   <td className="px-5 py-4">
                                     <button
                                       onClick={() => setSelectedRider(r)}
-                                      className="flex items-center gap-1.5 text-[12px] font-bold text-gray-500 hover:text-gray-900 transition-colors"
+                                      className="flex items-center gap-1.5 text-[12px] font-normal text-gray-500 hover:text-gray-900 transition-colors"
                                     >
                                       <Eye size={13} /> View
                                     </button>
@@ -13621,7 +13666,7 @@ const AdminDashboard = ({
                               <button
                                 disabled={safePage <= 1}
                                 onClick={() => setVerifyPage(1)}
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 «
                               </button>
@@ -13630,11 +13675,11 @@ const AdminDashboard = ({
                                 onClick={() =>
                                   setVerifyPage((p) => Math.max(1, p - 1))
                                 }
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 ‹
                               </button>
-                              <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">
+                              <span className="px-3 flex items-center text-[12px] font-normal text-gray-900">
                                 {safePage} / {totalPages}
                               </span>
                               <button
@@ -13644,14 +13689,14 @@ const AdminDashboard = ({
                                     Math.min(totalPages, p + 1),
                                   )
                                 }
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 ›
                               </button>
                               <button
                                 disabled={safePage >= totalPages}
                                 onClick={() => setVerifyPage(totalPages)}
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 »
                               </button>
@@ -13713,14 +13758,14 @@ const AdminDashboard = ({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-sm">
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 font-normal text-sm">
                             {(r.profiles?.full_name || r.rider_name || "?")[0]}
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-bold text-[13px] text-gray-900 truncate">
+                          <p className="font-normal text-[13px] text-gray-900 truncate">
                             {r.profiles?.full_name ||
                               r.rider_name ||
                               "Unknown Rider"}
@@ -13795,7 +13840,7 @@ const AdminDashboard = ({
                     hint?: string,
                   ) => (
                     <div key={key}>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                      <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                         {label}
                       </label>
                       <div className="flex items-center gap-1.5">
@@ -13815,7 +13860,7 @@ const AdminDashboard = ({
                             }));
                             setPricingSaved(false);
                           }}
-                          className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                          className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                         />
                         {hint && (
                           <span className="text-[11px] text-gray-400">
@@ -13831,7 +13876,7 @@ const AdminDashboard = ({
                       className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
                     >
                       <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-                        <h3 className="font-bold text-sm text-gray-900">
+                        <h3 className="font-normal text-sm text-gray-900">
                           {labels[tier]}
                         </h3>
                       </div>
@@ -13845,7 +13890,7 @@ const AdminDashboard = ({
                           <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                             <div className="flex items-center justify-between">
                               <div>
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest">
                                   Per KM Free Distance
                                 </label>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
@@ -13892,7 +13937,7 @@ const AdminDashboard = ({
                                     }));
                                     setPricingSaved(false);
                                   }}
-                                  className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                                  className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
                                 />
                                 <span className="text-[11px] text-gray-400 font-medium">
                                   km free
@@ -13917,7 +13962,7 @@ const AdminDashboard = ({
                         <div className="col-span-2 md:col-span-3">
                           <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
                             <div className="flex items-center justify-between mb-3">
-                              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                              <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest">
                                 Booking Fee
                               </label>
                               <div className="flex bg-gray-200 rounded-lg p-0.5">
@@ -13932,7 +13977,7 @@ const AdminDashboard = ({
                                     }));
                                     setPricingSaved(false);
                                   }}
-                                  className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                                  className={`px-3 py-1.5 rounded-md text-[11px] font-normal transition-all ${
                                     p.bookingFeeType === "static" ||
                                     !p.bookingFeeType
                                       ? "bg-white text-gray-900 shadow-sm"
@@ -13952,7 +13997,7 @@ const AdminDashboard = ({
                                     }));
                                     setPricingSaved(false);
                                   }}
-                                  className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                                  className={`px-3 py-1.5 rounded-md text-[11px] font-normal transition-all ${
                                     p.bookingFeeType === "per_km"
                                       ? "bg-white text-gray-900 shadow-sm"
                                       : "text-gray-500 hover:text-gray-700"
@@ -13979,7 +14024,7 @@ const AdminDashboard = ({
                                   }));
                                   setPricingSaved(false);
                                 }}
-                                className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+                                className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
                               />
                               <span className="text-[11px] text-gray-400 font-medium">
                                 {p.bookingFeeType === "per_km"
@@ -13998,17 +14043,17 @@ const AdminDashboard = ({
                       </div>
                       <div className="px-5 pb-4">
                         <div className="bg-gray-50 rounded-xl px-4 py-3 text-[12px] text-gray-500 border border-gray-100">
-                          <span className="font-bold text-gray-700">
+                          <span className="font-normal text-gray-700">
                             Net per KM:{" "}
                           </span>
                           ₱{(p.perKmRate - p.maintenanceCostPerKm).toFixed(2)}
                           <span className="mx-2 text-gray-300">·</span>
-                          <span className="font-bold text-gray-700">
+                          <span className="font-normal text-gray-700">
                             Maint. per KM:{" "}
                           </span>
                           ₱{p.maintenanceCostPerKm.toFixed(2)}
                           <span className="mx-2 text-gray-300">·</span>
-                          <span className="font-bold text-gray-700">
+                          <span className="font-normal text-gray-700">
                             Booking Fee:{" "}
                           </span>
                           {p.bookingFeeType === "per_km"
@@ -14017,7 +14062,7 @@ const AdminDashboard = ({
                           {p.perKmThresholdEnabled && p.perKmThreshold > 0 && (
                             <>
                               <span className="mx-2 text-gray-300">·</span>
-                              <span className="font-bold text-gray-700">
+                              <span className="font-normal text-gray-700">
                                 Free first:{" "}
                               </span>
                               {p.perKmThreshold} km
@@ -14031,7 +14076,7 @@ const AdminDashboard = ({
               </div>
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100 bg-emerald-50/40">
-                  <h3 className="font-bold text-sm text-gray-900">
+                  <h3 className="font-normal text-sm text-gray-900">
                     Team Booking Fee Discount
                   </h3>
                   <p className="text-[11px] text-gray-400 mt-0.5">
@@ -14040,7 +14085,7 @@ const AdminDashboard = ({
                   </p>
                 </div>
                 <div className="p-5">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                     Discount Percentage
                   </label>
                   <div className="flex items-center gap-2">
@@ -14061,13 +14106,13 @@ const AdminDashboard = ({
                         }));
                         setPricingSaved(false);
                       }}
-                      className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                     />
                     <span className="text-gray-400 text-sm font-semibold">
                       %
                     </span>
                     {pricingCfg.teamBookingFeeDiscount > 0 && (
-                      <span className="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                      <span className="text-[11px] text-emerald-600 font-normal bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
                         e.g. ₱50 fee → remit ₱
                         {(
                           50 *
@@ -14090,7 +14135,7 @@ const AdminDashboard = ({
                         "Pricing saved locally but failed to sync to database. Check console for details.",
                       );
                   }}
-                  className="px-6 py-2.5 bg-gray-950 text-white font-bold text-sm rounded-xl hover:bg-gray-800 transition-colors"
+                  className="px-6 py-2.5 bg-gray-950 text-white font-normal text-sm rounded-xl hover:bg-gray-800 transition-colors"
                 >
                   Save Pricing
                 </button>
@@ -14099,12 +14144,12 @@ const AdminDashboard = ({
                     setPricingCfg(DEFAULT_PRICING);
                     setPricingSaved(false);
                   }}
-                  className="px-6 py-2.5 bg-gray-100 text-gray-600 font-bold text-sm rounded-xl hover:bg-gray-200 transition-colors"
+                  className="px-6 py-2.5 bg-gray-100 text-gray-600 font-normal text-sm rounded-xl hover:bg-gray-200 transition-colors"
                 >
                   Reset to Defaults
                 </button>
                 {pricingSaved && (
-                  <span className="flex items-center gap-1.5 text-emerald-600 font-bold text-[13px]">
+                  <span className="flex items-center gap-1.5 text-emerald-600 font-normal text-[13px]">
                     <CheckCircle size={14} /> Saved to database
                   </span>
                 )}
@@ -14148,7 +14193,7 @@ const AdminDashboard = ({
                 return (
                   <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center bg-gray-50/50">
-                      <h3 className="font-bold text-sm text-gray-900">
+                      <h3 className="font-normal text-sm text-gray-900">
                         All Users{" "}
                         <span className="ml-2 text-[11px] text-gray-400 font-medium">
                           {filteredUsers.length} total
@@ -14221,7 +14266,7 @@ const AdminDashboard = ({
                                   </div>
                                 )}
                                 <div className="min-w-0 flex-1">
-                                  <p className="font-bold text-gray-900 text-sm truncate">
+                                  <p className="font-normal text-gray-900 text-sm truncate">
                                     {u.full_name || "—"}
                                   </p>
                                   <p className="text-[12px] text-gray-400 truncate">
@@ -14229,7 +14274,7 @@ const AdminDashboard = ({
                                   </p>
                                   <div className="flex items-center gap-2 mt-1">
                                     <span
-                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-normal ${
                                         u.role === "super_admin"
                                           ? "bg-purple-50 text-purple-700"
                                           : u.role === "admin"
@@ -14244,7 +14289,7 @@ const AdminDashboard = ({
                                       {u.role}
                                     </span>
                                     <span
-                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${u.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
+                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-normal ${u.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
                                     >
                                       {u.is_blocked ? "Inactive" : "Active"}
                                     </span>
@@ -14258,7 +14303,7 @@ const AdminDashboard = ({
                               </div>
                               {/* Row 2: Change Role */}
                               <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider w-24 shrink-0">
+                                <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wider w-24 shrink-0">
                                   Change Role
                                 </span>
                                 {roleUpdating === u.id ? (
@@ -14287,7 +14332,7 @@ const AdminDashboard = ({
                               <div className="flex flex-wrap gap-2">
                                 <button
                                   onClick={() => setUserDetailModal(u)}
-                                  className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                  className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-normal border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                 >
                                   <Eye size={12} /> Details
                                 </button>
@@ -14316,7 +14361,7 @@ const AdminDashboard = ({
                                           );
                                         setUserStatusToggling(null);
                                       }}
-                                      className={`flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border rounded-lg transition-colors ${
+                                      className={`flex items-center gap-1 px-3 py-1.5 text-[12px] font-normal border rounded-lg transition-colors ${
                                         u.is_blocked
                                           ? "border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
                                           : "border-red-200 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500"
@@ -14336,7 +14381,7 @@ const AdminDashboard = ({
                                 {onImpersonate && u.id !== profile.id && (
                                   <button
                                     onClick={() => onImpersonate(u)}
-                                    className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                    className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-normal border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                   >
                                     <Eye size={12} /> View As
                                   </button>
@@ -14362,31 +14407,31 @@ const AdminDashboard = ({
                             </colgroup>
                             <thead>
                               <tr className="border-b border-gray-100">
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   User
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Email
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Role
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Joined
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Change Role
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Team Leader
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Admin Roles
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Status
                                 </th>
-                                <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 py-3 text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                   Actions
                                 </th>
                               </tr>
@@ -14420,7 +14465,7 @@ const AdminDashboard = ({
                                   </td>
                                   <td className="px-3 py-3">
                                     <span
-                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-normal ${
                                         u.role === "super_admin"
                                           ? "bg-purple-50 text-purple-700"
                                           : u.role === "admin"
@@ -14523,7 +14568,7 @@ const AdminDashboard = ({
                                           </div>
                                         ) : ledTeam ? (
                                           <div className="flex items-center gap-1 min-w-0">
-                                            <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md truncate">
+                                            <span className="flex items-center gap-1 text-[10px] font-normal text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md truncate">
                                               <Crown
                                                 size={9}
                                                 className="shrink-0"
@@ -14549,7 +14594,7 @@ const AdminDashboard = ({
                                             onClick={() =>
                                               setTeamAssigning(u.id)
                                             }
-                                            className="flex items-center gap-1 text-[10px] font-bold text-gray-500 border border-gray-200 px-2 py-1 rounded-md hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors w-full justify-center"
+                                            className="flex items-center gap-1 text-[10px] font-normal text-gray-500 border border-gray-200 px-2 py-1 rounded-md hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors w-full justify-center"
                                           >
                                             <Crown size={9} /> Assign
                                           </button>
@@ -14571,7 +14616,7 @@ const AdminDashboard = ({
                                         </span>
                                         <button
                                           onClick={() => setRoleAssignTarget(u)}
-                                          className="px-2 py-0.5 rounded-md text-[10px] font-bold border border-gray-200 text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                          className="px-2 py-0.5 rounded-md text-[10px] font-normal border border-gray-200 text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                         >
                                           Assign
                                         </button>
@@ -14584,7 +14629,7 @@ const AdminDashboard = ({
                                   </td>
                                   <td className="px-3 py-3">
                                     <span
-                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${u.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
+                                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-normal ${u.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
                                     >
                                       {u.is_blocked ? "Inactive" : "Active"}
                                     </span>
@@ -14593,7 +14638,7 @@ const AdminDashboard = ({
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <button
                                         onClick={() => setUserDetailModal(u)}
-                                        className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold border border-gray-200 rounded-md text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                        className="flex items-center gap-1 px-2 py-1 text-[11px] font-normal border border-gray-200 rounded-md text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                       >
                                         <Eye size={11} /> Details
                                       </button>
@@ -14623,7 +14668,7 @@ const AdminDashboard = ({
                                                 );
                                               setUserStatusToggling(null);
                                             }}
-                                            className={`flex items-center gap-1 px-2 py-1 text-[11px] font-bold border rounded-md transition-colors ${
+                                            className={`flex items-center gap-1 px-2 py-1 text-[11px] font-normal border rounded-md transition-colors ${
                                               u.is_blocked
                                                 ? "border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
                                                 : "border-red-200 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500"
@@ -14644,7 +14689,7 @@ const AdminDashboard = ({
                                       {onImpersonate && u.id !== profile.id && (
                                         <button
                                           onClick={() => onImpersonate(u)}
-                                          className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold border border-gray-200 rounded-md text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
+                                          className="flex items-center gap-1 px-2 py-1 text-[11px] font-normal border border-gray-200 rounded-md text-gray-600 hover:bg-gray-950 hover:text-white hover:border-gray-950 transition-colors"
                                         >
                                           <Eye size={11} /> View As
                                         </button>
@@ -14677,7 +14722,7 @@ const AdminDashboard = ({
                               <button
                                 disabled={safePage <= 1}
                                 onClick={() => setUserPage(1)}
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 «
                               </button>
@@ -14686,11 +14731,11 @@ const AdminDashboard = ({
                                 onClick={() =>
                                   setUserPage((p) => Math.max(1, p - 1))
                                 }
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 ‹
                               </button>
-                              <span className="px-3 flex items-center text-[12px] font-bold text-gray-900">
+                              <span className="px-3 flex items-center text-[12px] font-normal text-gray-900">
                                 {safePage} / {totalPages}
                               </span>
                               <button
@@ -14700,14 +14745,14 @@ const AdminDashboard = ({
                                     Math.min(totalPages, p + 1),
                                   )
                                 }
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 ›
                               </button>
                               <button
                                 disabled={safePage >= totalPages}
                                 onClick={() => setUserPage(totalPages)}
-                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                                className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                               >
                                 »
                               </button>
@@ -14781,17 +14826,17 @@ const AdminDashboard = ({
                         </p>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${userDetailModal.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
+                            className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-normal ${userDetailModal.is_blocked ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}
                           >
                             {userDetailModal.is_blocked ? "Inactive" : "Active"}
                           </span>
-                          <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-600">
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[11px] font-normal bg-gray-100 text-gray-600">
                             {userDetailModal.is_online ? "Online" : "Offline"}
                           </span>
                           {(userDetailModal.role === "rider" ||
                             userDetailModal.role === "team_leader") && (
                             <span
-                              className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                              className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-normal ${
                                 userDetailModal.rider_status === "approved"
                                   ? "bg-emerald-50 text-emerald-700"
                                   : userDetailModal.rider_status === "pending"
@@ -14859,7 +14904,7 @@ const AdminDashboard = ({
                           key={label}
                           className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0"
                         >
-                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                          <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                             {label}
                           </span>
                           <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
@@ -14902,7 +14947,7 @@ const AdminDashboard = ({
                             key={label}
                             className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0"
                           >
-                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               {label}
                             </span>
                             <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
@@ -14912,7 +14957,7 @@ const AdminDashboard = ({
                         ))}
                         {userDetailModal.vehicle_image_url && (
                           <div className="mt-2">
-                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                            <p className="text-[11px] font-normal text-gray-400 uppercase tracking-wider mb-1.5">
                               Vehicle Photo
                             </p>
                             <img
@@ -14951,7 +14996,7 @@ const AdminDashboard = ({
                               key={label}
                               className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0"
                             >
-                              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                              <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                                 {label}
                               </span>
                               {url ? (
@@ -14959,7 +15004,7 @@ const AdminDashboard = ({
                                   href={url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[12px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                  className="text-[12px] font-normal text-blue-600 hover:underline flex items-center gap-1"
                                 >
                                   <Eye size={12} /> View
                                 </a>
@@ -14989,7 +15034,7 @@ const AdminDashboard = ({
                             key={label}
                             className="flex justify-between items-start border-b border-gray-50 py-2.5 last:border-0"
                           >
-                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                            <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wider">
                               {label}
                             </span>
                             <span className="text-[13px] font-semibold text-gray-800 text-right max-w-[60%]">
@@ -15002,7 +15047,7 @@ const AdminDashboard = ({
 
                     {userDetailModal.is_blocked && (
                       <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
-                        <p className="text-[11px] font-bold text-red-400 uppercase tracking-wider">
+                        <p className="text-[11px] font-normal text-red-400 uppercase tracking-wider">
                           Block Info
                         </p>
                         <p className="text-[13px] text-red-700 font-semibold">
@@ -15181,7 +15226,9 @@ const AdminDashboard = ({
                             }`}
                           >
                             <div>
-                              <p className="font-bold text-[13px]">{r.name}</p>
+                              <p className="font-normal text-[13px]">
+                                {r.name}
+                              </p>
                               {r.description && (
                                 <p
                                   className={`text-[11px] mt-0.5 ${assigned ? "text-white/60" : "text-gray-400"}`}
@@ -15193,7 +15240,7 @@ const AdminDashboard = ({
                                 {r.modules.map((m) => (
                                   <span
                                     key={m}
-                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${assigned ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-normal ${assigned ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}
                                   >
                                     {m}
                                   </span>
@@ -15219,7 +15266,7 @@ const AdminDashboard = ({
                   <div className="mt-5 pt-4 border-t border-gray-100 flex justify-end">
                     <button
                       onClick={() => setRoleAssignTarget(null)}
-                      className="px-4 py-2 bg-gray-950 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+                      className="px-4 py-2 bg-gray-950 text-white rounded-xl font-normal text-sm hover:bg-gray-800 transition-colors"
                     >
                       Done
                     </button>
@@ -15249,7 +15296,7 @@ const AdminDashboard = ({
                     setNewRoleModules([]);
                     setShowRoleForm(true);
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 text-white rounded-xl font-normal text-sm hover:bg-gray-800 transition-colors"
                 >
                   <Plus size={15} /> New Role
                 </button>
@@ -15264,12 +15311,12 @@ const AdminDashboard = ({
                     exit={{ opacity: 0, y: -8 }}
                     className="bg-white rounded-2xl border border-gray-200 p-6 mb-6"
                   >
-                    <h3 className="font-bold text-sm text-gray-900 mb-4">
+                    <h3 className="font-normal text-sm text-gray-900 mb-4">
                       {editingRole ? "Edit Role" : "Create New Role"}
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                        <label className="text-[11px] font-normal text-gray-400 uppercase tracking-wider block mb-1.5">
                           Role Name
                         </label>
                         <input
@@ -15280,7 +15327,7 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                        <label className="text-[11px] font-normal text-gray-400 uppercase tracking-wider block mb-1.5">
                           Description
                         </label>
                         <input
@@ -15291,7 +15338,7 @@ const AdminDashboard = ({
                         />
                       </div>
                       <div>
-                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-3">
+                        <label className="text-[11px] font-normal text-gray-400 uppercase tracking-wider block mb-3">
                           Modules Access
                         </label>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -15360,13 +15407,13 @@ const AdminDashboard = ({
                             }
                             setShowRoleForm(false);
                           }}
-                          className="px-5 py-2.5 bg-gray-950 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+                          className="px-5 py-2.5 bg-gray-950 text-white rounded-xl font-normal text-sm hover:bg-gray-800 transition-colors"
                         >
                           {editingRole ? "Save Changes" : "Create Role"}
                         </button>
                         <button
                           onClick={() => setShowRoleForm(false)}
-                          className="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                          className="px-5 py-2.5 border border-gray-200 rounded-xl font-normal text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                         >
                           Cancel
                         </button>
@@ -15383,7 +15430,7 @@ const AdminDashboard = ({
               ) : adminRoles.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 px-5 py-16 text-center">
                   <Shield size={32} className="text-gray-200 mx-auto mb-3" />
-                  <p className="font-bold text-gray-400 text-sm">
+                  <p className="font-normal text-gray-400 text-sm">
                     No roles yet
                   </p>
                   <p className="text-gray-300 text-[13px] mt-1">
@@ -15399,7 +15446,7 @@ const AdminDashboard = ({
                     >
                       <div className="flex items-start justify-between gap-4 mb-4">
                         <div>
-                          <h3 className="font-bold text-gray-900">
+                          <h3 className="font-normal text-gray-900">
                             {role.name}
                           </h3>
                           {role.description && (
@@ -15417,7 +15464,7 @@ const AdminDashboard = ({
                               setNewRoleModules(role.modules);
                               setShowRoleForm(true);
                             }}
-                            className="px-3 py-1.5 text-[12px] font-bold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="px-3 py-1.5 text-[12px] font-normal border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
                           >
                             Edit
                           </button>
@@ -15430,7 +15477,7 @@ const AdminDashboard = ({
                                 prev.filter((r) => r.id !== role.id),
                               );
                             }}
-                            className="px-3 py-1.5 text-[12px] font-bold border border-red-100 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                            className="px-3 py-1.5 text-[12px] font-normal border border-red-100 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
                           >
                             Delete
                           </button>
@@ -15519,7 +15566,7 @@ const AdminDashboard = ({
                   {/* Stats Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                      <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                         Total Users & Riders
                       </p>
                       <p className="text-3xl font-black text-gray-950">
@@ -15527,7 +15574,7 @@ const AdminDashboard = ({
                       </p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-red-100">
-                      <p className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-1">
+                      <p className="text-[11px] font-normal text-red-400 uppercase tracking-widest mb-1">
                         Currently Blocked
                       </p>
                       <p className="text-3xl font-black text-red-600">
@@ -15535,7 +15582,7 @@ const AdminDashboard = ({
                       </p>
                     </div>
                     <div className="bg-white p-5 rounded-2xl border border-emerald-100">
-                      <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest mb-1">
+                      <p className="text-[11px] font-normal text-emerald-500 uppercase tracking-widest mb-1">
                         Active
                       </p>
                       <p className="text-3xl font-black text-emerald-600">
@@ -15572,7 +15619,7 @@ const AdminDashboard = ({
                               setBlockFilterRole(r);
                               setBlockPage(1);
                             }}
-                            className={`px-3.5 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                            className={`px-3.5 py-2 rounded-xl text-[12px] font-normal transition-colors ${
                               blockFilterRole === r
                                 ? "bg-gray-950 text-white"
                                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
@@ -15595,7 +15642,7 @@ const AdminDashboard = ({
                               setBlockFilterStatus(s);
                               setBlockPage(1);
                             }}
-                            className={`px-3.5 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                            className={`px-3.5 py-2 rounded-xl text-[12px] font-normal transition-colors ${
                               blockFilterStatus === s
                                 ? s === "blocked"
                                   ? "bg-red-600 text-white"
@@ -15666,14 +15713,14 @@ const AdminDashboard = ({
                                         className="w-full h-full object-cover"
                                       />
                                     ) : (
-                                      <div className="w-full h-full flex items-center justify-center font-bold text-gray-500">
+                                      <div className="w-full h-full flex items-center justify-center font-normal text-gray-500">
                                         {(blockingTarget.first_name ||
                                           blockingTarget.email)?.[0]?.toUpperCase()}
                                       </div>
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="font-bold text-gray-900 text-sm truncate">
+                                    <p className="font-normal text-gray-900 text-sm truncate">
                                       {blockingTarget.first_name}{" "}
                                       {blockingTarget.last_name}
                                     </p>
@@ -15687,7 +15734,7 @@ const AdminDashboard = ({
                                 </div>
                                 {blockingTarget.block_reason && (
                                   <div className="bg-red-50 rounded-xl p-3 border border-red-100">
-                                    <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">
+                                    <p className="text-[10px] font-normal text-red-400 uppercase tracking-widest mb-1">
                                       Current Block Reason
                                     </p>
                                     <p className="text-sm text-red-700 font-medium">
@@ -15712,7 +15759,7 @@ const AdminDashboard = ({
                                     setBlockingTarget(null);
                                     setBlockReason("");
                                   }}
-                                  className="flex-1 py-3 rounded-2xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors text-sm"
+                                  className="flex-1 py-3 rounded-2xl border-2 border-gray-200 font-normal text-gray-600 hover:bg-gray-50 transition-colors text-sm"
                                 >
                                   Cancel
                                 </button>
@@ -15778,14 +15825,14 @@ const AdminDashboard = ({
                                         className="w-full h-full object-cover"
                                       />
                                     ) : (
-                                      <div className="w-full h-full flex items-center justify-center font-bold text-gray-500">
+                                      <div className="w-full h-full flex items-center justify-center font-normal text-gray-500">
                                         {(blockingTarget.first_name ||
                                           blockingTarget.email)?.[0]?.toUpperCase()}
                                       </div>
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="font-bold text-gray-900 text-sm truncate">
+                                    <p className="font-normal text-gray-900 text-sm truncate">
                                       {blockingTarget.first_name}{" "}
                                       {blockingTarget.last_name}
                                     </p>
@@ -15804,7 +15851,7 @@ const AdminDashboard = ({
                               </div>
 
                               <div className="mb-4">
-                                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                                <label className="text-[11px] font-normal text-gray-400 uppercase tracking-wider block mb-2">
                                   Block Reason{" "}
                                   <span className="text-red-400">*</span>
                                 </label>
@@ -15841,7 +15888,7 @@ const AdminDashboard = ({
                                     setBlockingTarget(null);
                                     setBlockReason("");
                                   }}
-                                  className="flex-1 py-3 rounded-2xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors text-sm"
+                                  className="flex-1 py-3 rounded-2xl border-2 border-gray-200 font-normal text-gray-600 hover:bg-gray-50 transition-colors text-sm"
                                 >
                                   Cancel
                                 </button>
@@ -15898,7 +15945,7 @@ const AdminDashboard = ({
                   ) : filtered.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-gray-100 px-5 py-16 text-center">
                       <Ban size={32} className="text-gray-200 mx-auto mb-3" />
-                      <p className="font-bold text-gray-400 text-sm">
+                      <p className="font-normal text-gray-400 text-sm">
                         No users found
                       </p>
                       <p className="text-gray-300 text-[13px] mt-1">
@@ -15924,7 +15971,7 @@ const AdminDashboard = ({
                                   className={`w-full h-full object-cover ${u.is_blocked ? "opacity-60 grayscale" : ""}`}
                                 />
                               ) : (
-                                <div className="w-full h-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 text-sm">
+                                <div className="w-full h-full bg-gray-200 flex items-center justify-center font-normal text-gray-500 text-sm">
                                   {(u.first_name ||
                                     u.email)?.[0]?.toUpperCase()}
                                 </div>
@@ -15935,7 +15982,7 @@ const AdminDashboard = ({
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
                                 <p
-                                  className={`font-bold text-sm truncate ${u.is_blocked ? "text-red-800 line-through decoration-red-300" : "text-gray-900"}`}
+                                  className={`font-normal text-sm truncate ${u.is_blocked ? "text-red-800 line-through decoration-red-300" : "text-gray-900"}`}
                                 >
                                   {u.first_name && u.last_name
                                     ? `${u.first_name} ${u.last_name}`
@@ -15989,7 +16036,7 @@ const AdminDashboard = ({
                                 setBlockingTarget(u);
                                 setBlockReason("");
                               }}
-                              className={`px-4 py-2 rounded-xl text-[12px] font-bold transition-colors shrink-0 flex items-center gap-1.5 ${
+                              className={`px-4 py-2 rounded-xl text-[12px] font-normal transition-colors shrink-0 flex items-center gap-1.5 ${
                                 u.is_blocked
                                   ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200"
                                   : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
@@ -16024,7 +16071,7 @@ const AdminDashboard = ({
                             <button
                               disabled={safePage <= 1}
                               onClick={() => setBlockPage(1)}
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                             >
                               «
                             </button>
@@ -16033,7 +16080,7 @@ const AdminDashboard = ({
                               onClick={() =>
                                 setBlockPage((p) => Math.max(1, p - 1))
                               }
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                             >
                               ‹
                             </button>
@@ -16062,7 +16109,7 @@ const AdminDashboard = ({
                                   <button
                                     key={item}
                                     onClick={() => setBlockPage(item as number)}
-                                    className={`w-8 h-8 rounded-lg text-[12px] font-bold transition-colors ${
+                                    className={`w-8 h-8 rounded-lg text-[12px] font-normal transition-colors ${
                                       safePage === item
                                         ? "bg-gray-950 text-white"
                                         : "border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -16077,14 +16124,14 @@ const AdminDashboard = ({
                               onClick={() =>
                                 setBlockPage((p) => Math.min(totalPages, p + 1))
                               }
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                             >
                               ›
                             </button>
                             <button
                               disabled={safePage >= totalPages}
                               onClick={() => setBlockPage(totalPages)}
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                             >
                               »
                             </button>
@@ -16120,7 +16167,7 @@ const AdminDashboard = ({
                       setRemitFilter(f);
                       setRemitPage(1);
                     }}
-                    className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-colors capitalize ${
+                    className={`px-4 py-2 rounded-xl text-[13px] font-normal transition-colors capitalize ${
                       remitFilter === f
                         ? "bg-gray-950 text-white"
                         : "bg-gray-50 text-gray-500 hover:bg-gray-100"
@@ -16139,7 +16186,7 @@ const AdminDashboard = ({
               </div>
             ) : allRemits.length === 0 ? (
               <div className="text-center py-16 bg-gray-50 border border-gray-100 rounded-2xl">
-                <p className="text-gray-400 font-bold text-sm">
+                <p className="text-gray-400 font-normal text-sm">
                   No remittances found
                 </p>
               </div>
@@ -16175,13 +16222,13 @@ const AdminDashboard = ({
                                     className="w-full h-full object-cover"
                                   />
                                 ) : (
-                                  <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">
+                                  <div className="w-full h-full flex items-center justify-center font-normal text-gray-400">
                                     {r.rider_name?.[0]}
                                   </div>
                                 )}
                               </div>
                               <div>
-                                <p className="font-bold text-[15px] text-gray-900">
+                                <p className="font-normal text-[15px] text-gray-900">
                                   {r.rider_name || "Rider"}
                                 </p>
                                 <p className="text-[11px] font-medium text-gray-400">
@@ -16209,7 +16256,7 @@ const AdminDashboard = ({
 
                           <div className="grid grid-cols-3 gap-3 mb-4 bg-gray-50 rounded-xl p-3">
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-0.5">
                                 Trips
                               </p>
                               <p className="font-black text-gray-900 text-[13px]">
@@ -16217,7 +16264,7 @@ const AdminDashboard = ({
                               </p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-0.5">
                                 Earnings
                               </p>
                               <p className="font-black text-gray-900 text-[13px]">
@@ -16225,7 +16272,7 @@ const AdminDashboard = ({
                               </p>
                             </div>
                             <div className="border-l border-gray-200 pl-3">
-                              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">
+                              <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-0.5">
                                 Remitted
                               </p>
                               <p className="font-black text-emerald-600 text-[13px]">
@@ -16289,7 +16336,7 @@ const AdminDashboard = ({
                                       }); // Will trigger reload via effect deps
                                       setRemitActionLoading(null);
                                     }}
-                                    className="flex-1 py-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 font-bold text-[13px] rounded-xl transition-colors disabled:opacity-50"
+                                    className="flex-1 py-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 font-normal text-[13px] rounded-xl transition-colors disabled:opacity-50"
                                   >
                                     {remitActionLoading === r.id
                                       ? "..."
@@ -16313,7 +16360,7 @@ const AdminDashboard = ({
                                       });
                                       setRemitActionLoading(null);
                                     }}
-                                    className="flex-1 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 font-bold text-[13px] rounded-xl transition-colors disabled:opacity-50"
+                                    className="flex-1 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 font-normal text-[13px] rounded-xl transition-colors disabled:opacity-50"
                                   >
                                     {remitActionLoading === r.id
                                       ? "..."
@@ -16324,7 +16371,7 @@ const AdminDashboard = ({
                             ) : (
                               r.admin_notes && (
                                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                                  <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                                     Admin Note
                                   </p>
                                   <p className="text-[13px] text-gray-600 leading-relaxed">
@@ -16356,7 +16403,7 @@ const AdminDashboard = ({
                           <button
                             disabled={safePage <= 1}
                             onClick={() => setRemitPage(1)}
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             «
                           </button>
@@ -16365,7 +16412,7 @@ const AdminDashboard = ({
                             onClick={() =>
                               setRemitPage((p) => Math.max(1, p - 1))
                             }
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             ‹
                           </button>
@@ -16393,7 +16440,7 @@ const AdminDashboard = ({
                                 <button
                                   key={item}
                                   onClick={() => setRemitPage(item as number)}
-                                  className={`w-8 h-8 rounded-lg text-[12px] font-bold transition-colors ${
+                                  className={`w-8 h-8 rounded-lg text-[12px] font-normal transition-colors ${
                                     safePage === item
                                       ? "bg-gray-950 text-white"
                                       : "border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -16408,14 +16455,14 @@ const AdminDashboard = ({
                             onClick={() =>
                               setRemitPage((p) => Math.min(totalPages, p + 1))
                             }
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             ›
                           </button>
                           <button
                             disabled={safePage >= totalPages}
                             onClick={() => setRemitPage(totalPages)}
-                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-bold"
+                            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[11px] font-normal"
                           >
                             »
                           </button>
@@ -16443,12 +16490,12 @@ const AdminDashboard = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                <h3 className="font-bold text-gray-900 text-base mb-5">
+                <h3 className="font-normal text-gray-900 text-base mb-5">
                   App Branding
                 </h3>
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                       Application Name
                     </label>
                     <input
@@ -16460,11 +16507,11 @@ const AdminDashboard = ({
                         )
                       }
                       placeholder="e.g. BiyaHero"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                       Web App Title (Browser Tab)
                     </label>
                     <input
@@ -16478,7 +16525,7 @@ const AdminDashboard = ({
                         )
                       }
                       placeholder="e.g. BiyaHero – Your Ride, Your Hero!"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-gray-950 focus:border-transparent"
                     />
                     <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
                       This text appears in the browser tab. Leave blank to use
@@ -16486,7 +16533,7 @@ const AdminDashboard = ({
                     </p>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-1.5">
                       App Logo
                     </label>
                     <div className="flex items-center gap-4">
@@ -16525,13 +16572,13 @@ const AdminDashboard = ({
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                <h3 className="font-bold text-gray-900 text-base mb-5">
+                <h3 className="font-normal text-gray-900 text-base mb-5">
                   Remittance Tools
                 </h3>
                 {/* Remittance enforcement toggle */}
                 <div className="flex items-center justify-between mb-5 pb-5 border-b border-gray-100">
                   <div>
-                    <p className="text-sm font-bold text-gray-900">
+                    <p className="text-sm font-normal text-gray-900">
                       Require Daily Remittance
                     </p>
                     <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
@@ -16565,7 +16612,7 @@ const AdminDashboard = ({
                   </button>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                  <label className="block text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                     Merchant / Remittance QR Code
                   </label>
                   <div className="flex flex-col items-center p-5 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
@@ -16615,7 +16662,7 @@ const AdminDashboard = ({
                   }
                   setSettingsUpdating(false);
                 }}
-                className="px-10 py-3.5 bg-gray-950 text-white font-bold text-sm rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50 flex items-center gap-2"
+                className="px-10 py-3.5 bg-gray-950 text-white font-normal text-sm rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50 flex items-center gap-2"
               >
                 {settingsUpdating && (
                   <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
@@ -16623,7 +16670,7 @@ const AdminDashboard = ({
                 Save All Settings
               </button>
               {settingsSaved && (
-                <span className="text-emerald-600 font-bold text-sm flex items-center gap-2">
+                <span className="text-emerald-600 font-normal text-sm flex items-center gap-2">
                   <CheckCircle size={18} /> Updated!
                 </span>
               )}
@@ -16657,7 +16704,7 @@ const NotificationToast = ({ message }: { message: string | null }) => (
         className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 w-max max-w-[90vw]"
       >
         <Bell size={18} className="text-emerald-400" />
-        <span className="font-bold text-sm">{message}</span>
+        <span className="font-normal text-sm">{message}</span>
       </motion.div>
     )}
   </AnimatePresence>
@@ -16814,7 +16861,7 @@ const RealtimeChat = ({
           <h4 className="font-black leading-tight text-gray-950 truncate">
             {otherName}
           </h4>
-          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wide">
+          <p className="text-[11px] text-gray-400 font-normal uppercase tracking-wide">
             {senderRole === "user" ? "Rider" : "Passenger"}
           </p>
         </div>
@@ -16871,7 +16918,7 @@ const RealtimeChat = ({
                   {m.content}
                 </p>
               </div>
-              <span className="text-[10px] font-bold text-gray-400 mt-1 px-1">
+              <span className="text-[10px] font-normal text-gray-400 mt-1 px-1">
                 {fmtTime(m.created_at)}
               </span>
             </div>
@@ -17001,7 +17048,7 @@ const ChatHistoryScreen = ({
       ) : grouped.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400 px-8">
           <MessageSquare size={52} className="opacity-20" />
-          <p className="font-bold text-gray-500">No conversations yet</p>
+          <p className="font-normal text-gray-500">No conversations yet</p>
           <p className="text-sm text-center">
             {role === "rider"
               ? "Your chats with passengers will appear here after completing a ride."
@@ -17015,13 +17062,13 @@ const ChatHistoryScreen = ({
               {confirmDelete === convo.other_name ? (
                 /* Inline confirm strip */
                 <div className="flex items-center justify-between px-5 py-4 bg-red-50">
-                  <p className="text-sm font-bold text-red-700">
+                  <p className="text-sm font-normal text-red-700">
                     Delete conversation with {convo.other_name}?
                   </p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setConfirmDelete(null)}
-                      className="px-4 py-2 text-sm font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2 text-sm font-normal text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       Cancel
                     </button>
@@ -17039,7 +17086,7 @@ const ChatHistoryScreen = ({
                         setDeleting(null);
                       }}
                       disabled={deleting === convo.other_name}
-                      className="px-4 py-2 text-sm font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2 text-sm font-normal text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-50"
                     >
                       {deleting === convo.other_name ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -17060,7 +17107,7 @@ const ChatHistoryScreen = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-baseline mb-0.5">
-                        <span className="font-bold text-gray-900 truncate">
+                        <span className="font-normal text-gray-900 truncate">
                           {convo.other_name}
                         </span>
                         <span className="text-xs text-gray-400 font-medium shrink-0 ml-2">
@@ -17384,7 +17431,7 @@ const HomePanel = ({
                       <>
                         {favorites.length > 0 && (
                           <>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">
+                            <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest px-3.5 mb-2">
                               Saved Places
                             </p>
                             {favorites.map((fav: any) => (
@@ -17432,7 +17479,7 @@ const HomePanel = ({
                             <div className="h-px bg-gray-100 mx-3.5 my-2" />
                           </>
                         )}
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mb-2">
+                        <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest px-3.5 mb-2">
                           Quick Destinations
                         </p>
                         <div
@@ -17477,7 +17524,7 @@ const HomePanel = ({
                             </p>
                           </div>
                         </div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3.5 mt-5 mb-2">
+                        <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest px-3.5 mt-5 mb-2">
                           Recent
                         </p>
                         <div
@@ -17627,7 +17674,7 @@ const SelectPanel = ({
       : null;
   const activeVoucherDiscount = selectedVoucherQuote?.reason
     ? 0
-    : selectedVoucherQuote?.discount ?? 0;
+    : (selectedVoucherQuote?.discount ?? 0);
   const activeTotalFare = selectedBreakdown
     ? Math.max(0, selectedBreakdown.totalFare - activeVoucherDiscount)
     : 0;
@@ -17677,7 +17724,7 @@ const SelectPanel = ({
         {isCollapsed && (
           <div className="flex items-center justify-between w-full px-5">
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest">
                 Selected
               </p>
               <p className="font-black text-[15px] text-gray-950">
@@ -17735,7 +17782,7 @@ const SelectPanel = ({
                       </div>
                       <div className="ml-3.5 flex-1">
                         <div className="flex justify-between items-center mb-0.5">
-                          <span className="font-bold text-[15px]">
+                          <span className="font-normal text-[15px]">
                             {ride.name}
                           </span>
                           <span className="font-black text-[16px]">
@@ -17777,7 +17824,7 @@ const SelectPanel = ({
                         : `Booking Fee`;
                     return (
                       <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                        <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           Fare Breakdown
                         </p>
                         <div className="space-y-2 text-[13px]">
@@ -17824,7 +17871,7 @@ const SelectPanel = ({
                           <Tag size={16} className="text-emerald-600" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900 truncate">
+                          <p className="text-sm font-normal text-gray-900 truncate">
                             {selectedUserVoucher?.voucher?.title || "Voucher"}
                           </p>
                           <p className="text-[11px] text-gray-400 truncate">
@@ -17842,7 +17889,7 @@ const SelectPanel = ({
                           setVoucherMessage(null);
                           setShowVoucherPicker(true);
                         }}
-                        className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-bold"
+                        className="px-3 py-2 rounded-xl bg-gray-950 text-white text-[12px] font-normal"
                       >
                         {selectedUserVoucher ? "Change" : "Add"}
                       </button>
@@ -17881,7 +17928,7 @@ const SelectPanel = ({
                           distanceM,
                           selectedVoucherQuote?.reason
                             ? null
-                            : selectedUserVoucher ?? null,
+                            : (selectedUserVoucher ?? null),
                           activeVoucherDiscount,
                         );
                       else {
@@ -17891,7 +17938,7 @@ const SelectPanel = ({
                     }
                   }}
                   disabled={isBooking || maintenanceMode === "half"}
-                  className="w-full bg-gray-950 text-white font-bold text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gray-950 text-white font-normal text-[15px] py-[17px] rounded-2xl hover:bg-gray-800 transition-colors active:scale-[0.98] shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isBooking
                     ? "Booking..."
@@ -17927,12 +17974,12 @@ const SelectPanel = ({
                   setVoucherCodeInput(normalizeVoucherCode(e.target.value))
                 }
                 placeholder="Enter code"
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-normal uppercase focus:outline-none focus:ring-2 focus:ring-gray-900"
               />
               <button
                 onClick={handleAddVoucher}
                 disabled={voucherLoading}
-                className="px-4 rounded-xl bg-gray-950 text-white text-sm font-bold disabled:opacity-50"
+                className="px-4 rounded-xl bg-gray-950 text-white text-sm font-normal disabled:opacity-50"
               >
                 Add
               </button>
@@ -17958,7 +18005,10 @@ const SelectPanel = ({
                       )
                     : "Voucher details unavailable";
                   const discount = voucher
-                    ? calculateVoucherDiscount(voucher, selectedBreakdown.totalFare)
+                    ? calculateVoucherDiscount(
+                        voucher,
+                        selectedBreakdown.totalFare,
+                      )
                     : 0;
                   const disabled = uv.status !== "available" || !!issue;
                   return (
@@ -17999,7 +18049,7 @@ const SelectPanel = ({
                   onSelectedUserVoucher?.(null);
                   setShowVoucherPicker(false);
                 }}
-                className="w-full mt-3 py-3 rounded-xl bg-gray-100 text-gray-600 text-sm font-bold"
+                className="w-full mt-3 py-3 rounded-xl bg-gray-100 text-gray-600 text-sm font-normal"
               >
                 Remove voucher
               </button>
@@ -18103,7 +18153,7 @@ const RiderConfirmModal = ({
                 </span>
               )}
               {riderRating !== null && riderRating >= 4 && (
-                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-1 text-[11px] font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
                   <Star size={10} className="fill-amber-400 text-amber-400" />
                   {riderRating.toFixed(1)}
                 </span>
@@ -18117,7 +18167,7 @@ const RiderConfirmModal = ({
           <div className="bg-gray-50 rounded-2xl p-4 mb-5 border border-gray-100 space-y-2.5">
             {vehicleType && (
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">
+                <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wide">
                   Type
                 </span>
                 <span className="text-[13px] font-semibold text-gray-800">
@@ -18127,7 +18177,7 @@ const RiderConfirmModal = ({
             )}
             {vehicleName && (
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">
+                <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wide">
                   Vehicle
                 </span>
                 <span className="text-[13px] font-semibold text-gray-800">
@@ -18137,7 +18187,7 @@ const RiderConfirmModal = ({
             )}
             {rider?.vehicle_color && (
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">
+                <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wide">
                   Color
                 </span>
                 <span className="text-[13px] font-semibold text-gray-800 capitalize">
@@ -18147,10 +18197,10 @@ const RiderConfirmModal = ({
             )}
             {rider?.vehicle_plate && (
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">
+                <span className="text-[11px] font-normal text-gray-400 uppercase tracking-wide">
                   Plate
                 </span>
-                <span className="text-[13px] font-bold text-gray-950 font-mono tracking-wider">
+                <span className="text-[13px] font-normal text-gray-950 font-mono tracking-wider">
                   {rider.vehicle_plate}
                 </span>
               </div>
@@ -18162,13 +18212,13 @@ const RiderConfirmModal = ({
         <div className="flex gap-2.5">
           <button
             onClick={onCancel}
-            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+            className="flex-1 py-3.5 rounded-xl border border-gray-200 font-normal text-sm text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onAccept}
-            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors"
+            className="flex-1 py-3.5 rounded-xl bg-gray-950 text-white font-normal text-sm hover:bg-gray-800 transition-colors"
           >
             Accept Rider
           </button>
@@ -18380,7 +18430,7 @@ const MatchedPanel = ({
           <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">
+              <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-0.5">
                 On the way
               </p>
               <h3 className="text-xl font-black tracking-tight leading-tight">
@@ -18418,7 +18468,7 @@ const MatchedPanel = ({
                 {/* ETA header (desktop only — already shown in handle on mobile) */}
                 <div className="hidden md:flex items-start justify-between mb-6">
                   <div>
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">
+                    <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-1">
                       On the way
                     </p>
                     <h3 className="text-[1.75rem] font-black tracking-tight leading-tight">
@@ -18483,7 +18533,7 @@ const MatchedPanel = ({
                         <MessageSquare size={16} />
                       </button>
                       {unreadCount > 0 && (
-                        <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 pointer-events-none">
+                        <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-normal rounded-full flex items-center justify-center px-1 pointer-events-none">
                           {unreadCount > 99 ? "99+" : unreadCount}
                         </div>
                       )}
@@ -18517,11 +18567,11 @@ const MatchedPanel = ({
                       className="w-full h-36 object-cover"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-xs font-normal px-3 py-1.5 rounded-full">
                         View Photo
                       </div>
                     </div>
-                    <div className="absolute bottom-2 left-3 text-[10px] font-bold text-white/80 uppercase tracking-widest drop-shadow">
+                    <div className="absolute bottom-2 left-3 text-[10px] font-normal text-white/80 uppercase tracking-widest drop-shadow">
                       Vehicle Photo
                     </div>
                   </button>
@@ -18543,7 +18593,7 @@ const MatchedPanel = ({
                       : `Booking Fee`;
                   return (
                     <div className="mb-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                      <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                         Fare Breakdown
                       </p>
                       <div className="space-y-2 text-[13px]">
@@ -18577,13 +18627,13 @@ const MatchedPanel = ({
                 })()}
                 {riderReviews.length > 0 && (
                   <div className="mb-6 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                    <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                       Recent Reviews
                     </p>
                     <div className="space-y-3">
                       {riderReviews.map((r, i) => (
                         <div key={i} className="flex gap-3">
-                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center font-bold text-xs text-gray-600 shrink-0">
+                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center font-normal text-xs text-gray-600 shrink-0">
                             {(r.user_name || "P")[0].toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -18630,13 +18680,13 @@ const MatchedPanel = ({
                       <div className="flex gap-2.5">
                         <button
                           onClick={() => setShowCancelConfirm(false)}
-                          className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 transition-colors"
+                          className="flex-1 bg-white text-gray-700 font-normal py-3 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 transition-colors"
                         >
                           Keep Ride
                         </button>
                         <button
                           onClick={onCancel}
-                          className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm hover:bg-red-700 transition-colors"
+                          className="flex-1 bg-red-600 text-white font-normal py-3 rounded-xl text-sm hover:bg-red-700 transition-colors"
                         >
                           Yes, Cancel
                         </button>
@@ -18644,12 +18694,12 @@ const MatchedPanel = ({
                     </div>
                   ) : (
                     <div className="flex gap-3">
-                      {/* <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">
+                      {/* <button className="flex-1 bg-gray-100 text-gray-700 font-normal py-4 rounded-2xl text-sm hover:bg-gray-200 transition-colors">
                         Share ETA
                       </button> */}
                       <button
                         onClick={() => setShowCancelConfirm(true)}
-                        className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors"
+                        className="flex-1 bg-red-50 text-red-500 font-normal py-4 rounded-2xl text-sm hover:bg-red-100 transition-colors"
                       >
                         Cancel
                       </button>
@@ -18675,13 +18725,13 @@ const MatchedPanel = ({
               <div className="flex gap-2.5">
                 <button
                   onClick={() => setShowCancelConfirm(false)}
-                  className="flex-1 bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 text-sm"
+                  className="flex-1 bg-white text-gray-700 font-normal py-3 rounded-xl border border-gray-200 text-sm"
                 >
                   Keep Ride
                 </button>
                 <button
                   onClick={onCancel}
-                  className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl text-sm"
+                  className="flex-1 bg-red-600 text-white font-normal py-3 rounded-xl text-sm"
                 >
                   Yes, Cancel
                 </button>
@@ -18689,12 +18739,12 @@ const MatchedPanel = ({
             </div>
           ) : (
             <div className="flex gap-3">
-              <button className="flex-1 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl text-sm">
+              <button className="flex-1 bg-gray-100 text-gray-700 font-normal py-4 rounded-2xl text-sm">
                 Share ETA
               </button>
               <button
                 onClick={() => setShowCancelConfirm(true)}
-                className="flex-1 bg-red-50 text-red-500 font-bold py-4 rounded-2xl text-sm"
+                className="flex-1 bg-red-50 text-red-500 font-normal py-4 rounded-2xl text-sm"
               >
                 Cancel
               </button>
@@ -18914,14 +18964,14 @@ const RatingPanel = ({
       <div className="flex gap-3">
         <button
           onClick={onDone}
-          className="flex-1 py-[15px] rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 transition-colors"
+          className="flex-1 py-[15px] rounded-2xl bg-gray-100 text-gray-600 font-normal text-sm hover:bg-gray-200 transition-colors"
         >
           Skip
         </button>
         <button
           onClick={handleSubmit}
           disabled={rating === 0}
-          className="flex-1 py-[15px] rounded-2xl bg-gray-950 text-white font-bold text-sm hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex-1 py-[15px] rounded-2xl bg-gray-950 text-white font-normal text-sm hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           Submit
         </button>
@@ -19088,7 +19138,7 @@ const RideHistoryScreen = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-bold text-gray-900 truncate">
+                          <p className="font-normal text-gray-900 truncate">
                             {ride.dropoff_label}
                           </p>
                           {ride.rider_name && (
@@ -19197,7 +19247,7 @@ const RideHistoryScreen = ({
                           {/* Fare breakdown */}
                           {ride.fare_breakdown && (
                             <div className="bg-white rounded-2xl p-3 border border-gray-100 space-y-1.5">
-                              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                              <p className="text-xs font-normal text-gray-500 uppercase tracking-wide mb-2">
                                 Fare Breakdown
                               </p>
                               {[
@@ -19222,7 +19272,7 @@ const RideHistoryScreen = ({
                                 </div>
                               ))}
                               <div className="flex justify-between text-sm border-t border-gray-100 pt-1.5 mt-1.5">
-                                <span className="font-bold text-gray-900">
+                                <span className="font-normal text-gray-900">
                                   Total
                                 </span>
                                 <span className="font-black text-emerald-600">
