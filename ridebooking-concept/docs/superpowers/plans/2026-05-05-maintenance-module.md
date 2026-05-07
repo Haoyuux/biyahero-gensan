@@ -359,7 +359,7 @@ const MaintenanceScreen = ({ settings, appSettings }: { settings: MaintenanceSet
         )}
 
         <div>
-          <h1 className="text-2xl font-black text-white mb-2">We'll be right back</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">We'll be right back</h1>
           <p className="text-white/50 text-sm leading-relaxed">{msg}</p>
         </div>
 

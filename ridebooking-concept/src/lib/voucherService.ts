@@ -159,17 +159,17 @@ export async function fetchUserVouchers(userId: string): Promise<UserVoucher[]> 
 
 async function getVoucherUsage(voucherId: string, userId: string) {
   const [{ count: totalUsed }, { count: userUsed }] = await Promise.all([
-    supabaseAdmin
-      .from('user_vouchers')
-      .select('*', { count: 'exact', head: true })
+    supabase
+      .from('rides')
+      .select('id', { count: 'exact', head: true })
       .eq('voucher_id', voucherId)
-      .eq('status', 'used'),
-    supabaseAdmin
-      .from('user_vouchers')
-      .select('*', { count: 'exact', head: true })
+      .eq('status', 'completed'),
+    supabase
+      .from('rides')
+      .select('id', { count: 'exact', head: true })
       .eq('voucher_id', voucherId)
       .eq('user_id', userId)
-      .eq('status', 'used'),
+      .eq('status', 'completed'),
   ]);
   return { totalUsed: totalUsed ?? 0, userUsed: userUsed ?? 0 };
 }

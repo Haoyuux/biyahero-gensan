@@ -840,7 +840,7 @@ export default function App() {
           <strong>{impersonating.full_name || impersonating.email}</strong> (
           {impersonating.role})
           {effectiveMode !== "off" && (
-            <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
               ✓ Maintenance bypassed
             </span>
           )}
@@ -1002,7 +1002,7 @@ const MaintenanceScreen = ({
         )}
 
         <div>
-          <h1 className="text-2xl font-black text-white mb-2">
+          <h1 className="text-2xl font-bold text-white mb-2">
             We'll be right back
           </h1>
           <p className="text-white/50 text-sm leading-relaxed">{msg}</p>
@@ -1088,7 +1088,7 @@ const MapLoadingScreen = ({ settings }: { settings: AppSettings | null }) => (
           <Navigation size={30} className="text-white" />
         )}
       </div>
-      <h2 className="text-white font-black text-xl tracking-tight">
+      <h2 className="text-white font-bold text-xl tracking-tight">
         Loading Map
       </h2>
       <p className="text-white/40 text-sm">Preparing your navigation…</p>
@@ -1148,7 +1148,7 @@ const LoginScreen = ({ settings }: { settings: AppSettings | null }) => {
               <Car size={28} className="text-white" />
             )}
           </div>
-          <h1 className="text-[3.25rem] font-black text-white tracking-tighter leading-none mb-3">
+          <h1 className="text-[3.25rem] font-bold text-white tracking-tighter leading-none mb-3">
             {settings?.app_name || "BiyaHero"}
           </h1>
           <p className="text-gray-500 text-sm font-medium tracking-wide">
@@ -1231,7 +1231,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
         </div>
 
         {/* Heading */}
-        <h1 className="text-[2rem] font-black text-white tracking-tight leading-tight text-center mb-2">
+        <h1 className="text-[2rem] font-bold text-white tracking-tight leading-tight text-center mb-2">
           Account Suspended
         </h1>
         <p className="text-gray-500 text-sm font-medium text-center mb-8">
@@ -1331,7 +1331,7 @@ const OnboardingScreen = ({
           <p className="text-xs font-semibold text-emerald-600 tracking-widest uppercase mb-4">
             Welcome to {settings?.app_name || "BiyaHero"}
           </p>
-          <h1 className="text-[2rem] font-black text-gray-950 tracking-tight leading-tight mb-2">
+          <h1 className="text-[2rem] font-bold text-gray-950 tracking-tight leading-tight mb-2">
             Hey {profile.full_name?.split(" ")[0] || "there"} 👋
           </h1>
           <p className="text-gray-400 text-[15px]">
@@ -1585,7 +1585,7 @@ const ProfileSetupScreen = ({
 
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-2xl font-black text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900">
               Complete Your Profile
             </h1>
             <p className="text-gray-500 text-sm font-medium mt-1">
@@ -1598,7 +1598,7 @@ const ProfileSetupScreen = ({
             {/* Name Row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                   First Name *
                 </label>
                 <input
@@ -1609,7 +1609,7 @@ const ProfileSetupScreen = ({
                 />
               </div>
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                   Last Name *
                 </label>
                 <input
@@ -1623,7 +1623,7 @@ const ProfileSetupScreen = ({
 
             {/* Phone */}
             <div>
-              <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                 Phone Number *
               </label>
               <div className="relative">
@@ -1647,7 +1647,7 @@ const ProfileSetupScreen = ({
 
             {/* Birthday */}
             <div>
-              <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                 Birthday *
               </label>
               <div className="relative">
@@ -1667,7 +1667,7 @@ const ProfileSetupScreen = ({
 
             {/* Sex */}
             <div>
-              <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                 Sex *
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -1686,7 +1686,7 @@ const ProfileSetupScreen = ({
 
             {/* Email (read only) */}
             <div>
-              <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                 Email
               </label>
               <input
@@ -1707,7 +1707,7 @@ const ProfileSetupScreen = ({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
             >
               {saving ? (
                 <>
@@ -1931,7 +1931,7 @@ const UserProfileScreen = ({
 
           {/* Name + role badge */}
           <div className="mb-6">
-            <h1 className="text-2xl font-black text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900">
               {profile.first_name && profile.last_name
                 ? `${profile.first_name} ${profile.last_name}`
                 : profile.full_name || "User"}
@@ -1940,7 +1940,7 @@ const UserProfileScreen = ({
               <span className="text-gray-500 text-sm font-medium">
                 {profile.email}
               </span>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-black rounded-full uppercase">
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full uppercase">
                 {profile.role}
               </span>
             </div>
@@ -1964,7 +1964,7 @@ const UserProfileScreen = ({
                   key={label}
                   className="bg-white rounded-2xl px-5 py-4 border border-gray-100 shadow-sm"
                 >
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-1">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
                     {label}
                   </p>
                   <p className="font-normal text-gray-800">{value || "—"}</p>
@@ -1976,7 +1976,7 @@ const UserProfileScreen = ({
             <div className="space-y-4 max-w-lg">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                     First Name *
                   </label>
                   <input
@@ -1987,7 +1987,7 @@ const UserProfileScreen = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                     Last Name *
                   </label>
                   <input
@@ -1999,7 +1999,7 @@ const UserProfileScreen = ({
                 </div>
               </div>
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                   Phone *
                 </label>
                 <div className="relative">
@@ -2021,7 +2021,7 @@ const UserProfileScreen = ({
                 </div>
               </div>
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                   Birthday *
                 </label>
                 <div className="relative">
@@ -2039,7 +2039,7 @@ const UserProfileScreen = ({
                 </div>
               </div>
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                   Sex *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -2056,7 +2056,7 @@ const UserProfileScreen = ({
                 </div>
               </div>
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                   Email
                 </label>
                 <input
@@ -2080,7 +2080,7 @@ const UserProfileScreen = ({
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {saving ? (
                     <>
@@ -2140,7 +2140,7 @@ const NotificationsPanel = ({
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1">
-          <h2 className="text-lg font-black text-gray-900">Notifications</h2>
+          <h2 className="text-lg font-bold text-gray-900">Notifications</h2>
           <p className="text-xs text-gray-400 font-medium">
             {notifications.length} notification
             {notifications.length !== 1 ? "s" : ""}
@@ -3270,7 +3270,7 @@ const UserApp = ({
                     )}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="font-black text-gray-950 text-sm truncate">
+                    <p className="font-bold text-gray-950 text-sm truncate">
                       {currentProfile.full_name ||
                         currentProfile.first_name ||
                         "User"}
@@ -3343,7 +3343,7 @@ const UserApp = ({
                       <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 relative">
                         <item.icon size={17} className="text-gray-600" />
                         {item.badge && item.badge > 0 ? (
-                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-black flex items-center justify-center">
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center">
                             {item.badge > 9 ? "9+" : item.badge}
                           </span>
                         ) : null}
@@ -3382,7 +3382,7 @@ const UserApp = ({
               >
                 <Menu size={22} />
                 {appNotifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-black flex items-center justify-center leading-none">
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] font-bold flex items-center justify-center leading-none">
                     {appNotifications.filter((n) => !n.read).length > 9
                       ? "9+"
                       : appNotifications.filter((n) => !n.read).length}
@@ -3444,7 +3444,7 @@ const UserApp = ({
                 )}
               </div>
               <div className="min-w-0">
-                <h1 className="font-black text-[15px] text-gray-950 leading-tight truncate">
+                <h1 className="font-bold text-[15px] text-gray-950 leading-tight truncate">
                   {settings?.app_name || "BiyaHero"}
                 </h1>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -3462,7 +3462,7 @@ const UserApp = ({
               >
                 <Newspaper size={16} className="text-gray-600" />
                 {newsUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
                     {newsUnreadCount > 99 ? "99+" : newsUnreadCount}
                   </span>
                 )}
@@ -3490,7 +3490,7 @@ const UserApp = ({
               >
                 <Bell size={16} className="text-gray-600" />
                 {appNotifications.filter((n) => !n.read).length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full text-white text-[8px] font-black flex items-center justify-center leading-none">
+                  <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full text-white text-[8px] font-bold flex items-center justify-center leading-none">
                     {appNotifications.filter((n) => !n.read).length > 9
                       ? "9+"
                       : appNotifications.filter((n) => !n.read).length}
@@ -3986,7 +3986,7 @@ const UserApp = ({
           {/* North-up reset — tap after rotating by gesture */}
           <button
             onClick={() => userMapRef.current?.setBearing(0)}
-            className="absolute bottom-4 left-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors"
+            className="absolute bottom-4 left-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
             title="Reset to north"
           >
             N
@@ -4180,7 +4180,7 @@ const RiderProfileScreen = ({
   }) => (
     <div className="border border-gray-200 rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-        <span className="text-xs font-black text-gray-500 uppercase tracking-wider">
+        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
           {label}
         </span>
         {editing && (
@@ -4332,14 +4332,14 @@ const RiderProfileScreen = ({
               )}
             </div>
             <span
-              className={`px-3 py-1.5 rounded-full text-xs font-black ${status.bg} ${status.text}`}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold ${status.bg} ${status.text}`}
             >
               {status.label}
             </span>
           </div>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-black text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900">
               {profile.first_name && profile.last_name
                 ? `${profile.first_name} ${profile.last_name}`
                 : profile.full_name || "Rider"}
@@ -4353,7 +4353,7 @@ const RiderProfileScreen = ({
             <div className="space-y-5">
               {/* Personal Info */}
               <div>
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
                   Personal Information
                 </h3>
                 <div className="space-y-2">
@@ -4380,7 +4380,7 @@ const RiderProfileScreen = ({
                       key={label}
                       className="bg-white rounded-2xl px-4 py-3 border border-gray-100 flex justify-between items-center"
                     >
-                      <span className="text-xs font-black text-gray-400 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                         {label}
                       </span>
                       <span className="font-normal text-gray-800 text-sm">
@@ -4392,7 +4392,7 @@ const RiderProfileScreen = ({
               </div>
               {/* Vehicle Info */}
               <div>
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
                   Vehicle Information
                 </h3>
                 <div className="space-y-2">
@@ -4407,7 +4407,7 @@ const RiderProfileScreen = ({
                       key={label}
                       className="bg-white rounded-2xl px-4 py-3 border border-gray-100 flex justify-between items-center"
                     >
-                      <span className="text-xs font-black text-gray-400 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                         {label}
                       </span>
                       <span className="font-normal text-gray-800 text-sm">
@@ -4419,7 +4419,7 @@ const RiderProfileScreen = ({
               </div>
               {/* Documents */}
               <div>
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
                   Documents
                 </h3>
                 <div className="space-y-3">
@@ -4462,7 +4462,7 @@ const RiderProfileScreen = ({
                   <button
                     onClick={handleSubmitForReview}
                     disabled={submitting}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg shadow-emerald-500/30 disabled:opacity-60 flex items-center justify-center gap-2"
                   >
                     {submitting ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -4512,13 +4512,13 @@ const RiderProfileScreen = ({
             <div className="space-y-5">
               {/* Personal fields */}
               <div>
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
                   Personal Information
                 </h3>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                         First Name
                       </label>
                       <input
@@ -4528,7 +4528,7 @@ const RiderProfileScreen = ({
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                         Last Name
                       </label>
                       <input
@@ -4584,7 +4584,7 @@ const RiderProfileScreen = ({
               </div>
               {/* Vehicle fields */}
               <div>
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
                   Vehicle Information
                 </h3>
                 <div className="space-y-3">
@@ -4632,7 +4632,7 @@ const RiderProfileScreen = ({
                     },
                   ].map(({ label, value, set, placeholder }) => (
                     <div key={label}>
-                      <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
                         {label}
                       </label>
                       <input
@@ -4647,7 +4647,7 @@ const RiderProfileScreen = ({
               </div>
               {/* Docs in edit mode */}
               <div>
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
                   Documents
                 </h3>
                 <div className="space-y-3">
@@ -4691,7 +4691,7 @@ const RiderProfileScreen = ({
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl transition-colors shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl transition-colors shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {saving ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -5156,7 +5156,7 @@ const RiderActiveRide = ({
         />
         {offlineMapStatus !== "idle" && (
           <div
-            className={`absolute top-36 left-4 z-[5] rounded-full px-3 py-1.5 text-[11px] font-black shadow-lg border ${
+            className={`absolute top-36 left-4 z-[5] rounded-full px-3 py-1.5 text-[11px] font-bold shadow-lg border ${
               offlineMapStatus === "ready"
                 ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                 : offlineMapStatus === "saving"
@@ -5183,7 +5183,7 @@ const RiderActiveRide = ({
         {/* North-up reset — tap after rotating by gesture */}
         <button
           onClick={() => riderMapRef.current?.setBearing(0)}
-          className="absolute top-4 right-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-black text-gray-700 hover:bg-gray-50 transition-colors"
+          className="absolute top-4 right-4 z-[5] bg-white rounded-full shadow-lg w-9 h-9 flex items-center justify-center text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
           title="Reset to north"
         >
           N
@@ -5206,12 +5206,12 @@ const RiderActiveRide = ({
                 className="w-10 h-10 rounded-full object-cover shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 shrink-0">
                 {request.user?.first_name?.[0] || "U"}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="font-black text-gray-900 text-sm truncate">
+              <p className="font-bold text-gray-900 text-sm truncate">
                 {request.user?.first_name} {request.user?.last_name || ""}
               </p>
               <p className="text-xs text-gray-400">
@@ -5221,7 +5221,7 @@ const RiderActiveRide = ({
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <p className="font-black text-lg text-emerald-600">
+              <p className="font-bold text-lg text-emerald-600">
                 ₱{request.fare}
               </p>
               {/* Chat button */}
@@ -5292,12 +5292,12 @@ const RiderActiveRide = ({
                       className="w-12 h-12 rounded-full object-cover shrink-0"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center font-black text-blue-600 text-lg shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-lg shrink-0">
                       {request.user?.first_name?.[0] || "U"}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-black text-gray-900 text-sm">
+                    <p className="font-bold text-gray-900 text-sm">
                       {request.user?.first_name} {request.user?.last_name || ""}
                     </p>
                     {request.user?.phone ? (
@@ -5395,7 +5395,7 @@ const RiderActiveRide = ({
                             <span>₱{row.value}</span>
                           </div>
                         ))}
-                        <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                        <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
                           <span>Total</span>
                           <span className="text-emerald-600">
                             ₱{request.fareBreakdown.totalFare}
@@ -5437,7 +5437,7 @@ const RiderActiveRide = ({
                   onComplete();
                 }
               }}
-              className={`flex-1 py-4 text-white font-black text-base rounded-2xl transition-all shadow-lg ${
+              className={`flex-1 py-4 text-white font-bold text-base rounded-2xl transition-all shadow-lg ${
                 ridePhase === "pickup"
                   ? "bg-orange-500 hover:bg-orange-600 shadow-orange-500/30"
                   : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30"
@@ -6347,7 +6347,7 @@ const RiderDashboard = ({
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="font-black text-[14px] md:text-[15px] text-gray-950 leading-tight">
+              <h1 className="font-bold text-[14px] md:text-[15px] text-gray-950 leading-tight">
                 {settings?.app_name || "BiyaHero"} Driver
               </h1>
               <p className="text-[10px] md:text-[11px] text-gray-400 mt-0.5 truncate max-w-[120px] md:max-w-none">
@@ -6357,7 +6357,7 @@ const RiderDashboard = ({
           </div>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             <div
-              className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black tracking-wide ${waitingForUserConfirm ? "bg-amber-100 text-amber-700" : isOnline && !requestAccepted ? "bg-emerald-50 text-emerald-700" : requestAccepted ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-500"}`}
+              className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-bold tracking-wide ${waitingForUserConfirm ? "bg-amber-100 text-amber-700" : isOnline && !requestAccepted ? "bg-emerald-50 text-emerald-700" : requestAccepted ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-500"}`}
             >
               {waitingForUserConfirm
                 ? "PENDING"
@@ -6384,7 +6384,7 @@ const RiderDashboard = ({
             >
               <Bell size={15} className="text-gray-600" />
               {appNotifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute top-1 right-1 w-3 h-3 md:w-3.5 md:h-3.5 bg-red-500 rounded-full text-white text-[8px] md:text-[9px] font-black flex items-center justify-center leading-none">
+                <span className="absolute top-1 right-1 w-3 h-3 md:w-3.5 md:h-3.5 bg-red-500 rounded-full text-white text-[8px] md:text-[9px] font-bold flex items-center justify-center leading-none">
                   {appNotifications.filter((n) => !n.read).length > 9
                     ? "9+"
                     : appNotifications.filter((n) => !n.read).length}
@@ -6492,7 +6492,7 @@ const RiderDashboard = ({
                 >
                   <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
                   {tab === "news" && riderNewsUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
+                    <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
                       {riderNewsUnreadCount > 99 ? "99+" : riderNewsUnreadCount}
                     </span>
                   )}
@@ -6570,7 +6570,7 @@ const RiderDashboard = ({
                       <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-0.5">
                         Viewing
                       </p>
-                      <p className="font-black text-[15px] text-gray-950">
+                      <p className="font-bold text-[15px] text-gray-950">
                         {new Date(
                           selectedHistoryDate + "T00:00:00",
                         ).toLocaleDateString([], {
@@ -6601,7 +6601,7 @@ const RiderDashboard = ({
                           key={label}
                           className="bg-white rounded-2xl p-4 border border-gray-100 text-center"
                         >
-                          <p className="font-black text-xl text-gray-950 tracking-tight">
+                          <p className="font-bold text-xl text-gray-950 tracking-tight">
                             {value}
                           </p>
                           <p className="text-[11px] text-gray-400 font-medium mt-0.5">
@@ -6663,7 +6663,7 @@ const RiderDashboard = ({
                           </div>
                           <div className="text-right shrink-0 flex items-center gap-2">
                             <div>
-                              <p className="font-black text-sm text-gray-950">
+                              <p className="font-bold text-sm text-gray-950">
                                 ₱{t.fare}
                               </p>
                               {(t.voucher_discount || 0) > 0 && (
@@ -6730,7 +6730,7 @@ const RiderDashboard = ({
                               <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-1">
                                 Completed
                               </p>
-                              <p className="font-black text-[1.2rem] tracking-tight leading-tight">
+                              <p className="font-bold text-[1.2rem] tracking-tight leading-tight">
                                 Trip Details
                               </p>
                               <p className="text-gray-400 text-xs mt-0.5">
@@ -6846,7 +6846,7 @@ const RiderDashboard = ({
                                       <span>₱{row.value}</span>
                                     </div>
                                   ))}
-                                  <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                                  <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
                                     <span>Total</span>
                                     <span>
                                       ₱
@@ -6856,7 +6856,7 @@ const RiderDashboard = ({
                                   </div>
                                 </>
                               ) : (
-                                <div className="flex justify-between font-black text-gray-900 text-sm">
+                                <div className="flex justify-between font-bold text-gray-900 text-sm">
                                   <span>Total</span>
                                   <span>₱{selectedTrip.fare}</span>
                                 </div>
@@ -6871,7 +6871,7 @@ const RiderDashboard = ({
                                   <p className="text-[10px] font-normal text-emerald-700 uppercase tracking-widest mb-1">
                                     Voucher Reimbursement
                                   </p>
-                                  <p className="font-black text-lg text-emerald-700">
+                                  <p className="font-bold text-lg text-emerald-700">
                                     ₱{selectedTrip.voucher_discount}
                                   </p>
                                   <p className="text-[12px] text-emerald-700/70 mt-0.5">
@@ -6880,7 +6880,7 @@ const RiderDashboard = ({
                                   </p>
                                 </div>
                                 <span
-                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black ${
+                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold ${
                                     selectedTrip.voucher_discount_paid
                                       ? "bg-white text-emerald-700 border border-emerald-200"
                                       : "bg-amber-100 text-amber-700"
@@ -6970,7 +6970,7 @@ const RiderDashboard = ({
                         <AlertCircle size={16} className="text-amber-950" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-black text-amber-900 mb-1">
+                        <p className="text-sm font-bold text-amber-900 mb-1">
                           Complete your profile
                         </p>
                         <p className="text-xs text-amber-700 leading-relaxed">
@@ -6998,7 +6998,7 @@ const RiderDashboard = ({
                           }
                         />
                       </div>
-                      <h2 className="text-gray-950 font-black text-[1.1rem] tracking-tight mb-1">
+                      <h2 className="text-gray-950 font-bold text-[1.1rem] tracking-tight mb-1">
                         Account Not Approved
                       </h2>
                       <p className="text-gray-400 text-sm mb-4 leading-relaxed">
@@ -7025,7 +7025,7 @@ const RiderDashboard = ({
                       {isOnline ? (
                         <>
                           <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mx-auto mb-4" />
-                          <h2 className="text-white font-black text-[1.1rem] tracking-tight mb-1">
+                          <h2 className="text-white font-bold text-[1.1rem] tracking-tight mb-1">
                             You're Online
                           </h2>
                           <p className="text-gray-400 text-sm mb-5">
@@ -7037,7 +7037,7 @@ const RiderDashboard = ({
                           <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
                             <Navigation size={20} className="text-gray-400" />
                           </div>
-                          <h2 className="text-gray-950 font-black text-[1.1rem] tracking-tight mb-1">
+                          <h2 className="text-gray-950 font-bold text-[1.1rem] tracking-tight mb-1">
                             You're Offline
                           </h2>
                           <p className="text-gray-400 text-sm mb-5">
@@ -7125,14 +7125,14 @@ const RiderDashboard = ({
                                 (riderTeam.schedule_days ?? []).includes(i) ? (
                                   <span
                                     key={i}
-                                    className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-black rounded"
+                                    className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-bold rounded"
                                   >
                                     {d}
                                   </span>
                                 ) : (
                                   <span
                                     key={i}
-                                    className="px-1.5 py-0.5 bg-gray-100 text-gray-300 text-[9px] font-black rounded"
+                                    className="px-1.5 py-0.5 bg-gray-100 text-gray-300 text-[9px] font-bold rounded"
                                   >
                                     {d}
                                   </span>
@@ -7159,16 +7159,16 @@ const RiderDashboard = ({
                       >
                         <div className="flex items-center gap-2 mb-4">
                           <div className="w-1.5 h-1.5 bg-gray-950 rounded-full animate-pulse" />
-                          <span className="text-[10px] font-black text-gray-950 uppercase tracking-widest">
+                          <span className="text-[10px] font-bold text-gray-950 uppercase tracking-widest">
                             New Ride Request
                           </span>
                         </div>
                         <div className="flex items-center gap-3 mb-4">
-                          <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center font-black text-gray-600 text-base shrink-0">
+                          <div className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-600 text-base shrink-0">
                             {currentRequest?.user?.first_name?.[0] || "U"}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-black text-[15px] text-gray-950 truncate">
+                            <h3 className="font-bold text-[15px] text-gray-950 truncate">
                               {currentRequest?.user?.first_name}{" "}
                               {currentRequest?.user?.last_name || ""}
                             </h3>
@@ -7181,7 +7181,7 @@ const RiderDashboard = ({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-black text-xl text-gray-950">
+                            <p className="font-bold text-xl text-gray-950">
                               ₱{currentRequest?.fare}
                             </p>
                             <p className="text-[11px] text-gray-400">
@@ -7408,7 +7408,7 @@ const RiderDashboard = ({
                         key={label}
                         className="bg-white rounded-2xl p-4 border border-gray-100 text-center"
                       >
-                        <p className="font-black text-xl text-gray-950 tracking-tight">
+                        <p className="font-bold text-xl text-gray-950 tracking-tight">
                           {value}
                         </p>
                         <p className="text-[11px] text-gray-400 font-medium mt-0.5">
@@ -7451,7 +7451,7 @@ const RiderDashboard = ({
                             </p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-black text-sm text-gray-950">
+                            <p className="font-bold text-sm text-gray-950">
                               ₱{t.fare}
                             </p>
                             {t.rating != null && (
@@ -7481,7 +7481,7 @@ const RiderDashboard = ({
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-black tracking-tight text-gray-950 leading-tight">
+                  <h2 className="text-lg font-bold tracking-tight text-gray-950 leading-tight">
                     Remittances
                   </h2>
                   <p className="text-[13px] text-gray-400 font-medium">
@@ -7517,7 +7517,7 @@ const RiderDashboard = ({
                         <p className="text-[11px] font-normal text-gray-500 uppercase tracking-wider mb-1">
                           Earnings
                         </p>
-                        <p className="text-xl font-black text-gray-900">
+                        <p className="text-xl font-bold text-gray-900">
                           ₱{remitStats.earnings}
                         </p>
                         <p className="text-[11px] text-gray-400 mt-1">
@@ -7534,7 +7534,7 @@ const RiderDashboard = ({
                             <p className="text-sm font-normal text-emerald-400 line-through">
                               ₱{remitStats.bookingFee}
                             </p>
-                            <p className="text-xl font-black text-emerald-700">
+                            <p className="text-xl font-bold text-emerald-700">
                               ₱{feeToRemit}
                             </p>
                             <p className="text-[11px] text-emerald-600 font-normal mt-1 flex items-center gap-1">
@@ -7544,7 +7544,7 @@ const RiderDashboard = ({
                           </>
                         ) : (
                           <>
-                            <p className="text-xl font-black text-emerald-700">
+                            <p className="text-xl font-bold text-emerald-700">
                               ₱{remitStats.bookingFee}
                             </p>
                             <p className="text-[11px] text-emerald-600/70 mt-1">
@@ -7658,7 +7658,7 @@ const RiderDashboard = ({
                   </div>
 
                   {/* History Section */}
-                  <h3 className="text-lg font-black tracking-tight text-gray-950 mt-8 mb-4">
+                  <h3 className="text-lg font-bold tracking-tight text-gray-950 mt-8 mb-4">
                     Submission History
                   </h3>
                   {remitHistory.length === 0 ? (
@@ -7684,7 +7684,7 @@ const RiderDashboard = ({
                                   minute: "2-digit",
                                 })}
                               </p>
-                              <p className="font-black text-[15px] text-gray-900">
+                              <p className="font-bold text-[15px] text-gray-900">
                                 ₱{r.amount_remitted}
                               </p>
                               {r.amount_remitted < r.total_booking_fee && (
@@ -7700,7 +7700,7 @@ const RiderDashboard = ({
                               )}
                             </div>
                             <div
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
                                 r.status === "approved"
                                   ? "bg-emerald-50 text-emerald-600"
                                   : r.status === "rejected"
@@ -7783,7 +7783,7 @@ const RiderDashboard = ({
                       <Crown size={18} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-black text-gray-900">{myTeam.name}</p>
+                      <p className="font-bold text-gray-900">{myTeam.name}</p>
                       <p className="text-[12px] text-gray-400">
                         {(myTeam.members ?? []).length} / {myTeam.capacity}{" "}
                         members
@@ -7809,14 +7809,14 @@ const RiderDashboard = ({
                             (myTeam.schedule_days ?? []).includes(i) ? (
                               <span
                                 key={i}
-                                className="px-2 py-0.5 bg-gray-900 text-white text-[10px] font-black rounded-md"
+                                className="px-2 py-0.5 bg-gray-900 text-white text-[10px] font-bold rounded-md"
                               >
                                 {d}
                               </span>
                             ) : (
                               <span
                                 key={i}
-                                className="px-2 py-0.5 bg-gray-100 text-gray-300 text-[10px] font-black rounded-md"
+                                className="px-2 py-0.5 bg-gray-100 text-gray-300 text-[10px] font-bold rounded-md"
                               >
                                 {d}
                               </span>
@@ -7912,7 +7912,7 @@ const RiderDashboard = ({
                                     className="w-6 h-6 rounded-full"
                                   />
                                 ) : (
-                                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400">
+                                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-400">
                                     {r.full_name?.[0] || "?"}
                                   </div>
                                 )}
@@ -7955,7 +7955,7 @@ const RiderDashboard = ({
                                   className="w-9 h-9 rounded-full"
                                 />
                               ) : (
-                                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+                                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400">
                                   {name[0]}
                                 </div>
                               )}
@@ -8061,7 +8061,7 @@ const RiderDashboard = ({
                                     className="w-9 h-9 rounded-full shrink-0"
                                   />
                                 ) : (
-                                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400 shrink-0">
+                                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 shrink-0">
                                     {(r.rider_name || "?")[0]}
                                   </div>
                                 )}
@@ -8146,7 +8146,7 @@ const RiderDashboard = ({
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                   <div>
-                    <p className="font-black text-gray-900 text-base">
+                    <p className="font-bold text-gray-900 text-base">
                       Remittance Details
                     </p>
                     <p className="text-[11px] text-gray-400 mt-0.5">
@@ -8177,7 +8177,7 @@ const RiderDashboard = ({
                         className="w-11 h-11 rounded-full"
                       />
                     ) : (
-                      <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center font-black text-gray-400">
+                      <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-400">
                         {(viewingRemittance.rider_name || "?")[0]}
                       </div>
                     )}
@@ -8222,7 +8222,7 @@ const RiderDashboard = ({
                           {label}
                         </span>
                         <span
-                          className={`text-[13px] ${bold ? "font-black text-gray-900" : "font-semibold text-gray-700"}`}
+                          className={`text-[13px] ${bold ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}
                         >
                           {value}
                         </span>
@@ -8311,7 +8311,7 @@ const RiderDashboard = ({
                   {/* Fixed Top Bar */}
                   <div className="relative px-6 py-6 flex items-center justify-center shrink-0">
                     <div className="text-center">
-                      <h3 className="font-black text-base text-gray-900 uppercase tracking-tight">
+                      <h3 className="font-bold text-base text-gray-900 uppercase tracking-tight">
                         {viewerTitle}
                       </h3>
                       <p className="text-[11px] text-gray-400 font-normal uppercase tracking-wider mt-0.5 opacity-60">
@@ -8348,7 +8348,7 @@ const RiderDashboard = ({
                           )
                         }
                         disabled={downloading}
-                        className="w-full py-4 bg-emerald-500 text-white font-black text-sm rounded-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.97] disabled:opacity-50"
+                        className="w-full py-4 bg-emerald-500 text-white font-bold text-sm rounded-2xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.97] disabled:opacity-50"
                       >
                         {downloading ? (
                           <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
@@ -8530,7 +8530,7 @@ const TeamManagementPanel = ({
     <div>
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-gray-950">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-950">
             Team Management
           </h2>
           <p className="text-gray-400 text-sm mt-1">
@@ -8653,7 +8653,7 @@ const TeamManagementPanel = ({
                               (team.schedule_days ?? []).includes(i) ? (
                                 <span
                                   key={i}
-                                  className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-black rounded"
+                                  className="px-1.5 py-0.5 bg-gray-900 text-white text-[9px] font-bold rounded"
                                 >
                                   {d}
                                 </span>
@@ -8761,7 +8761,7 @@ const TeamManagementPanel = ({
                                     schedule_days: next,
                                   });
                                 }}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-colors ${active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}
                               >
                                 {d}
                               </button>
@@ -8834,7 +8834,7 @@ const TeamManagementPanel = ({
                                 className="w-8 h-8 rounded-full border-2 border-amber-400"
                               />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-amber-100 border-2 border-amber-400 flex items-center justify-center text-xs font-black text-amber-700">
+                              <div className="w-8 h-8 rounded-full bg-amber-100 border-2 border-amber-400 flex items-center justify-center text-xs font-bold text-amber-700">
                                 {leaderName?.[0] || "?"}
                               </div>
                             )}
@@ -8872,14 +8872,14 @@ const TeamManagementPanel = ({
                                   (team.schedule_days ?? []).includes(i) ? (
                                     <span
                                       key={i}
-                                      className="px-2.5 py-1 bg-gray-900 text-white text-[11px] font-black rounded-lg"
+                                      className="px-2.5 py-1 bg-gray-900 text-white text-[11px] font-bold rounded-lg"
                                     >
                                       {d}
                                     </span>
                                   ) : (
                                     <span
                                       key={i}
-                                      className="px-2.5 py-1 bg-gray-100 text-gray-300 text-[11px] font-black rounded-lg"
+                                      className="px-2.5 py-1 bg-gray-100 text-gray-300 text-[11px] font-bold rounded-lg"
                                     >
                                       {d}
                                     </span>
@@ -8953,7 +8953,7 @@ const TeamManagementPanel = ({
                                           className="w-6 h-6 rounded-full"
                                         />
                                       ) : (
-                                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-black text-gray-500">
+                                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">
                                           {r.full_name?.[0] || "?"}
                                         </div>
                                       )}
@@ -8996,7 +8996,7 @@ const TeamManagementPanel = ({
                                         className="w-8 h-8 rounded-full"
                                       />
                                     ) : (
-                                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-black text-gray-400">
+                                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-bold text-gray-400">
                                         {name[0]}
                                       </div>
                                     )}
@@ -9226,7 +9226,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
     <div>
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-gray-950">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-950">
             News Feed
           </h2>
           <p className="text-gray-400 text-sm mt-1">
@@ -9252,7 +9252,7 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
             {t.label}
             {t.count > 0 && (
               <span
-                className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${filter === t.key ? "bg-gray-100 text-gray-600" : "bg-gray-200 text-gray-400"}`}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filter === t.key ? "bg-gray-100 text-gray-600" : "bg-gray-200 text-gray-400"}`}
               >
                 {t.count}
               </span>
@@ -9446,23 +9446,23 @@ const NewsFeedPanel = ({ currentProfile }: { currentProfile: Profile }) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${post.is_archived ? "bg-gray-100 text-gray-400" : (CATEGORY_COLORS[post.category] ?? "bg-gray-100 text-gray-600")}`}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${post.is_archived ? "bg-gray-100 text-gray-400" : (CATEGORY_COLORS[post.category] ?? "bg-gray-100 text-gray-600")}`}
                       >
                         {post.category}
                       </span>
                       {post.is_archived && (
-                        <span className="px-2 py-0.5 bg-orange-100 text-orange-500 rounded-full text-[10px] font-black uppercase tracking-wide">
+                        <span className="px-2 py-0.5 bg-orange-100 text-orange-500 rounded-full text-[10px] font-bold uppercase tracking-wide">
                           Archived
                         </span>
                       )}
                       {!post.published && !post.is_archived && (
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-wide">
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full text-[10px] font-bold uppercase tracking-wide">
                           Draft
                         </span>
                       )}
                       {post.visible_to !== "all" && (
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${post.visible_to === "rider" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${post.visible_to === "rider" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}
                         >
                           {post.visible_to === "rider"
                             ? "Drivers only"
@@ -9663,7 +9663,7 @@ const NewsFeedViewer = ({
                   <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                 )}
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${CATEGORY_COLORS[post.category] ?? "bg-gray-100 text-gray-600"}`}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${CATEGORY_COLORS[post.category] ?? "bg-gray-100 text-gray-600"}`}
                 >
                   {post.category}
                 </span>
@@ -9675,7 +9675,7 @@ const NewsFeedViewer = ({
                   })}
                 </span>
               </div>
-              <p className="font-black text-gray-950 text-[15px] leading-snug mb-2">
+              <p className="font-bold text-gray-950 text-[15px] leading-snug mb-2">
                 {post.title}
               </p>
               <p
@@ -9725,7 +9725,7 @@ const NewsFeedViewer = ({
           <ChevronLeft size={20} />
         </button>
         <div className="flex-1">
-          <p className="font-black text-gray-950 text-base">News & Updates</p>
+          <p className="font-bold text-gray-950 text-base">News & Updates</p>
           <p className="text-[11px] text-gray-400">
             {posts.length} post{posts.length !== 1 ? "s" : ""}
           </p>
@@ -10166,13 +10166,13 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
     setVouchers(list);
     if (list.length > 0) {
       const { data } = await supabase
-        .from("user_vouchers")
+        .from("rides")
         .select("voucher_id")
         .in(
           "voucher_id",
           list.map((v) => v.id),
         )
-        .eq("status", "used");
+        .eq("status", "completed");
       const counts = ((data as { voucher_id: string }[]) || []).reduce(
         (acc, row) => {
           acc[row.voucher_id] = (acc[row.voucher_id] || 0) + 1;
@@ -10317,7 +10317,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
   return (
     <>
       <div className="mb-8">
-        <h2 className="text-2xl font-black tracking-tight text-gray-950">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-950">
           Vouchers
         </h2>
         <p className="text-gray-400 text-sm mt-1">
@@ -10326,7 +10326,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-5">
         <div className="bg-white rounded-2xl border border-gray-100 p-5 h-fit">
-          <h3 className="font-black text-gray-950 mb-4">
+          <h3 className="font-bold text-gray-950 mb-4">
             {editing ? "Edit Voucher" : "Create Voucher"}
           </h3>
           <div className="space-y-3">
@@ -10524,7 +10524,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                         className="border-b border-gray-50 last:border-0"
                       >
                         <td className="px-5 py-4">
-                          <p className="font-black text-gray-950">{v.code}</p>
+                          <p className="font-bold text-gray-950">{v.code}</p>
                           <p className="text-[11px] text-gray-400">{v.title}</p>
                         </td>
                         <td className="px-5 py-4 text-sm font-normal text-gray-800">
@@ -10540,7 +10540,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                             `until ${new Date(v.expires_at).toLocaleDateString("en-PH")}`}
                         </td>
                         <td className="px-5 py-4">
-                          <p className="text-sm font-black text-gray-950">
+                          <p className="text-sm font-bold text-gray-950">
                             {remaining == null
                               ? "Unlimited"
                               : `${remaining} left`}
@@ -10600,7 +10600,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
             >
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                  <h3 className="font-black text-gray-950">
+                  <h3 className="font-bold text-gray-950">
                     {viewingVoucher.code}
                   </h3>
                   <p className="text-[12px] text-gray-400">
@@ -10681,7 +10681,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
                               Paid by passenger: ₱{ride.final_fare ?? ride.fare}
                             </p>
                           </td>
-                          <td className="px-5 py-4 text-sm font-black text-emerald-600">
+                          <td className="px-5 py-4 text-sm font-bold text-emerald-600">
                             ₱{ride.voucher_discount || 0}
                           </td>
                           <td className="px-5 py-4">
@@ -11416,7 +11416,7 @@ const AdminDashboard = ({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-black text-[14px] leading-tight text-white truncate">
+            <h1 className="font-bold text-[14px] leading-tight text-white truncate">
               {settings?.app_name || "Admin"}
             </h1>
             <p className="text-[11px] text-white/40 font-medium truncate">
@@ -11473,7 +11473,7 @@ const AdminDashboard = ({
                 <Shield size={14} className="text-gray-950" />
               )}
             </div>
-            <span className="font-black text-[13px] uppercase tracking-wider text-gray-950">
+            <span className="font-bold text-[13px] uppercase tracking-wider text-gray-950">
               {settings?.app_name || "Admin"}
             </span>
           </div>
@@ -11550,7 +11550,7 @@ const AdminDashboard = ({
               return (
                 <>
                   <div className="mb-8">
-                    <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                    <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                       Live Operations
                     </h2>
                     <p className="text-gray-400 text-sm mt-1">
@@ -11592,7 +11592,7 @@ const AdminDashboard = ({
                             <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                               {label}
                             </p>
-                            <h3 className="text-3xl font-black text-gray-950 tracking-tight">
+                            <h3 className="text-3xl font-bold text-gray-950 tracking-tight">
                               {value}
                             </h3>
                             <p className="text-[12px] text-gray-400 font-medium mt-2">
@@ -11796,7 +11796,7 @@ const AdminDashboard = ({
                                     className="w-full h-full object-cover"
                                   />
                                 ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-500 bg-gray-100">
+                                  <div className="w-full h-full flex items-center justify-center text-lg font-bold text-gray-500 bg-gray-100">
                                     {
                                       (selectedRiderProfile.first_name ||
                                         selectedRiderProfile.full_name ||
@@ -11806,7 +11806,7 @@ const AdminDashboard = ({
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-black text-base text-gray-950 truncate">
+                                <p className="font-bold text-base text-gray-950 truncate">
                                   {selectedRiderProfile.first_name &&
                                   selectedRiderProfile.last_name
                                     ? `${selectedRiderProfile.first_name} ${selectedRiderProfile.last_name}`
@@ -11962,13 +11962,13 @@ const AdminDashboard = ({
                                             className="w-full h-full object-cover"
                                           />
                                         ) : (
-                                          <div className="w-full h-full flex items-center justify-center text-lg font-black bg-gray-100 text-gray-500">
+                                          <div className="w-full h-full flex items-center justify-center text-lg font-bold bg-gray-100 text-gray-500">
                                             {name[0]}
                                           </div>
                                         )}
                                       </div>
                                       <div>
-                                        <p className="font-black text-base text-gray-950">
+                                        <p className="font-bold text-base text-gray-950">
                                           {name}
                                         </p>
                                         <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-normal px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
@@ -12003,7 +12003,7 @@ const AdminDashboard = ({
                   <div className="mt-8">
                     <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
                       <div>
-                        <h3 className="text-lg font-black tracking-tight text-gray-950">
+                        <h3 className="text-lg font-bold tracking-tight text-gray-950">
                           Ongoing Rides
                         </h3>
                         <p className="text-gray-400 text-xs mt-0.5">
@@ -12093,7 +12093,7 @@ const AdminDashboard = ({
                                     alt=""
                                   />
                                 ) : (
-                                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-black text-gray-400 shrink-0">
+                                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-bold text-gray-400 shrink-0">
                                     {(ride.user_name || "?")[0]}
                                   </div>
                                 )}
@@ -12110,7 +12110,7 @@ const AdminDashboard = ({
                                 </p>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-sm font-black text-gray-900">
+                                <span className="text-sm font-bold text-gray-900">
                                   ₱{ride.fare ?? "—"}
                                 </span>
                                 <button
@@ -12197,7 +12197,7 @@ const AdminDashboard = ({
                                           alt=""
                                         />
                                       ) : (
-                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 shrink-0">
+                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-400 shrink-0">
                                           {(ride.user_name || "?")[0]}
                                         </div>
                                       )}
@@ -12216,7 +12216,7 @@ const AdminDashboard = ({
                                             alt=""
                                           />
                                         ) : (
-                                          <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-black text-emerald-600 shrink-0">
+                                          <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-600 shrink-0">
                                             {ride.rider_name[0]}
                                           </div>
                                         )}
@@ -12245,7 +12245,7 @@ const AdminDashboard = ({
                                       {ride.ride_type || "—"}
                                     </span>
                                   </td>
-                                  <td className="px-4 py-3 text-[13px] font-black text-gray-900">
+                                  <td className="px-4 py-3 text-[13px] font-bold text-gray-900">
                                     ₱{ride.fare ?? "—"}
                                   </td>
                                   <td className="px-4 py-3 text-[12px] text-gray-400 whitespace-nowrap">
@@ -12315,7 +12315,7 @@ const AdminDashboard = ({
                             {/* Header */}
                             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
                               <div>
-                                <h3 className="font-black text-gray-950 text-base">
+                                <h3 className="font-bold text-gray-950 text-base">
                                   Ride Details
                                 </h3>
                                 <p className="text-[11px] text-gray-400 mt-0.5 font-mono">
@@ -12359,7 +12359,7 @@ const AdminDashboard = ({
                                             alt=""
                                           />
                                         ) : (
-                                          <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-xl font-black text-gray-400">
+                                          <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-xl font-bold text-gray-400">
                                             {
                                               (ongoingDetail.user_name ||
                                                 "?")[0]
@@ -12367,7 +12367,7 @@ const AdminDashboard = ({
                                           </div>
                                         )}
                                         <div className="min-w-0">
-                                          <p className="font-black text-gray-950 text-sm truncate">
+                                          <p className="font-bold text-gray-950 text-sm truncate">
                                             {ongoingUserProfile?.full_name ||
                                               ongoingDetail.user_name ||
                                               "—"}
@@ -12432,7 +12432,7 @@ const AdminDashboard = ({
                                                 alt=""
                                               />
                                             ) : (
-                                              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-xl font-black text-emerald-500">
+                                              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center text-xl font-bold text-emerald-500">
                                                 {
                                                   (ongoingDetail.rider_name ||
                                                     "?")[0]
@@ -12440,7 +12440,7 @@ const AdminDashboard = ({
                                               </div>
                                             )}
                                             <div className="min-w-0">
-                                              <p className="font-black text-gray-950 text-sm truncate">
+                                              <p className="font-bold text-gray-950 text-sm truncate">
                                                 {ongoingRiderProfile?.full_name ||
                                                   ongoingDetail.rider_name ||
                                                   "—"}
@@ -12604,7 +12604,7 @@ const AdminDashboard = ({
               return (
                 <>
                   <div className="mb-8">
-                    <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                    <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                       Driver Management
                     </h2>
                     <p className="text-gray-400 text-sm mt-1">
@@ -12808,7 +12808,7 @@ const AdminDashboard = ({
           {activeTab === "analytics" && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                   Booking Analytics
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
@@ -12837,7 +12837,7 @@ const AdminDashboard = ({
                       <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                         Rides This Week
                       </p>
-                      <p className="text-3xl font-black text-gray-950 tracking-tight mb-5">
+                      <p className="text-3xl font-bold text-gray-950 tracking-tight mb-5">
                         {analyticsData?.totalThisWeek ?? "—"}
                       </p>
                       <div className="flex items-end gap-1.5 h-36">
@@ -12865,7 +12865,7 @@ const AdminDashboard = ({
                         Week-over-Week
                       </p>
                       <div className="mb-5">
-                        <h4 className="text-4xl font-black text-gray-950 tracking-tight">
+                        <h4 className="text-4xl font-bold text-gray-950 tracking-tight">
                           {analyticsData?.totalThisWeek ?? "—"}
                           <span className="text-lg text-gray-300 font-normal ml-1.5">
                             rides
@@ -12925,7 +12925,7 @@ const AdminDashboard = ({
           {activeTab === "finances" && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                   Revenue Dashboard
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
@@ -12953,7 +12953,7 @@ const AdminDashboard = ({
                         <p className="text-[11px] font-normal text-white/40 uppercase tracking-widest mb-3">
                           Total Gross Volume
                         </p>
-                        <h3 className="text-3xl font-black tracking-tight mb-3">
+                        <h3 className="text-3xl font-bold tracking-tight mb-3">
                           {fmt(gross)}
                         </h3>
                         {weekChange !== null && (
@@ -12970,7 +12970,7 @@ const AdminDashboard = ({
                         <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           Platform Revenue (20%)
                         </p>
-                        <h3 className="text-3xl font-black tracking-tight text-gray-950 mb-3">
+                        <h3 className="text-3xl font-bold tracking-tight text-gray-950 mb-3">
                           {fmt(Math.round(gross * 0.2))}
                         </h3>
                         <p className="text-[12px] text-gray-400 font-semibold">
@@ -12981,7 +12981,7 @@ const AdminDashboard = ({
                         <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           This Week Gross
                         </p>
-                        <h3 className="text-3xl font-black tracking-tight text-gray-950 mb-3">
+                        <h3 className="text-3xl font-bold tracking-tight text-gray-950 mb-3">
                           {fmt(thisWeek)}
                         </h3>
                         <p className="text-[12px] text-gray-400 font-semibold">
@@ -13145,7 +13145,7 @@ const AdminDashboard = ({
           {activeTab === "riders" && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                   Rider Verification
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
@@ -13185,7 +13185,7 @@ const AdminDashboard = ({
                             </div>
                           )}
                           <div>
-                            <h3 className="font-black text-[15px] text-gray-950 leading-tight">
+                            <h3 className="font-bold text-[15px] text-gray-950 leading-tight">
                               {selectedRider.full_name || "—"}
                             </h3>
                             <p className="text-[12px] text-gray-400">
@@ -13205,7 +13205,7 @@ const AdminDashboard = ({
                         {/* Status badge */}
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wide ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
                               selectedRider.rider_status === "approved"
                                 ? "bg-emerald-50 text-emerald-700"
                                 : selectedRider.rider_status === "pending"
@@ -13559,7 +13559,7 @@ const AdminDashboard = ({
                                           className="w-8 h-8 rounded-full object-cover"
                                         />
                                       ) : (
-                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-black text-gray-400">
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400">
                                           {r.full_name?.[0] || "?"}
                                         </div>
                                       )}
@@ -13723,7 +13723,7 @@ const AdminDashboard = ({
           {activeTab === "reviews" && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                   Ride Reviews
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
@@ -13815,7 +13815,7 @@ const AdminDashboard = ({
           {activeTab === "pricing" && isSuperAdmin && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                   Pricing Configuration
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
@@ -14160,7 +14160,7 @@ const AdminDashboard = ({
           {activeTab === "users" && isSuperAdmin && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                   User Management
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
@@ -14261,7 +14261,7 @@ const AdminDashboard = ({
                                     className="w-10 h-10 rounded-full shrink-0 object-cover"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-black text-gray-400 shrink-0">
+                                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-400 shrink-0">
                                     {u.full_name?.[0] || "?"}
                                   </div>
                                 )}
@@ -14451,7 +14451,7 @@ const AdminDashboard = ({
                                           className="w-6 h-6 rounded-full shrink-0"
                                         />
                                       ) : (
-                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 shrink-0">
+                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-400 shrink-0">
                                           {u.full_name?.[0] || "?"}
                                         </div>
                                       )}
@@ -14786,7 +14786,7 @@ const AdminDashboard = ({
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
-                    <h3 className="font-black text-gray-950 text-base">
+                    <h3 className="font-bold text-gray-950 text-base">
                       {userDetailModal.role === "rider" ||
                       userDetailModal.role === "team_leader"
                         ? "Rider Details"
@@ -14813,12 +14813,12 @@ const AdminDashboard = ({
                           }
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-black text-gray-400">
+                        <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-400">
                           {userDetailModal.full_name?.[0] || "?"}
                         </div>
                       )}
                       <div>
-                        <p className="font-black text-gray-950 text-base">
+                        <p className="font-bold text-gray-950 text-base">
                           {userDetailModal.full_name || "—"}
                         </p>
                         <p className="text-[12px] text-gray-400">
@@ -14856,7 +14856,7 @@ const AdminDashboard = ({
 
                     {/* Personal Info */}
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
                         Personal Info
                       </p>
                       {[
@@ -14918,7 +14918,7 @@ const AdminDashboard = ({
                     {(userDetailModal.role === "rider" ||
                       userDetailModal.role === "team_leader") && (
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
                           Vehicle Info
                         </p>
                         {[
@@ -14974,7 +14974,7 @@ const AdminDashboard = ({
                     {(userDetailModal.role === "rider" ||
                       userDetailModal.role === "team_leader") && (
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
                           Documents
                         </p>
                         <div className="space-y-2">
@@ -15092,7 +15092,7 @@ const AdminDashboard = ({
                             }
                             setUserStatusToggling(null);
                           }}
-                          className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 ${
+                          className={`w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 ${
                             userDetailModal.is_blocked
                               ? "bg-emerald-500 hover:bg-emerald-600 text-white"
                               : "bg-red-500 hover:bg-red-600 text-white"
@@ -15165,7 +15165,7 @@ const AdminDashboard = ({
                 >
                   <div className="flex items-center justify-between mb-5">
                     <div>
-                      <h3 className="font-black text-gray-950 text-base">
+                      <h3 className="font-bold text-gray-950 text-base">
                         Assign Admin Roles
                       </h3>
                       <p className="text-[12px] text-gray-400 mt-0.5">
@@ -15281,7 +15281,7 @@ const AdminDashboard = ({
             <>
               <div className="mb-8 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                  <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                     Roles & Permissions
                   </h2>
                   <p className="text-gray-400 text-sm mt-1">
@@ -15554,7 +15554,7 @@ const AdminDashboard = ({
                 <>
                   {/* Header */}
                   <div className="mb-8">
-                    <h2 className="text-2xl font-black tracking-tight text-gray-950">
+                    <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                       User Blocking
                     </h2>
                     <p className="text-gray-400 text-sm mt-1">
@@ -15569,7 +15569,7 @@ const AdminDashboard = ({
                       <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-1">
                         Total Users & Riders
                       </p>
-                      <p className="text-3xl font-black text-gray-950">
+                      <p className="text-3xl font-bold text-gray-950">
                         {blockableUsers.length}
                       </p>
                     </div>
@@ -15577,7 +15577,7 @@ const AdminDashboard = ({
                       <p className="text-[11px] font-normal text-red-400 uppercase tracking-widest mb-1">
                         Currently Blocked
                       </p>
-                      <p className="text-3xl font-black text-red-600">
+                      <p className="text-3xl font-bold text-red-600">
                         {blockedCount}
                       </p>
                     </div>
@@ -15585,7 +15585,7 @@ const AdminDashboard = ({
                       <p className="text-[11px] font-normal text-emerald-500 uppercase tracking-widest mb-1">
                         Active
                       </p>
-                      <p className="text-3xl font-black text-emerald-600">
+                      <p className="text-3xl font-bold text-emerald-600">
                         {blockableUsers.length - blockedCount}
                       </p>
                     </div>
@@ -15694,7 +15694,7 @@ const AdminDashboard = ({
                                   />
                                 </div>
                                 <div>
-                                  <h3 className="font-black text-gray-900 text-lg">
+                                  <h3 className="font-bold text-gray-900 text-lg">
                                     Unblock User
                                   </h3>
                                   <p className="text-gray-400 text-sm font-medium">
@@ -15728,7 +15728,7 @@ const AdminDashboard = ({
                                       {blockingTarget.email}
                                     </p>
                                   </div>
-                                  <span className="ml-auto px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[10px] font-black uppercase">
+                                  <span className="ml-auto px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[10px] font-bold uppercase">
                                     Blocked
                                   </span>
                                 </div>
@@ -15783,7 +15783,7 @@ const AdminDashboard = ({
                                     setBlockingTarget(null);
                                     setBlockReason("");
                                   }}
-                                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-2xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60"
+                                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60"
                                 >
                                   {blockActionLoading === blockingTarget.id ? (
                                     <>
@@ -15806,7 +15806,7 @@ const AdminDashboard = ({
                                   <Ban size={22} className="text-red-600" />
                                 </div>
                                 <div>
-                                  <h3 className="font-black text-gray-900 text-lg">
+                                  <h3 className="font-bold text-gray-900 text-lg">
                                     Block User
                                   </h3>
                                   <p className="text-gray-400 text-sm font-medium">
@@ -15841,7 +15841,7 @@ const AdminDashboard = ({
                                     </p>
                                   </div>
                                   <span
-                                    className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${blockingTarget.role === "rider" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"}`}
+                                    className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${blockingTarget.role === "rider" ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600"}`}
                                   >
                                     {blockingTarget.role === "rider"
                                       ? "Rider"
@@ -15916,7 +15916,7 @@ const AdminDashboard = ({
                                     setBlockingTarget(null);
                                     setBlockReason("");
                                   }}
-                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-40"
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-40"
                                 >
                                   {blockActionLoading === blockingTarget.id ? (
                                     <>
@@ -15989,7 +15989,7 @@ const AdminDashboard = ({
                                     : u.full_name || u.email}
                                 </p>
                                 <span
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0 ${
                                     u.role === "rider"
                                       ? "bg-blue-100 text-blue-600"
                                       : "bg-gray-100 text-gray-500"
@@ -15998,7 +15998,7 @@ const AdminDashboard = ({
                                   {u.role === "rider" ? "Rider" : "User"}
                                 </span>
                                 {u.is_blocked && (
-                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] font-black uppercase shrink-0">
+                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] font-bold uppercase shrink-0">
                                     Blocked
                                   </span>
                                 )}
@@ -16149,7 +16149,7 @@ const AdminDashboard = ({
         {activeTab === "remittances" && (
           <div className="space-y-6">
             <div className="mb-8">
-              <h2 className="text-2xl font-black tracking-tight text-gray-950">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                 Remittances
               </h2>
               <p className="text-gray-400 text-sm mt-1">
@@ -16242,7 +16242,7 @@ const AdminDashboard = ({
                               </div>
                             </div>
                             <div
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
                                 r.status === "approved"
                                   ? "bg-emerald-50 text-emerald-600"
                                   : r.status === "rejected"
@@ -16259,7 +16259,7 @@ const AdminDashboard = ({
                               <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-0.5">
                                 Trips
                               </p>
-                              <p className="font-black text-gray-900 text-[13px]">
+                              <p className="font-bold text-gray-900 text-[13px]">
                                 {r.rides_count}
                               </p>
                             </div>
@@ -16267,7 +16267,7 @@ const AdminDashboard = ({
                               <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-0.5">
                                 Earnings
                               </p>
-                              <p className="font-black text-gray-900 text-[13px]">
+                              <p className="font-bold text-gray-900 text-[13px]">
                                 ₱{r.total_earnings}
                               </p>
                             </div>
@@ -16275,7 +16275,7 @@ const AdminDashboard = ({
                               <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-0.5">
                                 Remitted
                               </p>
-                              <p className="font-black text-emerald-600 text-[13px]">
+                              <p className="font-bold text-emerald-600 text-[13px]">
                                 ₱{r.amount_remitted}
                               </p>
                             </div>
@@ -16480,7 +16480,7 @@ const AdminDashboard = ({
         {activeTab === "settings" && isSuperAdmin && (
           <div className="space-y-6">
             <div className="mb-8">
-              <h2 className="text-2xl font-black tracking-tight text-gray-950">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-950">
                 App Settings
               </h2>
               <p className="text-gray-400 text-sm mt-1">
@@ -16852,13 +16852,13 @@ const RealtimeChat = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-600 font-black text-base">
+            <div className="w-full h-full flex items-center justify-center text-gray-600 font-bold text-base">
               {otherInitial}
             </div>
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-black leading-tight text-gray-950 truncate">
+          <h4 className="font-bold leading-tight text-gray-950 truncate">
             {otherName}
           </h4>
           <p className="text-[11px] text-gray-400 font-normal uppercase tracking-wide">
@@ -16868,7 +16868,7 @@ const RealtimeChat = ({
         {isDisconnected && (
           <div className="flex items-center gap-1.5 bg-red-50 px-2.5 py-1 rounded-full shrink-0">
             <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            <span className="text-[10px] font-black text-red-600">Offline</span>
+            <span className="text-[10px] font-bold text-red-600">Offline</span>
           </div>
         )}
         {isConnecting && (
@@ -16898,7 +16898,7 @@ const RealtimeChat = ({
             <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 flex items-center justify-center mb-3 shadow-sm">
               <MessageSquare size={24} className="opacity-50" />
             </div>
-            <p className="text-sm font-black text-gray-600">No messages yet</p>
+            <p className="text-sm font-bold text-gray-600">No messages yet</p>
             <p className="text-xs mt-1 font-medium">
               Coordinate pickup details here.
             </p>
@@ -17038,7 +17038,7 @@ const ChatHistoryScreen = ({
         >
           <ChevronLeft size={22} />
         </button>
-        <h2 className="font-black text-xl text-gray-900">Messages</h2>
+        <h2 className="font-bold text-xl text-gray-900">Messages</h2>
       </div>
 
       {loading ? (
@@ -17102,7 +17102,7 @@ const ChatHistoryScreen = ({
                     onClick={() => setOpenChat(convo)}
                     className="flex items-center gap-4 flex-1 px-5 py-4 text-left"
                   >
-                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center font-black text-emerald-700 text-lg shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 text-lg shrink-0">
                       {convo.other_name[0]}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -17156,7 +17156,7 @@ const OngoingRidePanel = ({
     <div className="bg-gray-950 text-white rounded-2xl px-4 py-4 flex items-center gap-3.5 shadow-xl shadow-black/20">
       <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="font-black text-[15px] leading-tight">Ongoing ride</p>
+        <p className="font-bold text-[15px] leading-tight">Ongoing ride</p>
         <p className="text-gray-400 text-[12px] font-medium truncate mt-1">
           {activeRider
             ? `Driver: ${activeRider.first_name || "Your rider"}`
@@ -17165,7 +17165,7 @@ const OngoingRidePanel = ({
       </div>
       <button
         onClick={onView}
-        className="shrink-0 bg-white text-gray-950 hover:bg-gray-100 font-black text-[12px] px-4 py-2.5 rounded-xl transition-colors"
+        className="shrink-0 bg-white text-gray-950 hover:bg-gray-100 font-bold text-[12px] px-4 py-2.5 rounded-xl transition-colors"
       >
         View
       </button>
@@ -17303,7 +17303,7 @@ const HomePanel = ({
 
       <div className="px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:px-6 md:pt-6">
         <div className="flex items-center justify-between mb-3 md:mb-5">
-          <h2 className="text-[1.35rem] md:text-[1.75rem] font-black tracking-tight leading-tight">
+          <h2 className="text-[1.35rem] md:text-[1.75rem] font-bold tracking-tight leading-tight">
             Where to?
           </h2>
           <button
@@ -17613,7 +17613,7 @@ const HomePanel = ({
         {/* Find a Rider button — always visible, active only when destination is set */}
         <button
           onClick={() => (dropoff ? setStep("select") : handleFocus("dropoff"))}
-          className={`w-full py-4 font-black text-[15px] rounded-2xl mb-3 transition-all active:scale-[0.98] ${
+          className={`w-full py-4 font-bold text-[15px] rounded-2xl mb-3 transition-all active:scale-[0.98] ${
             dropoff
               ? "bg-gray-950 text-white hover:bg-gray-800 shadow-[0_4px_24px_rgba(0,0,0,0.18)]"
               : "bg-gray-100 text-gray-400 cursor-default"
@@ -17727,13 +17727,13 @@ const SelectPanel = ({
               <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest">
                 Selected
               </p>
-              <p className="font-black text-[15px] text-gray-950">
+              <p className="font-bold text-[15px] text-gray-950">
                 {selectedRideLabel}
               </p>
             </div>
             <div className="flex items-center gap-2">
               {selectedBreakdown && (
-                <span className="font-black text-[15px] text-gray-950">
+                <span className="font-bold text-[15px] text-gray-950">
                   ₱{activeTotalFare}
                 </span>
               )}
@@ -17765,7 +17765,7 @@ const SelectPanel = ({
                   <ArrowLeft size={20} />
                   <span className="text-sm font-medium">Back</span>
                 </button>
-                <h3 className="text-[1.5rem] font-black tracking-tight mb-5">
+                <h3 className="text-[1.5rem] font-bold tracking-tight mb-5">
                   Choose a ride
                 </h3>
                 <div className="space-y-2.5 mb-5 pb-1">
@@ -17785,7 +17785,7 @@ const SelectPanel = ({
                           <span className="font-normal text-[15px]">
                             {ride.name}
                           </span>
-                          <span className="font-black text-[16px]">
+                          <span className="font-bold text-[16px]">
                             ₱{ride.breakdown.totalFare}
                           </span>
                         </div>
@@ -17854,7 +17854,7 @@ const SelectPanel = ({
                               <span>₱{row.value}</span>
                             </div>
                           ))}
-                          <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                          <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
                             <span>Total</span>
                             <span>₱{activeTotalFare}</span>
                           </div>
@@ -17897,7 +17897,7 @@ const SelectPanel = ({
                     {activeVoucherDiscount > 0 && (
                       <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[13px]">
                         <span className="text-gray-500">Voucher discount</span>
-                        <span className="font-black text-emerald-600">
+                        <span className="font-bold text-emerald-600">
                           -₱{activeVoucherDiscount}
                         </span>
                       </div>
@@ -17959,7 +17959,7 @@ const SelectPanel = ({
           />
           <div className="relative w-full max-w-md bg-white rounded-t-[28px] md:rounded-2xl p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-black text-gray-950">Vouchers</h3>
+              <h3 className="text-lg font-bold text-gray-950">Vouchers</h3>
               <button
                 onClick={() => setShowVoucherPicker(false)}
                 className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center"
@@ -18027,14 +18027,14 @@ const SelectPanel = ({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-black text-gray-950">
+                          <p className="text-sm font-bold text-gray-950">
                             {voucher?.title || uv.code}
                           </p>
                           <p className="text-[11px] text-gray-400 mt-0.5">
                             {issue || `Save ₱${discount} on this ride`}
                           </p>
                         </div>
-                        <span className="text-[11px] font-black bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg">
+                        <span className="text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg">
                           {uv.code}
                         </span>
                       </div>
@@ -18116,7 +18116,7 @@ const RiderConfirmModal = ({
       >
         <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-5 md:hidden" />
 
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
           Driver Found
         </p>
 
@@ -18130,7 +18130,7 @@ const RiderConfirmModal = ({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center font-black text-2xl text-gray-500">
+              <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-gray-500">
                 {(rider?.first_name ||
                   rider?.full_name ||
                   "R")[0].toUpperCase()}
@@ -18138,7 +18138,7 @@ const RiderConfirmModal = ({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-black text-[17px] text-gray-950 leading-tight truncate">
+            <h3 className="font-bold text-[17px] text-gray-950 leading-tight truncate">
               {rider?.first_name} {rider?.last_name || ""}
             </h3>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -18258,7 +18258,7 @@ const SearchingPanel = ({
         <Search size={24} className="text-white" />
       </div>
     </div>
-    <h3 className="text-[1.35rem] font-black tracking-tight text-gray-950">
+    <h3 className="text-[1.35rem] font-bold tracking-tight text-gray-950">
       Finding your driver
     </h3>
     <p className="text-gray-400 text-sm font-medium mt-1.5">
@@ -18433,7 +18433,7 @@ const MatchedPanel = ({
               <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-0.5">
                 On the way
               </p>
-              <h3 className="text-xl font-black tracking-tight leading-tight">
+              <h3 className="text-xl font-bold tracking-tight leading-tight">
                 {etaLabel}
               </h3>
               <p className="text-gray-400 text-xs font-medium mt-0.5">
@@ -18442,7 +18442,7 @@ const MatchedPanel = ({
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <div className="bg-gray-950 text-white text-sm font-black px-3 py-1.5 rounded-xl">
+              <div className="bg-gray-950 text-white text-sm font-bold px-3 py-1.5 rounded-xl">
                 ₱{activeFare.totalFare}
               </div>
               <ChevronLeft
@@ -18471,7 +18471,7 @@ const MatchedPanel = ({
                     <p className="text-[10px] font-normal text-emerald-600 uppercase tracking-widest mb-1">
                       On the way
                     </p>
-                    <h3 className="text-[1.75rem] font-black tracking-tight leading-tight">
+                    <h3 className="text-[1.75rem] font-bold tracking-tight leading-tight">
                       {etaLabel}
                     </h3>
                     <p className="text-gray-400 text-sm font-medium mt-0.5">
@@ -18479,7 +18479,7 @@ const MatchedPanel = ({
                         `${activeRider ? `${activeRider.vehicle_make || ""} ${activeRider.vehicle_model || ""}`.trim() || "Vehicle" : "Toyota Vios"} · ${activeRider?.vehicle_plate || "ABC 1234"}`}
                     </p>
                   </div>
-                  <div className="bg-gray-950 text-white text-sm font-black px-4 py-2 rounded-xl shrink-0">
+                  <div className="bg-gray-950 text-white text-sm font-bold px-4 py-2 rounded-xl shrink-0">
                     ₱{activeFare.totalFare}
                   </div>
                 </div>
@@ -18493,13 +18493,13 @@ const MatchedPanel = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-400">
                         {activeRider?.first_name?.[0] || "D"}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-black text-[15px] truncate">
+                    <h4 className="font-bold text-[15px] truncate">
                       {activeRider
                         ? `${activeRider.first_name || ""} ${activeRider.last_name || ""}`.trim()
                         : "Juan Dela Cruz"}
@@ -18617,7 +18617,7 @@ const MatchedPanel = ({
                             <span>₱{row.value}</span>
                           </div>
                         ))}
-                        <div className="border-t border-gray-200 pt-2 flex justify-between font-black text-gray-900 text-sm">
+                        <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-gray-900 text-sm">
                           <span>Total</span>
                           <span>₱{activeFare.totalFare}</span>
                         </div>
@@ -18670,7 +18670,7 @@ const MatchedPanel = ({
                 <div className="md:hidden">
                   {showCancelConfirm ? (
                     <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
-                      <h4 className="font-black text-sm text-red-800 mb-1">
+                      <h4 className="font-bold text-sm text-red-800 mb-1">
                         Cancel your ride?
                       </h4>
                       <p className="text-red-500 text-xs mb-4">
@@ -18715,7 +18715,7 @@ const MatchedPanel = ({
         <div className="hidden md:block px-6 pb-8">
           {showCancelConfirm ? (
             <div className="bg-red-50 p-5 rounded-2xl border border-red-100">
-              <h4 className="font-black text-sm text-red-800 mb-1">
+              <h4 className="font-bold text-sm text-red-800 mb-1">
                 Cancel your ride?
               </h4>
               <p className="text-red-500 text-xs mb-4">
@@ -18858,7 +18858,7 @@ const RatingPanel = ({
         >
           <CheckCircle size={28} className="text-white" />
         </motion.div>
-        <h3 className="text-[1.3rem] font-black tracking-tight text-gray-950">
+        <h3 className="text-[1.3rem] font-bold tracking-tight text-gray-950">
           Thanks for rating!
         </h3>
         <p className="text-gray-400 text-sm text-center">
@@ -18888,12 +18888,12 @@ const RatingPanel = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-400">
+            <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-400">
               {rider?.first_name?.[0] || "R"}
             </div>
           )}
         </div>
-        <h3 className="text-[1.25rem] font-black tracking-tight text-gray-950">
+        <h3 className="text-[1.25rem] font-bold tracking-tight text-gray-950">
           Rate your ride
         </h3>
         <p className="text-gray-400 text-sm mt-0.5">
@@ -19066,7 +19066,7 @@ const RideHistoryScreen = ({
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-black text-gray-900">Ride History</h2>
+          <h2 className="text-lg font-bold text-gray-900">Ride History</h2>
           <p className="text-xs text-gray-400 font-medium">
             {rides.length} trip{rides.length !== 1 ? "s" : ""}
             {rides.length > 0 ? ` · ₱${totalSpent} spent` : ""}
@@ -19151,7 +19151,7 @@ const RideHistoryScreen = ({
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-black text-gray-900 text-base">
+                          <p className="font-bold text-gray-900 text-base">
                             ₱{ride.fare}
                           </p>
                           <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
@@ -19275,7 +19275,7 @@ const RideHistoryScreen = ({
                                 <span className="font-normal text-gray-900">
                                   Total
                                 </span>
-                                <span className="font-black text-emerald-600">
+                                <span className="font-bold text-emerald-600">
                                   ₱{ride.fare_breakdown.totalFare}
                                 </span>
                               </div>

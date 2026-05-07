@@ -20,7 +20,7 @@ $header = '      <div className="flex-1 p-6 md:p-8 overflow-y-auto w-full">' + "
           '            <div className="w-7 h-7 flex items-center justify-center shrink-0">' + "`n" + 
           '              {settings?.app_logo_url ? <img src={settings.app_logo_url} className="w-full h-full object-contain" /> : <Shield size={14} className="text-gray-950" />}' + "`n" + 
           '            </div>' + "`n" + 
-          '            <span className="font-black text-[13px] uppercase tracking-wider text-gray-950">{settings?.app_name || ''Admin''}</span>' + "`n" + 
+          '            <span className="font-bold text-[13px] uppercase tracking-wider text-gray-950">{settings?.app_name || ''Admin''}</span>' + "`n" + 
           '          </div>' + "`n" + 
           '' + "`n" + 
           '          <div className="w-9" />' + "`n" + 

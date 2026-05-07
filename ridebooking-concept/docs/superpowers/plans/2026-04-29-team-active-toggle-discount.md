@@ -516,9 +516,7 @@ Find the Due Fee card:
   <p className="text-[11px] font-normal text-emerald-600 uppercase tracking-wider mb-1">
     Due Fee
   </p>
-  <p className="text-xl font-black text-emerald-700">
-    ₱{remitStats.bookingFee}
-  </p>
+  <p className="text-xl font-bold text-emerald-700">₱{remitStats.bookingFee}</p>
   <p className="text-[11px] text-emerald-600/70 mt-1">To remit</p>
 </div>
 ```
@@ -535,7 +533,7 @@ Replace with:
       <p className="text-sm font-normal text-emerald-400 line-through">
         ₱{remitStats.bookingFee}
       </p>
-      <p className="text-xl font-black text-emerald-700">₱{feeToRemit}</p>
+      <p className="text-xl font-bold text-emerald-700">₱{feeToRemit}</p>
       <p className="text-[11px] text-emerald-600 font-normal mt-1 flex items-center gap-1">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
         Team {discountPct}% discount
@@ -543,7 +541,7 @@ Replace with:
     </>
   ) : (
     <>
-      <p className="text-xl font-black text-emerald-700">
+      <p className="text-xl font-bold text-emerald-700">
         ₱{remitStats.bookingFee}
       </p>
       <p className="text-[11px] text-emerald-600/70 mt-1">To remit</p>
@@ -591,13 +589,13 @@ await createRemittance(
 Find the history card amount display:
 
 ```tsx
-<p className="font-black text-[15px] text-gray-900">₱{r.amount_remitted}</p>
+<p className="font-bold text-[15px] text-gray-900">₱{r.amount_remitted}</p>
 ```
 
 Replace with:
 
 ```tsx
-<p className="font-black text-[15px] text-gray-900">₱{r.amount_remitted}</p>;
+<p className="font-bold text-[15px] text-gray-900">₱{r.amount_remitted}</p>;
 {
   r.amount_remitted < r.total_booking_fee && (
     <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
