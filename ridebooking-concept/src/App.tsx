@@ -11378,7 +11378,7 @@ const AdminDashboard = ({
   ];
 
   return (
-    <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col md:flex-row font-sans text-gray-900">
+    <div className="w-full min-h-[100dvh] bg-gray-50 flex flex-col md:flex-row text-gray-900" style={{ fontFamily: "Inter, sans-serif" }}>
       {/* Sidebar */}
       {/* Mobile Backdrop */}
       <AnimatePresence>
