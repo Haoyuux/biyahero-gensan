@@ -19381,6 +19381,7 @@ interface RideRecord {
 
 const RideHistoryScreen = ({
   userId,
+  userName,
   onBack,
 }: {
   userId: string;
