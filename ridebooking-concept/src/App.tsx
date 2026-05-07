@@ -10072,6 +10072,9 @@ const ALL_MODULES: { id: AdminTab; label: string }[] = [
 
 const VouchersTab = ({ profile }: { profile: Profile }) => {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [voucherUsageCounts, setVoucherUsageCounts] = useState<
+    Record<string, number>
+  >({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Voucher | null>(null);
@@ -10093,7 +10096,28 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    setVouchers(await fetchVouchers());
+    const list = await fetchVouchers();
+    setVouchers(list);
+    if (list.length > 0) {
+      const { data } = await supabase
+        .from("user_vouchers")
+        .select("voucher_id")
+        .in(
+          "voucher_id",
+          list.map((v) => v.id),
+        )
+        .eq("status", "used");
+      const counts = ((data as { voucher_id: string }[]) || []).reduce(
+        (acc, row) => {
+          acc[row.voucher_id] = (acc[row.voucher_id] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+      setVoucherUsageCounts(counts);
+    } else {
+      setVoucherUsageCounts({});
+    }
     setLoading(false);
   }, []);
 
@@ -10334,7 +10358,7 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {["Code", "Discount", "Rules", "Status", "Actions"].map(
+                  {["Code", "Discount", "Rules", "Usage", "Status", "Actions"].map(
                     (h) => (
                       <th
                         key={h}
@@ -10349,49 +10373,65 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
                       Loading...
                     </td>
                   </tr>
                 ) : vouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
                       No vouchers yet.
                     </td>
                   </tr>
                 ) : (
-                  vouchers.map((v) => (
-                    <tr key={v.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-5 py-4">
-                        <p className="font-black text-gray-950">{v.code}</p>
-                        <p className="text-[11px] text-gray-400">{v.title}</p>
-                      </td>
-                      <td className="px-5 py-4 text-sm font-bold text-gray-800">
-                        {v.discount_type === "fixed"
-                          ? `₱${v.discount_value} off`
-                          : `${v.discount_value}% off`}
-                      </td>
-                      <td className="px-5 py-4 text-[12px] text-gray-500">
-                        {v.minimum_distance_km > 0 && `${v.minimum_distance_km}km+ `}
-                        {v.minimum_fare > 0 && `₱${v.minimum_fare}+ `}
-                        {v.expires_at &&
-                          `until ${new Date(v.expires_at).toLocaleDateString("en-PH")}`}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${v.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                          {v.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
-                          onClick={() => editVoucher(v)}
-                          className="text-[12px] font-bold text-gray-500 hover:text-gray-900"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  vouchers.map((v) => {
+                    const used = voucherUsageCounts[v.id] || 0;
+                    const remaining =
+                      v.usage_limit == null
+                        ? null
+                        : Math.max(0, v.usage_limit - used);
+                    return (
+                      <tr key={v.id} className="border-b border-gray-50 last:border-0">
+                        <td className="px-5 py-4">
+                          <p className="font-black text-gray-950">{v.code}</p>
+                          <p className="text-[11px] text-gray-400">{v.title}</p>
+                        </td>
+                        <td className="px-5 py-4 text-sm font-bold text-gray-800">
+                          {v.discount_type === "fixed"
+                            ? `₱${v.discount_value} off`
+                            : `${v.discount_value}% off`}
+                        </td>
+                        <td className="px-5 py-4 text-[12px] text-gray-500">
+                          {v.minimum_distance_km > 0 && `${v.minimum_distance_km}km+ `}
+                          {v.minimum_fare > 0 && `₱${v.minimum_fare}+ `}
+                          {v.expires_at &&
+                            `until ${new Date(v.expires_at).toLocaleDateString("en-PH")}`}
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-black text-gray-950">
+                            {remaining == null ? "Unlimited" : `${remaining} left`}
+                          </p>
+                          <p className="text-[11px] text-gray-400">
+                            {used} used
+                            {v.usage_limit != null ? ` / ${v.usage_limit} total` : ""}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${v.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                            {v.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <button
+                            onClick={() => editVoucher(v)}
+                            className="text-[12px] font-bold text-gray-500 hover:text-gray-900"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
