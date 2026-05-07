@@ -180,6 +180,7 @@ import {
   fetchVouchers,
   getVoucherRideIssue,
   markVoucherUsed,
+  removeUserVoucher,
   normalizeVoucherCode,
   quoteVoucher,
   updateVoucher,
@@ -10162,6 +10163,8 @@ const VouchersTab = ({ profile }: { profile: Profile }) => {
   const [voucherRideRows, setVoucherRideRows] = useState<any[]>([]);
   const [voucherRideLoading, setVoucherRideLoading] = useState(false);
   const [voucherPaymentLoading, setVoucherPaymentLoading] = useState<string | null>(null);
+  const [voucherRemoveLoading, setVoucherRemoveLoading] = useState<string | null>(null);
+  const [voucherRemoveConfirm, setVoucherRemoveConfirm] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: "",
     title: "",
@@ -10308,6 +10311,16 @@ const load = React.useCallback(async () => {
       );
     }
     setVoucherPaymentLoading(null);
+  };
+
+  const handleRemoveUserVoucher = async (rowId: string, userName: string) => {
+    setVoucherRemoveLoading(rowId);
+    const ok = await removeUserVoucher(rowId);
+    if (ok) {
+      setVoucherRideRows((rows) => rows.filter((r) => r.id !== rowId));
+    }
+    setVoucherRemoveLoading(null);
+    setVoucherRemoveConfirm(null);
   };
 
   const resetForm = () => {
@@ -10781,6 +10794,31 @@ const load = React.useCallback(async () => {
                                     ? "Completed"
                                     : "Mark Complete"}
                               </button>
+                            ) : row.status === "available" ? (
+                              voucherRemoveConfirm === row.id ? (
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleRemoveUserVoucher(row.id, row.user_name)}
+                                    disabled={voucherRemoveLoading === row.id}
+                                    className="px-2.5 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-semibold disabled:opacity-50 hover:bg-red-700 transition-colors"
+                                  >
+                                    {voucherRemoveLoading === row.id ? "Removing..." : "Confirm"}
+                                  </button>
+                                  <button
+                                    onClick={() => setVoucherRemoveConfirm(null)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-[11px] font-semibold hover:bg-gray-200 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setVoucherRemoveConfirm(row.id)}
+                                  className="px-3 py-2 rounded-xl bg-red-50 text-red-600 text-[12px] font-semibold hover:bg-red-100 transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              )
                             ) : (
                               <span className="text-[11px] text-gray-400">-</span>
                             )}

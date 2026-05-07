@@ -235,3 +235,14 @@ export async function markVoucherUsed(
   if (error) console.error('markVoucherUsed:', error);
   return !error;
 }
+
+export async function removeUserVoucher(
+  userVoucherId: string,
+): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from('user_vouchers')
+    .delete()
+    .eq('id', userVoucherId);
+  if (error) console.error('removeUserVoucher:', error);
+  return !error;
+}
