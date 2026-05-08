@@ -6,9 +6,10 @@ import { X, Shield, Lock, Eye, Users, Mail } from "lucide-react";
 interface PrivacyPolicyProps {
   isOpen: boolean;
   onClose: () => void;
+  onShowTerms?: () => void;
 }
 
-export default function PrivacyPolicy({ isOpen, onClose }: PrivacyPolicyProps) {
+export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyPolicyProps) {
   const lastUpdated = "May 8, 2026";
 
   if (!isOpen) return null;
@@ -198,6 +199,17 @@ export default function PrivacyPolicy({ isOpen, onClose }: PrivacyPolicyProps) {
                 <p>• Email: support@biyahero.online</p>
                 <p>• Phone: +63 945 110 6077</p>
                 <p>• Address: General Santos City, Philippines</p>
+                {onShowTerms && (
+                  <p className="mt-2">
+                    View our{" "}
+                    <button
+                      onClick={onShowTerms}
+                      className="text-emerald-600 hover:underline font-medium"
+                    >
+                      Terms & Conditions
+                    </button>
+                  </p>
+                )}
               </div>
             </section>
 

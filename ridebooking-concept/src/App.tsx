@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import PrivacyPolicy from "./PrivacyPolicy";
+import TermsAndConditions from "./TermsAndConditions";
 import { motion, AnimatePresence, useDragControls } from "motion/react";
 import {
   Car,
@@ -662,6 +663,7 @@ export default function App() {
     useState<MaintenanceSettings | null>(null);
   const [mapLoading, setMapLoading] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const mapLoadShownRef = React.useRef(false);
 
   useEffect(() => {
@@ -797,7 +799,7 @@ export default function App() {
 
   if (authLoading || (session && !profile))
     return <SplashScreen settings={globalSettings} />;
-  if (!session || !profile) return <LoginScreen settings={globalSettings} onShowPrivacy={() => setShowPrivacy(true)} />;
+  if (!session || !profile) return <LoginScreen settings={globalSettings} onShowPrivacy={() => setShowPrivacy(true)} onShowTerms={() => setShowTerms(true)} />;
   if (!profile.onboarded)
     return (
       <OnboardingScreen
@@ -947,7 +949,8 @@ export default function App() {
       />
 
       {/* Privacy Policy Modal */}
-      <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+      <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} onShowTerms={() => setShowTerms(true)} />
+        <TermsAndConditions isOpen={showTerms} onClose={() => setShowTerms(false)} />
     </>
   );
 }
@@ -1132,7 +1135,7 @@ const SplashScreen = ({ settings }: { settings: AppSettings | null }) => (
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 
-const LoginScreen = ({ settings, onShowPrivacy }: { settings: AppSettings | null; onShowPrivacy?: () => void }) => {
+const LoginScreen = ({ settings, onShowPrivacy, onShowTerms }: { settings: AppSettings | null; onShowPrivacy?: () => void; onShowTerms?: () => void }) => {
   const [loading, setLoading] = useState(false);
 
   return (
@@ -1203,10 +1206,17 @@ const LoginScreen = ({ settings, onShowPrivacy }: { settings: AppSettings | null
         <p className="text-gray-700 text-[11px] mt-7 text-center leading-relaxed">
           By continuing you agree to our{" "}
           <button
+            onClick={onShowTerms}
+            className="underline hover:no-underline text-emerald-600 font-medium"
+          >
+            Terms & Conditions
+          </button>{" "}
+          and{" "}
+          <button
             onClick={onShowPrivacy}
             className="underline hover:no-underline text-emerald-600 font-medium"
           >
-            Terms &amp; Privacy Policy
+            Privacy Policy
           </button>
           .
         </p>
