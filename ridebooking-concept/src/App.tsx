@@ -819,9 +819,30 @@ export default function App() {
     }
   }, [profile?.id]);
 
+  // Show standalone pages regardless of login status
+  if (currentPage === "privacy") {
+    return (
+      <>
+        <PrivacyPolicyPage onClose={() => { window.location.hash = ""; setCurrentPage(null); }} />
+        <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} onShowTerms={() => setShowTerms(true)} />
+        <TermsAndConditions isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      </>
+    );
+  }
+  
+  if (currentPage === "termsandcondition") {
+    return (
+      <>
+        <TermsAndConditionsPage onClose={() => { window.location.hash = ""; setCurrentPage(null); }} />
+        <PrivacyPolicy isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} onShowTerms={() => setShowTerms(true)} />
+        <TermsAndConditions isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      </>
+    );
+  }
+
   if (authLoading || (session && !profile))
     return <SplashScreen settings={globalSettings} />;
-  if (!session || !profile) return <LoginScreen settings={globalSettings} onShowPrivacy={() => setShowPrivacy(true)} onShowTerms={() => setShowTerms(true)} />;
+  if (!session || !profile) return <LoginScreen settings={globalSettings} onShowPrivacy={() => window.location.hash = "privacy"} onShowTerms={() => window.location.hash = "termsandcondition"} />;
   if (!profile.onboarded)
     return (
       <OnboardingScreen
