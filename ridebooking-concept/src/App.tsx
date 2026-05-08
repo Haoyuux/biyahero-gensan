@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsAndConditions from "./TermsAndConditions";
+import PrivacyPolicyPage from "./PrivacyPolicyPage";
+import TermsAndConditionsPage from "./TermsAndConditionsPage";
 import { motion, AnimatePresence, useDragControls } from "motion/react";
 import {
   Car,
@@ -664,7 +666,27 @@ export default function App() {
   const [mapLoading, setMapLoading] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [currentPage, setCurrentPage] = useState<string | null>(null);
   const mapLoadShownRef = React.useRef(false);
+
+  // Handle hash-based routing for /privacy and /termsandcondition
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "privacy" || hash === "termsandcondition") {
+        setCurrentPage(hash);
+      } else {
+        setCurrentPage(null);
+      }
+    };
+    
+    // Check initial hash
+    handleHashChange();
+    
+    // Listen for hash changes
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   useEffect(() => {
     getAppSettings().then(setGlobalSettings);
@@ -1206,14 +1228,14 @@ const LoginScreen = ({ settings, onShowPrivacy, onShowTerms }: { settings: AppSe
         <p className="text-gray-700 text-[11px] mt-7 text-center leading-relaxed">
           By continuing you agree to our{" "}
           <button
-            onClick={onShowTerms}
+            onClick={() => window.location.hash = "termsandcondition"}
             className="underline hover:no-underline text-emerald-600 font-medium"
           >
             Terms & Conditions
           </button>{" "}
           and{" "}
           <button
-            onClick={onShowPrivacy}
+            onClick={() => window.location.hash = "privacy"}
             className="underline hover:no-underline text-emerald-600 font-medium"
           >
             Privacy Policy
