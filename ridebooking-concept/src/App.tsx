@@ -669,23 +669,29 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<string | null>(null);
   const mapLoadShownRef = React.useRef(false);
 
-  // Handle hash-based routing for /privacy and /termsandcondition
+  // Navigate to page without hash
+  const navigateTo = (page: string) => {
+    window.history.pushState({}, "", `/${page}`);
+    setCurrentPage(page);
+  };
+
+  // Handle clean URL routing for /privacy and /termsandcondition
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace("#", "");
-      if (hash === "privacy" || hash === "termsandcondition") {
-        setCurrentPage(hash);
+    const handleRouteChange = () => {
+      const path = window.location.pathname;
+      if (path === "/privacy" || path === "/termsandcondition") {
+        setCurrentPage(path.replace("/", ""));
       } else {
         setCurrentPage(null);
       }
     };
     
-    // Check initial hash
-    handleHashChange();
+    // Check initial route
+    handleRouteChange();
     
-    // Listen for hash changes
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    // Listen for popstate (back/forward navigation)
+    window.addEventListener("popstate", handleRouteChange);
+    return () => window.removeEventListener("popstate", handleRouteChange);
   }, []);
 
   useEffect(() => {
@@ -1249,14 +1255,14 @@ const LoginScreen = ({ settings, onShowPrivacy, onShowTerms }: { settings: AppSe
         <p className="text-gray-700 text-[11px] mt-7 text-center leading-relaxed">
           By continuing you agree to our{" "}
           <button
-            onClick={() => window.location.hash = "termsandcondition"}
+            onClick={() => { window.history.pushState({}, "", "/termsandcondition"); window.dispatchEvent(new PopStateEvent("popstate")); }}
             className="underline hover:no-underline text-emerald-600 font-medium"
           >
             Terms & Conditions
           </button>{" "}
           and{" "}
           <button
-            onClick={() => window.location.hash = "privacy"}
+            onClick={() => { window.history.pushState({}, "", "/privacy"); window.dispatchEvent(new PopStateEvent("popstate")); }}
             className="underline hover:no-underline text-emerald-600 font-medium"
           >
             Privacy Policy
