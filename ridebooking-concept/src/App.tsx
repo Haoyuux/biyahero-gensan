@@ -2641,8 +2641,8 @@ const UserApp = ({
 
   // Orchestration loop: broadcasts to top 5 (or more) nearest riders simultaneously
   useEffect(() => {
-    if (step !== "searching" || pendingRider) {
-      if (step !== "searching") pendingRequestRef.current = null;
+    if (step !== "searching") {
+      pendingRequestRef.current = null;
       return;
     }
 
@@ -2669,7 +2669,7 @@ const UserApp = ({
     broadcastCycle();
     const interval = setInterval(broadcastCycle, 4000);
     return () => clearInterval(interval);
-  }, [step, currentRideId, targetLimit, pendingRider]);
+  }, [step, currentRideId, targetLimit]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -2947,15 +2947,21 @@ const UserApp = ({
 
     channel.on("broadcast", { event: "RIDE_ACCEPTED" }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
-        setPendingRider(payload.payload.rider);
-        showNotification("A rider accepted! Review details to confirm.");
+        const rider = payload.payload.rider;
+        setActiveRider(rider);
+        setStep("matched");
+        supabase.channel("rides").send({
+          type: "broadcast",
+          event: "USER_CONFIRMED_RIDER",
+          payload: { rideId: currentRideId },
+        });
         pushNotification(
           "Rider found! 🛵",
-          "Review driver details and confirm your booking.",
+          `${rider?.first_name || rider?.full_name || "Your rider"} is on the way.`,
         );
         pushAppNotification(
-          "Rider found! 🛵",
-          "Tap to review and confirm your driver.",
+          "Rider on the way 🛵",
+          "Your rider is heading to you now.",
         );
       }
     });
@@ -3929,9 +3935,7 @@ const UserApp = ({
               {step === "searching" && (
                 <SearchingPanel
                   key="search"
-                  onCancel={
-                    pendingRider ? undefined : () => handleCancelBooking(true)
-                  }
+                  onCancel={() => handleCancelBooking(true)}
                 />
               )}
               {step === "matched" && (
@@ -3971,43 +3975,6 @@ const UserApp = ({
           </div>
         </div>
 
-        {pendingRider && (
-          <RiderConfirmModal
-            rider={pendingRider}
-            rideId={currentRideId}
-            onAccept={() => {
-              setActiveRider(pendingRider);
-              setPendingRider(null);
-              setStep("matched");
-              if (currentRideId) {
-                supabase.channel("rides").send({
-                  type: "broadcast",
-                  event: "USER_CONFIRMED_RIDER",
-                  payload: { rideId: currentRideId },
-                });
-              }
-              pushAppNotification(
-                "Rider on the way 🛵",
-                "Your rider is heading to you now.",
-              );
-            }}
-            onCancel={() => {
-              if (currentRideId) {
-                supabase.channel("rides").send({
-                  type: "broadcast",
-                  event: "CANCEL_RIDE",
-                  payload: { rideId: currentRideId },
-                });
-                supabase
-                  .from("rides")
-                  .update({ status: "cancelled" })
-                  .eq("id", currentRideId);
-              }
-              setPendingRider(null);
-              handleCancelBooking();
-            }}
-          />
-        )}
 
         {/* Map — full screen on mobile (behind panels), fills right on desktop */}
         <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
@@ -6551,11 +6518,9 @@ const RiderDashboard = ({
           </div>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             <div
-              className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-bold tracking-wide ${waitingForUserConfirm ? "bg-amber-100 text-amber-700" : isOnline && !requestAccepted ? "bg-emerald-50 text-emerald-700" : requestAccepted ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-500"}`}
+              className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-bold tracking-wide ${isOnline && !requestAccepted ? "bg-emerald-50 text-emerald-700" : requestAccepted ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-500"}`}
             >
-              {waitingForUserConfirm
-                ? "PENDING"
-                : requestAccepted
+              {requestAccepted
                   ? "ON TRIP"
                   : isOnline
                     ? "ONLINE"
@@ -6712,30 +6677,26 @@ const RiderDashboard = ({
                 exit={{ opacity: 0, y: -10 }}
               >
                 <div
-                  className={`${waitingForUserConfirm ? "bg-amber-500" : "bg-gray-950"} text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20`}
+                  className="bg-gray-950 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20"
                 >
                   <div
-                    className={`w-2 h-2 rounded-full ${waitingForUserConfirm ? "bg-white animate-pulse" : "bg-emerald-400 animate-pulse"} shrink-0`}
+                    className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-normal text-[13px] leading-tight">
-                      {waitingForUserConfirm
-                        ? "Waiting for passenger..."
-                        : "Ongoing trip"}
+                      Ongoing trip
                     </p>
                     <p className="text-white/70 text-[11px] font-medium truncate mt-0.5">
                       {currentRequest.user?.first_name || "Passenger"} ·{" "}
                       {currentRequest.pickup?.label}
                     </p>
                   </div>
-                  {!waitingForUserConfirm && (
-                    <button
-                      onClick={() => setShowActiveRide(true)}
-                      className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-normal text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
-                    >
-                      View
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setShowActiveRide(true)}
+                    className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-normal text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    View
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -7560,8 +7521,8 @@ const RiderDashboard = ({
                               usedRideIdsRef.current.add(rid);
                               myAcceptedRideIdRef.current = rid;
                               setRequestAccepted(true);
-                              setWaitingForUserConfirm(true);
                               setHasRequest(false);
+                              setShowActiveRide(true);
                               supabase.channel("rides").send({
                                 type: "broadcast",
                                 event: "RIDE_ACCEPTED",
