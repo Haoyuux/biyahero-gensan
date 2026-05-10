@@ -1,0 +1,622 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, Switch,
+  ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
+} from 'react-native';
+import * as Location from 'expo-location';
+import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
+import { supabase, Profile } from '../../lib/supabase';
+import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
+
+interface Props {
+  profile: Profile;
+  onSignOut: () => void;
+}
+
+export default function RiderHomeScreen({ profile, onSignOut }: Props) {
+  const mapRef = useRef<OsmMapHandle>(null);
+  const locationSub = useRef<Location.LocationSubscription | null>(null);
+  const isOnlineRef = useRef(profile.is_online ?? false);
+  const acceptedRideIdRef = useRef<string | null>(null);
+
+  const [isOnline, setIsOnline] = useState(profile.is_online ?? false);
+  const [mapReady, setMapReady] = useState(false);
+
+  // Today stats
+  const [todayEarnings, setTodayEarnings] = useState(0);
+  const [todayRides, setTodayRides] = useState(0);
+
+  // Requests
+  const [requestQueue, setRequestQueue] = useState<any[]>([]);
+  const [currentRequest, setCurrentRequest] = useState<any>(null);
+  const [hasRequest, setHasRequest] = useState(false);
+  const [requestAccepted, setRequestAccepted] = useState(false);
+
+  // Active ride
+  const [activeRide, setActiveRide] = useState<any>(null);
+  const [rideStatus, setRideStatus] = useState<'going_to_pickup' | 'picked_up'>('going_to_pickup');
+
+  // Chat
+  const [showChat, setShowChat] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const chatScrollRef = useRef<ScrollView>(null);
+
+  // GPS
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      locationSub.current = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
+        async (loc) => {
+          const { latitude, longitude } = loc.coords;
+          if (mapReady) mapRef.current?.setUserLocation(latitude, longitude);
+          if (isOnlineRef.current) {
+            await supabase.from('profiles')
+              .update({ last_lat: latitude, last_lng: longitude })
+              .eq('id', profile.id);
+            if (acceptedRideIdRef.current) {
+              supabase.channel('rides').send({
+                type: 'broadcast', event: 'RIDER_LOCATION',
+                payload: { rideId: acceptedRideIdRef.current, lat: latitude, lng: longitude },
+              });
+            }
+          }
+        },
+      );
+
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (mapReady) {
+        mapRef.current?.setUserLocation(loc.coords.latitude, loc.coords.longitude);
+        mapRef.current?.flyTo(loc.coords.latitude, loc.coords.longitude, 15);
+      }
+    })();
+    return () => { locationSub.current?.remove(); };
+  }, [mapReady]);
+
+  // Today stats
+  const fetchTodayStats = async () => {
+    const date = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('rides')
+      .select('fare')
+      .eq('rider_id', profile.id)
+      .eq('status', 'completed')
+      .gte('created_at', `${date}T00:00:00`)
+      .lte('created_at', `${date}T23:59:59`);
+    const rides = data ?? [];
+    setTodayRides(rides.length);
+    setTodayEarnings(rides.reduce((sum, r) => sum + (r.fare ?? 0), 0));
+  };
+
+  useEffect(() => { fetchTodayStats(); }, []);
+
+  // Rides channel
+  useEffect(() => {
+    if (!isOnline) return;
+    const ch = supabase.channel('rides');
+
+    ch.on('broadcast', { event: 'REQUEST_RIDE' }, ({ payload }) => {
+      setRequestQueue(prev => {
+        if (prev.some(r => r.rideId === payload.rideId)) return prev;
+        return [...prev, payload];
+      });
+    });
+
+    ch.on('broadcast', { event: 'CANCEL_RIDE' }, ({ payload }) => {
+      const { rideId } = payload;
+      setRequestQueue(prev => prev.filter(r => r.rideId !== rideId));
+      if (acceptedRideIdRef.current === rideId) {
+        acceptedRideIdRef.current = null;
+        setRequestAccepted(false);
+        setCurrentRequest(null);
+        setActiveRide(null);
+        setHasRequest(false);
+        setMessages([]);
+      } else if (currentRequest?.rideId === rideId) {
+        setHasRequest(false);
+        setCurrentRequest(null);
+      }
+    });
+
+    ch.on('broadcast', { event: 'RIDE_ACCEPTED' }, ({ payload }) => {
+      if (acceptedRideIdRef.current !== payload.rideId) {
+        setRequestQueue(prev => prev.filter(r => r.rideId !== payload.rideId));
+      }
+    });
+
+    ch.on('broadcast', { event: 'USER_CONFIRMED_RIDER' }, ({ payload }) => {
+      if (acceptedRideIdRef.current === payload.rideId) {
+        setActiveRide(currentRequest);
+        setRequestAccepted(true);
+      }
+    });
+
+    ch.subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [isOnline, currentRequest]);
+
+  // Pop from queue
+  useEffect(() => {
+    if (requestQueue.length > 0 && !hasRequest && !requestAccepted) {
+      setCurrentRequest(requestQueue[0]);
+      setHasRequest(true);
+      setRequestQueue(prev => prev.slice(1));
+    }
+  }, [requestQueue, hasRequest, requestAccepted]);
+
+  // Chat subscription when active ride
+  useEffect(() => {
+    if (!acceptedRideIdRef.current) return;
+    const rideId = acceptedRideIdRef.current;
+    fetchMessages(rideId).then(setMessages);
+    const unsub = subscribeToMessages(rideId, (msg) => {
+      if (msg.sender_id === profile.id) return;
+      setMessages(prev => [...prev, msg]);
+      if (!showChat) setUnreadCount(c => c + 1);
+    });
+    return unsub;
+  }, [requestAccepted, showChat]);
+
+  useEffect(() => {
+    if (showChat) {
+      setUnreadCount(0);
+      setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [showChat, messages]);
+
+  const toggleOnline = async (value: boolean) => {
+    isOnlineRef.current = value;
+    setIsOnline(value);
+    if (!value) {
+      setHasRequest(false);
+      setRequestQueue([]);
+    }
+    await supabase.from('profiles').update({ is_online: value }).eq('id', profile.id);
+  };
+
+  const handleAccept = async () => {
+    if (!currentRequest) return;
+    const rideId = currentRequest.rideId;
+    const { error } = await supabase.from('rides')
+      .update({ status: 'accepted', rider_id: profile.id })
+      .eq('id', rideId)
+      .eq('status', 'pending');
+
+    if (error) {
+      setHasRequest(false);
+      setCurrentRequest(null);
+      return;
+    }
+
+    acceptedRideIdRef.current = rideId;
+    setHasRequest(false);
+    setRequestAccepted(true);
+    setActiveRide(currentRequest);
+
+    supabase.channel('rides').send({
+      type: 'broadcast', event: 'RIDE_ACCEPTED',
+      payload: { rideId, rider: profile },
+    });
+  };
+
+  const handleDecline = () => {
+    setHasRequest(false);
+    setCurrentRequest(null);
+  };
+
+  const handleArrivedAtPickup = () => {
+    if (!acceptedRideIdRef.current) return;
+    supabase.channel('rides').send({
+      type: 'broadcast', event: 'RIDER_ARRIVED',
+      payload: { rideId: acceptedRideIdRef.current },
+    });
+    setRideStatus('picked_up');
+  };
+
+  const handleCompleteRide = async () => {
+    if (!acceptedRideIdRef.current) return;
+    const rideId = acceptedRideIdRef.current;
+    supabase.channel('rides').send({
+      type: 'broadcast', event: 'RIDE_COMPLETED',
+      payload: { rideId, rider: profile },
+    });
+    await supabase.from('rides')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', rideId);
+    acceptedRideIdRef.current = null;
+    setRequestAccepted(false);
+    setActiveRide(null);
+    setCurrentRequest(null);
+    setMessages([]);
+    setRideStatus('going_to_pickup');
+    fetchTodayStats();
+  };
+
+  const handleSendChat = async () => {
+    const text = chatInput.trim();
+    if (!text || !acceptedRideIdRef.current) return;
+    setChatInput('');
+    const rideId = acceptedRideIdRef.current;
+    const tempMsg: ChatMessage = {
+      id: `tmp-${Date.now()}`,
+      ride_id: rideId,
+      sender_id: profile.id,
+      sender_role: 'rider',
+      sender_name: profile.first_name ?? 'Rider',
+      content: text,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, tempMsg]);
+    await sendMessage(rideId, profile.id, 'rider', profile.first_name ?? 'Rider', text);
+  };
+
+  // ─── Chat overlay ───────────────────────────────────────────────────────────
+  if (showChat) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.chatContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.chatHeader}>
+          <TouchableOpacity onPress={() => setShowChat(false)} style={styles.chatBack}>
+            <Text style={styles.chatBackText}>←</Text>
+          </TouchableOpacity>
+          <View style={styles.chatAvatar}>
+            <Text style={styles.chatAvatarText}>
+              {(activeRide?.user?.first_name?.[0] ?? 'U').toUpperCase()}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.chatName}>{activeRide?.user?.first_name} {activeRide?.user?.last_name}</Text>
+            <Text style={styles.chatRole}>Passenger</Text>
+          </View>
+        </View>
+        <ScrollView
+          ref={chatScrollRef}
+          style={styles.chatMessages}
+          contentContainerStyle={{ padding: 16, gap: 8 }}
+        >
+          {messages.length === 0 && (
+            <Text style={styles.chatEmpty}>No messages yet.</Text>
+          )}
+          {messages.map(m => {
+            const isMe = m.sender_id === profile.id;
+            return (
+              <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowThem]}>
+                <View style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleThem]}>
+                  <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextThem]}>
+                    {m.content}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+        <View style={styles.chatInputRow}>
+          <TextInput
+            style={styles.chatInput}
+            placeholder="Type a message..."
+            placeholderTextColor="#9ca3af"
+            value={chatInput}
+            onChangeText={setChatInput}
+            onSubmitEditing={handleSendChat}
+            returnKeyType="send"
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !chatInput.trim() && styles.sendBtnDisabled]}
+            onPress={handleSendChat}
+            disabled={!chatInput.trim()}
+          >
+            <Text style={styles.sendBtnText}>→</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <OsmMap ref={mapRef} style={styles.map} onMapReady={() => setMapReady(true)} />
+
+      {/* Active ride sheet */}
+      {requestAccepted && activeRide ? (
+        <ScrollView style={styles.sheet} showsVerticalScrollIndicator={false}>
+          <View style={styles.handle} />
+          <Text style={styles.sectionLabel}>ACTIVE RIDE</Text>
+
+          {/* Passenger */}
+          <View style={styles.passengerCard}>
+            <View style={styles.driverAvatar}>
+              <Text style={styles.driverAvatarText}>
+                {(activeRide.user?.first_name?.[0] ?? 'U').toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.driverName}>
+                {activeRide.user?.first_name} {activeRide.user?.last_name}
+              </Text>
+              <Text style={styles.fareText}>₱{activeRide.fare}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => { setShowChat(true); setUnreadCount(0); }}
+            >
+              <Text style={styles.actionBtnIcon}>💬</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Route info */}
+          <View style={styles.routeCard}>
+            <View style={styles.routeRow}>
+              <View style={styles.dotBlack} />
+              <View>
+                <Text style={styles.routeLabel}>PICKUP</Text>
+                <Text style={styles.routeValue}>{activeRide.pickup?.label ?? 'Current Location'}</Text>
+              </View>
+            </View>
+            <View style={styles.routeDivider} />
+            <View style={styles.routeRow}>
+              <View style={styles.dotGreen} />
+              <View>
+                <Text style={styles.routeLabel}>DROPOFF</Text>
+                <Text style={styles.routeValue}>{activeRide.dropoff?.label ?? activeRide.dropoff_label}</Text>
+              </View>
+            </View>
+          </View>
+
+          {rideStatus === 'going_to_pickup' ? (
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleArrivedAtPickup}>
+              <Text style={styles.primaryBtnText}>I Arrived at Pickup</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: '#10b981' }]} onPress={handleCompleteRide}>
+              <Text style={styles.primaryBtnText}>Complete Ride ✓</Text>
+            </TouchableOpacity>
+          )}
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      ) : (
+        /* Default rider sheet */
+        <View style={styles.sheet}>
+          <View style={styles.handle} />
+          <View style={styles.riderRow}>
+            <View style={styles.driverAvatar}>
+              <Text style={styles.driverAvatarText}>
+                {(profile.first_name?.[0] ?? 'R').toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.driverName}>{profile.first_name} {profile.last_name}</Text>
+              <Text style={styles.driverMeta}>
+                {[profile.vehicle_make, profile.vehicle_model, profile.vehicle_plate].filter(Boolean).join(' · ') || 'No vehicle info'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.onlineCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={[styles.onlineDot, isOnline && styles.onlineDotActive]} />
+              <View>
+                <Text style={styles.onlineLabel}>{isOnline ? 'You are Online' : 'You are Offline'}</Text>
+                <Text style={styles.onlineSub}>{isOnline ? 'Accepting ride requests' : 'Go online to accept rides'}</Text>
+              </View>
+            </View>
+            <Switch
+              value={isOnline}
+              onValueChange={toggleOnline}
+              trackColor={{ false: '#e5e7eb', true: '#030712' }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>STATUS</Text>
+              <Text style={[styles.statValue, { color: isOnline ? '#10b981' : '#9ca3af' }]}>
+                {isOnline ? 'Online' : 'Offline'}
+              </Text>
+            </View>
+            <View style={[styles.statCard, { marginHorizontal: 8 }]}>
+              <Text style={styles.statLabel}>TODAY</Text>
+              <Text style={styles.statValue}>₱{todayEarnings.toFixed(0)}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>RIDES</Text>
+              <Text style={styles.statValue}>{todayRides}</Text>
+            </View>
+          </View>
+
+          {!isOnline && (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineText}>Toggle online to start receiving ride requests.</Text>
+            </View>
+          )}
+
+          <TouchableOpacity onPress={onSignOut} style={styles.signOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Incoming request modal */}
+      <Modal visible={hasRequest && !!currentRequest} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.handle} />
+            <Text style={styles.sectionLabel}>INCOMING RIDE</Text>
+
+            {/* Passenger info */}
+            <View style={styles.passengerCard}>
+              <View style={styles.driverAvatar}>
+                <Text style={styles.driverAvatarText}>
+                  {(currentRequest?.user?.first_name?.[0] ?? 'U').toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.driverName}>
+                  {currentRequest?.user?.first_name} {currentRequest?.user?.last_name}
+                </Text>
+                <Text style={styles.fareText}>₱{currentRequest?.fare}</Text>
+              </View>
+            </View>
+
+            {/* Route */}
+            <View style={styles.routeCard}>
+              <View style={styles.routeRow}>
+                <View style={styles.dotBlack} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.routeLabel}>PICKUP</Text>
+                  <Text style={styles.routeValue} numberOfLines={2}>
+                    {currentRequest?.pickup?.label}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.routeDivider} />
+              <View style={styles.routeRow}>
+                <View style={styles.dotGreen} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.routeLabel}>DROPOFF</Text>
+                  <Text style={styles.routeValue} numberOfLines={2}>
+                    {currentRequest?.dropoff?.label}
+                  </Text>
+                </View>
+              </View>
+              {currentRequest?.routeDistance > 0 && (
+                <Text style={styles.distanceText}>
+                  {(currentRequest.routeDistance / 1000).toFixed(1)} km
+                </Text>
+              )}
+            </View>
+
+            {/* Ride type */}
+            <View style={styles.rideTypeBadge}>
+              <Text style={styles.rideTypeText}>
+                {currentRequest?.ride_type === 'moto' ? '🏍️ Motorcycle' :
+                  currentRequest?.ride_type === 'eco' ? '🚕 Standard Car' : '🚙 Premium'}
+              </Text>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
+                <Text style={styles.declineBtnText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
+                <Text style={styles.acceptBtnText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  map: { flex: 1 },
+
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36,
+    maxHeight: '55%',
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20,
+    shadowOffset: { width: 0, height: -1 }, elevation: 16,
+  },
+  handle: { width: 40, height: 5, backgroundColor: '#e5e7eb', borderRadius: 99, alignSelf: 'center', marginBottom: 16 },
+  sectionLabel: { fontSize: 9, fontWeight: '700', color: '#9ca3af', letterSpacing: 1.5, marginBottom: 12 },
+
+  riderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  driverAvatar: { width: 48, height: 48, borderRadius: 99, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
+  driverAvatarText: { fontSize: 18, fontWeight: '700', color: '#374151' },
+  driverName: { fontSize: 15, fontWeight: '700', color: '#030712' },
+  driverMeta: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  fareText: { fontSize: 15, fontWeight: '700', color: '#10b981', marginTop: 2 },
+
+  onlineCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#f9fafb', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
+    borderWidth: 1, borderColor: '#f3f4f6', marginBottom: 12,
+  },
+  onlineDot: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#d1d5db' },
+  onlineDotActive: { backgroundColor: '#10b981' },
+  onlineLabel: { fontSize: 14, fontWeight: '600', color: '#030712' },
+  onlineSub: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+
+  statsRow: { flexDirection: 'row', marginBottom: 12 },
+  statCard: { flex: 1, backgroundColor: '#f9fafb', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#f3f4f6', alignItems: 'center' },
+  statLabel: { fontSize: 9, fontWeight: '600', color: '#9ca3af', letterSpacing: 1, marginBottom: 4 },
+  statValue: { fontSize: 17, fontWeight: '700', color: '#030712' },
+
+  offlineBanner: { backgroundColor: '#fef3c7', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#fde68a' },
+  offlineText: { fontSize: 12, color: '#92400e', fontWeight: '500' },
+
+  signOut: { alignItems: 'center', marginTop: 12 },
+  signOutText: { fontSize: 12, color: '#d1d5db' },
+
+  // Active ride
+  passengerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#f3f4f6', marginBottom: 10, gap: 12 },
+  actionBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
+  actionBtnIcon: { fontSize: 16 },
+  badge: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: 99, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+
+  routeCard: { backgroundColor: '#f9fafb', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#f3f4f6', marginBottom: 12 },
+  routeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  dotBlack: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#030712', marginTop: 4 },
+  dotGreen: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#10b981', marginTop: 4 },
+  routeLabel: { fontSize: 9, fontWeight: '700', color: '#9ca3af', letterSpacing: 1 },
+  routeValue: { fontSize: 13, fontWeight: '600', color: '#030712', marginTop: 1 },
+  routeDivider: { height: 16, width: 1, backgroundColor: '#e5e7eb', marginLeft: 3, marginVertical: 4 },
+  distanceText: { fontSize: 11, color: '#9ca3af', marginTop: 8 },
+
+  primaryBtn: { backgroundColor: '#030712', borderRadius: 16, paddingVertical: 17, alignItems: 'center', marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
+  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+  rideTypeBadge: { backgroundColor: '#f9fafb', borderRadius: 12, padding: 10, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
+  rideTypeText: { fontSize: 14, fontWeight: '600', color: '#030712' },
+  actionRow: { flexDirection: 'row', gap: 10 },
+  declineBtn: { flex: 1, paddingVertical: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#e5e7eb', alignItems: 'center' },
+  declineBtnText: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
+  acceptBtn: { flex: 1, paddingVertical: 16, borderRadius: 16, backgroundColor: '#030712', alignItems: 'center' },
+  acceptBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+
+  // Chat
+  chatContainer: { flex: 1, backgroundColor: '#fff' },
+  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  chatBack: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  chatBackText: { fontSize: 20, color: '#030712' },
+  chatAvatar: { width: 36, height: 36, borderRadius: 99, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
+  chatAvatarText: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  chatName: { fontSize: 14, fontWeight: '700', color: '#030712' },
+  chatRole: { fontSize: 10, color: '#9ca3af', fontWeight: '600', letterSpacing: 0.5 },
+  chatMessages: { flex: 1, backgroundColor: '#f6f7f9' },
+  chatEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
+  msgRow: { flexDirection: 'row', marginBottom: 6 },
+  msgRowMe: { justifyContent: 'flex-end' },
+  msgRowThem: { justifyContent: 'flex-start' },
+  msgBubble: { maxWidth: '72%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20 },
+  msgBubbleMe: { backgroundColor: '#10b981' },
+  msgBubbleThem: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f3f4f6' },
+  msgText: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  msgTextMe: { color: '#fff' },
+  msgTextThem: { color: '#111827' },
+  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  chatInput: { flex: 1, backgroundColor: '#f3f4f6', borderRadius: 99, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#111827' },
+  sendBtn: { width: 44, height: 44, borderRadius: 99, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center' },
+  sendBtnDisabled: { opacity: 0.4 },
+  sendBtnText: { fontSize: 18, color: '#fff', fontWeight: '700' },
+});
