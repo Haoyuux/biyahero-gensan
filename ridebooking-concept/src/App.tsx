@@ -17728,7 +17728,7 @@ const HomePanel = ({
       setLoading(true);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&viewbox=118.3,10.2,127.5,4.5&bounded=1`,
         );
         setSuggestions(await res.json());
       } catch {
@@ -17822,9 +17822,15 @@ const HomePanel = ({
 
       <div className="px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:px-6 md:pt-6">
         <div className="flex items-center justify-between mb-3 md:mb-5">
-          <h2 className="text-[1.35rem] md:text-[1.75rem] font-bold tracking-tight leading-tight">
-            Where to?
-          </h2>
+          <div>
+            <h2 className="text-[1.35rem] md:text-[1.75rem] font-bold tracking-tight leading-tight">
+              Where to?
+            </h2>
+            <p className="text-[10px] text-gray-400 font-normal mt-0.5 flex items-center gap-1">
+              <MapPin size={9} className="text-gray-300" />
+              Service available in Mindanao only
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -17909,6 +17915,12 @@ const HomePanel = ({
                           )}
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {!suggestions.length && query.length >= 3 && !loading && (
+                  <div className="px-4 py-3 text-xs text-gray-400 text-center">
+                    No locations found in Mindanao for "{query}"
                   </div>
                 )}
 
