@@ -3753,6 +3753,18 @@ const UserApp = ({
                           );
                           return;
                         }
+                        if (s === "select" && destinationCoords && !isInMindanao(destinationCoords[0], destinationCoords[1])) {
+                          showNotification(
+                            "Destination is outside Mindanao. Service is available in Mindanao only.",
+                          );
+                          return;
+                        }
+                        if (s === "select" && pickupCoords && !isInMindanao(pickupCoords[0], pickupCoords[1])) {
+                          showNotification(
+                            "Pickup location is outside Mindanao. Service is available in Mindanao only.",
+                          );
+                          return;
+                        }
                         if (s === "select" && currentRideId) {
                           showNotification(
                             "You have an ongoing ride. Finish it before booking another.",
@@ -17695,6 +17707,11 @@ const OngoingRidePanel = ({
   </motion.div>
 );
 
+const MINDANAO_BOUNDS = { minLat: 4.5, maxLat: 10.2, minLon: 118.3, maxLon: 127.5 };
+const isInMindanao = (lat: number, lon: number) =>
+  lat >= MINDANAO_BOUNDS.minLat && lat <= MINDANAO_BOUNDS.maxLat &&
+  lon >= MINDANAO_BOUNDS.minLon && lon <= MINDANAO_BOUNDS.maxLon;
+
 const HomePanel = ({
   setStep,
   pickup,
@@ -17715,6 +17732,7 @@ const HomePanel = ({
   );
   const [query, setQuery] = useState(dropoff);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const dragControls = useDragControls();
@@ -17728,7 +17746,7 @@ const HomePanel = ({
       setLoading(true);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&viewbox=118.3,10.2,127.5,4.5&bounded=1`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=ph&viewbox=118.3,10.2,127.5,4.5&bounded=1`,
         );
         setSuggestions(await res.json());
       } catch {
@@ -17754,11 +17772,15 @@ const HomePanel = ({
   };
 
   const handleSelect = (place: any) => {
+    const lat = parseFloat(place.lat);
+    const lon = parseFloat(place.lon);
+    if (!isInMindanao(lat, lon)) {
+      setLocationError("This location is outside Mindanao. Service is available in Mindanao only.");
+      return;
+    }
+    setLocationError(null);
     const shortName = place.name || place.display_name.split(",")[0];
-    const coords: [number, number] = [
-      parseFloat(place.lat),
-      parseFloat(place.lon),
-    ];
+    const coords: [number, number] = [lat, lon];
     if (activeField === "pickup") {
       setPickup(shortName);
       setPickupCoords(coords);
@@ -17826,10 +17848,17 @@ const HomePanel = ({
             <h2 className="text-[1.35rem] md:text-[1.75rem] font-bold tracking-tight leading-tight">
               Where to?
             </h2>
-            <p className="text-[10px] text-gray-400 font-normal mt-0.5 flex items-center gap-1">
-              <MapPin size={9} className="text-gray-300" />
-              Service available in Mindanao only
-            </p>
+            {locationError ? (
+              <p className="text-[10px] text-red-500 font-normal mt-0.5 flex items-center gap-1">
+                <MapPin size={9} className="text-red-400 shrink-0" />
+                {locationError}
+              </p>
+            ) : (
+              <p className="text-[10px] text-gray-400 font-normal mt-0.5 flex items-center gap-1">
+                <MapPin size={9} className="text-gray-300" />
+                Service available in Mindanao only
+              </p>
+            )}
           </div>
           <button
             type="button"
