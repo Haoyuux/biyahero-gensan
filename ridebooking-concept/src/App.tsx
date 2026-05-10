@@ -14057,12 +14057,39 @@ const AdminDashboard = ({
                   return (
                     <div
                       key={tier}
-                      className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
+                      className={`bg-white rounded-2xl border overflow-hidden transition-opacity ${p.disabled ? "border-gray-100 opacity-60" : "border-gray-100"}`}
                     >
-                      <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-                        <h3 className="font-normal text-sm text-gray-900">
-                          {labels[tier]}
-                        </h3>
+                      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-normal text-sm text-gray-900">
+                            {labels[tier]}
+                          </h3>
+                          {p.disabled && (
+                            <span className="text-[10px] font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400">
+                            {p.disabled ? "Unavailable to users" : "Available to users"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPricingCfg((prev) => ({
+                                ...prev,
+                                [tier]: { ...prev[tier], disabled: !p.disabled },
+                              }));
+                              setPricingSaved(false);
+                            }}
+                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${!p.disabled ? "bg-gray-900" : "bg-gray-200"}`}
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${!p.disabled ? "translate-x-5" : "translate-x-0"}`}
+                            />
+                          </button>
+                        </div>
                       </div>
                       <div className="p-5 grid grid-cols-2 md:grid-cols-3 gap-5">
                         {field("baseFare", "Base Fare")}
@@ -18062,19 +18089,24 @@ const SelectPanel = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const dragControls = useDragControls();
 
-  const dynamicRides = RIDE_OPTIONS.map((ride) => {
-    const breakdown = calculateFare(
-      ride.id as "moto" | "eco" | "premium",
-      distanceM,
-      durationS,
-      pricingConfig ?? DEFAULT_PRICING,
-    );
-    return {
-      ...ride,
-      breakdown,
-      time: durationMin > 0 ? `${durationMin} min` : ride.time,
-    };
-  });
+  const dynamicRides = RIDE_OPTIONS
+    .filter((ride) => {
+      const tierCfg = (pricingConfig ?? DEFAULT_PRICING)[ride.id as "moto" | "eco" | "premium"];
+      return !tierCfg?.disabled;
+    })
+    .map((ride) => {
+      const breakdown = calculateFare(
+        ride.id as "moto" | "eco" | "premium",
+        distanceM,
+        durationS,
+        pricingConfig ?? DEFAULT_PRICING,
+      );
+      return {
+        ...ride,
+        breakdown,
+        time: durationMin > 0 ? `${durationMin} min` : ride.time,
+      };
+    });
 
   const selectedBreakdown = dynamicRides.find(
     (r) => r.id === selectedRide,

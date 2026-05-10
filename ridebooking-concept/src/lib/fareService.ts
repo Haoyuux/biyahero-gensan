@@ -12,6 +12,7 @@ export interface TierPricing {
   maintenanceCostPerKm: number; // internal operating cost, not billed to the user
   perKmThresholdEnabled: boolean; // if true, per-km rate only applies beyond perKmThreshold km
   perKmThreshold: number;         // km below this are free of per-km charge
+  disabled: boolean;              // when true, tier is hidden from users
 }
 
 export interface PricingConfig {
@@ -43,6 +44,7 @@ export const DEFAULT_PRICING: PricingConfig = {
     maintenanceCostPerKm: 2,
     perKmThresholdEnabled: false,
     perKmThreshold: 0,
+    disabled: false,
   },
   eco: {
     baseFare: 60,
@@ -53,6 +55,7 @@ export const DEFAULT_PRICING: PricingConfig = {
     maintenanceCostPerKm: 3,
     perKmThresholdEnabled: false,
     perKmThreshold: 0,
+    disabled: false,
   },
   premium: {
     baseFare: 100,
@@ -63,6 +66,7 @@ export const DEFAULT_PRICING: PricingConfig = {
     maintenanceCostPerKm: 5,
     perKmThresholdEnabled: false,
     perKmThreshold: 0,
+    disabled: false,
   },
 };
 
