@@ -18089,24 +18089,21 @@ const SelectPanel = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const dragControls = useDragControls();
 
-  const dynamicRides = RIDE_OPTIONS
-    .filter((ride) => {
-      const tierCfg = (pricingConfig ?? DEFAULT_PRICING)[ride.id as "moto" | "eco" | "premium"];
-      return !tierCfg?.disabled;
-    })
-    .map((ride) => {
-      const breakdown = calculateFare(
-        ride.id as "moto" | "eco" | "premium",
-        distanceM,
-        durationS,
-        pricingConfig ?? DEFAULT_PRICING,
-      );
-      return {
-        ...ride,
-        breakdown,
-        time: durationMin > 0 ? `${durationMin} min` : ride.time,
-      };
-    });
+  const dynamicRides = RIDE_OPTIONS.map((ride) => {
+    const tierCfg = (pricingConfig ?? DEFAULT_PRICING)[ride.id as "moto" | "eco" | "premium"];
+    const breakdown = calculateFare(
+      ride.id as "moto" | "eco" | "premium",
+      distanceM,
+      durationS,
+      pricingConfig ?? DEFAULT_PRICING,
+    );
+    return {
+      ...ride,
+      breakdown,
+      time: durationMin > 0 ? `${durationMin} min` : ride.time,
+      disabled: tierCfg?.disabled ?? false,
+    };
+  });
 
   const selectedBreakdown = dynamicRides.find(
     (r) => r.id === selectedRide,
@@ -18219,11 +18216,17 @@ const SelectPanel = ({
                   {dynamicRides.map((ride) => (
                     <div
                       key={ride.id}
-                      onClick={() => setSelectedRide(ride.id)}
-                      className={`flex items-center p-4 rounded-2xl border transition-all cursor-pointer ${selectedRide === ride.id ? "border-gray-900 bg-gray-50" : "border-gray-100 bg-gray-50 hover:border-gray-200"}`}
+                      onClick={() => !ride.disabled && setSelectedRide(ride.id)}
+                      className={`flex items-center p-4 rounded-2xl border transition-all ${
+                        ride.disabled
+                          ? "border-gray-100 bg-gray-50 opacity-50 grayscale cursor-not-allowed"
+                          : selectedRide === ride.id
+                            ? "border-gray-900 bg-gray-50 cursor-pointer"
+                            : "border-gray-100 bg-gray-50 hover:border-gray-200 cursor-pointer"
+                      }`}
                     >
                       <div
-                        className={`w-[52px] h-[52px] rounded-xl flex items-center justify-center shrink-0 ${selectedRide === ride.id ? "bg-gray-950 text-white" : "bg-white text-gray-500 shadow-sm border border-gray-100"}`}
+                        className={`w-[52px] h-[52px] rounded-xl flex items-center justify-center shrink-0 ${!ride.disabled && selectedRide === ride.id ? "bg-gray-950 text-white" : "bg-white text-gray-500 shadow-sm border border-gray-100"}`}
                       >
                         <ride.icon size={24} />
                       </div>
@@ -18232,28 +18235,33 @@ const SelectPanel = ({
                           <span className="font-normal text-[15px]">
                             {ride.name}
                           </span>
-                          <div className="flex flex-col items-end">
-                            {(() => {
-                              const quote = selectedUserVoucher?.voucher 
-                                ? quoteVoucher(selectedUserVoucher.voucher, ride.breakdown)
-                                : null;
-                              const discount = quote && !quote.reason ? quote.discount : 0;
-                              const finalPrice = Math.max(0, ride.breakdown.totalFare - discount);
-                              
-                              return (
-                                <>
-                                  <span className="font-bold text-[16px] text-gray-950">
-                                    ₱{finalPrice}
-                                  </span>
-                                  {discount > 0 && (
-                                    <span className="text-[10px] text-gray-400 line-through">
-                                      ₱{ride.breakdown.totalFare}
+                          {ride.disabled ? (
+                            <span className="text-[11px] font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                              Not Available
+                            </span>
+                          ) : (
+                            <div className="flex flex-col items-end">
+                              {(() => {
+                                const quote = selectedUserVoucher?.voucher
+                                  ? quoteVoucher(selectedUserVoucher.voucher, ride.breakdown)
+                                  : null;
+                                const discount = quote && !quote.reason ? quote.discount : 0;
+                                const finalPrice = Math.max(0, ride.breakdown.totalFare - discount);
+                                return (
+                                  <>
+                                    <span className="font-bold text-[16px] text-gray-950">
+                                      ₱{finalPrice}
                                     </span>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
+                                    {discount > 0 && (
+                                      <span className="text-[10px] text-gray-400 line-through">
+                                        ₱{ride.breakdown.totalFare}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center text-xs text-gray-400 font-medium gap-1">
                           <Clock size={11} /> {ride.time} away
@@ -18261,7 +18269,7 @@ const SelectPanel = ({
                           <User size={11} /> {ride.capacity}
                         </div>
                       </div>
-                      {selectedRide === ride.id && (
+                      {!ride.disabled && selectedRide === ride.id && (
                         <div className="ml-3 w-4 h-4 rounded-full bg-gray-950 flex items-center justify-center shrink-0">
                           <div className="w-1.5 h-1.5 rounded-full bg-white" />
                         </div>

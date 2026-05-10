@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Shield, Lock, Eye, Users, Mail } from "lucide-react";
+import { X, Shield, Lock, Eye, Users, Mail, Database, MapPin } from "lucide-react";
 
 interface PrivacyPolicyProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface PrivacyPolicyProps {
 }
 
 export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyPolicyProps) {
-  const lastUpdated = "May 8, 2026";
+  const lastUpdated = "May 10, 2026";
 
   if (!isOpen) return null;
 
@@ -63,10 +63,10 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
             {/* Introduction */}
             <section>
               <p className="leading-relaxed">
-                Biyahero Online ("we," "our," or "us") is committed to
-                protecting your privacy. This Privacy Policy explains how we
-                collect, use, disclose, and safeguard your information when you
-                use our ride-booking mobile application and services.
+                Biyahero Online ("we," "our," or "us") is committed to protecting your privacy.
+                This Privacy Policy explains how we collect, use, disclose, and safeguard your
+                information when you use our ride-booking application and services in
+                General Santos City, Philippines.
               </p>
             </section>
 
@@ -80,24 +80,32 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
               </div>
               <ul className="space-y-2 text-xs">
                 <li>
-                  • <strong>Personal Information:</strong> Name, email, phone
-                  number, profile photo
+                  • <strong>Google Account Data:</strong> Name, email address, and profile photo
+                  obtained via Google Sign-In (OAuth 2.0). This is the only sign-in method supported.
                 </li>
                 <li>
-                  • <strong>Location Data:</strong> GPS coordinates for ride
-                  matching and tracking
+                  • <strong>Profile Information:</strong> Phone number, date of birth, and
+                  additional details you provide during profile setup
                 </li>
                 <li>
-                  • <strong>Device Information:</strong> Device ID, OS version,
-                  app version
+                  • <strong>Location Data:</strong> GPS coordinates used for ride matching,
+                  routing, and map display. Device location is used only during active app sessions.
                 </li>
                 <li>
-                  • <strong>Trip Data:</strong> Pickup/dropoff locations, trip
-                  history, ratings
+                  • <strong>Trip Data:</strong> Pickup/dropoff labels, ride type, fare breakdown,
+                  ride status, voucher usage, and driver ratings
                 </li>
                 <li>
-                  • <strong>Payment Information:</strong> Processed through
-                  secure payment partners
+                  • <strong>Driver Documents:</strong> For riders, uploaded files including
+                  license photos, vehicle registration, and profile/cover photos stored securely
+                </li>
+                <li>
+                  • <strong>Remittance Records:</strong> Daily booking fee amounts, receipt
+                  photos, and submission timestamps for driver accounts
+                </li>
+                <li>
+                  • <strong>Chat Messages:</strong> In-app messages exchanged between users
+                  and drivers during active rides
                 </li>
               </ul>
             </section>
@@ -111,12 +119,60 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
                 </h3>
               </div>
               <ul className="space-y-2 text-xs">
-                <li>• To provide and improve our ride-booking services</li>
-                <li>• To match you with nearby drivers</li>
-                <li>• To process payments and generate receipts</li>
-                <li>• To communicate with you about trips and updates</li>
-                <li>• To analyze usage patterns and enhance user experience</li>
+                <li>• To authenticate your identity via Google Sign-In</li>
+                <li>• To match you with nearby available drivers</li>
+                <li>• To calculate and display ride fares accurately</li>
+                <li>• To facilitate real-time in-app chat between users and drivers</li>
+                <li>• To process and review driver remittance submissions</li>
+                <li>• To verify driver eligibility through document review</li>
+                <li>• To send browser notifications about ride status updates</li>
+                <li>• To analyze usage patterns and improve the platform</li>
                 <li>• To comply with legal obligations</li>
+              </ul>
+            </section>
+
+            {/* Third-Party Services */}
+            <section className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Database className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Third-Party Services We Use
+                </h3>
+              </div>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  • <strong>Google (OAuth):</strong> Handles account authentication. Your Google
+                  account data is subject to Google's Privacy Policy.
+                </li>
+                <li>
+                  • <strong>Supabase:</strong> Our backend provider. Stores your profile, ride
+                  history, messages, documents, and remittance data in secure cloud databases
+                  and file storage.
+                </li>
+                <li>
+                  • <strong>OpenStreetMap / Nominatim:</strong> Provides location search
+                  autocomplete. Search queries (location text) are sent to their servers.
+                </li>
+                <li>
+                  • <strong>OSRM (Open Source Routing Machine):</strong> Calculates route
+                  geometry, distance, and estimated duration between pickup and dropoff coordinates.
+                </li>
+              </ul>
+            </section>
+
+            {/* Location & Notifications */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Location & Notifications
+                </h3>
+              </div>
+              <ul className="space-y-2 text-xs">
+                <li>• Location access is requested to show your position on the map and assist with pickup selection</li>
+                <li>• Driver locations are shared with users only during an active ride match</li>
+                <li>• Browser notification permission may be requested to alert you of ride updates</li>
+                <li>• Notifications can be disabled at any time through your browser settings</li>
               </ul>
             </section>
 
@@ -133,16 +189,16 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
               </p>
               <ul className="space-y-2 text-xs">
                 <li>
-                  • <strong>Drivers:</strong> Your pickup location and contact
-                  details for trip coordination
+                  • <strong>Drivers:</strong> Your pickup location and display name for active ride coordination
                 </li>
                 <li>
-                  • <strong>Service Providers:</strong> Payment processors,
-                  cloud storage, analytics
+                  • <strong>Team Leaders:</strong> Remittance records and ride stats for riders under their team
                 </li>
                 <li>
-                  • <strong>Legal Authorities:</strong> When required by law or
-                  for safety purposes
+                  • <strong>Platform Administrators:</strong> Account info, ride history, and documents for operational management
+                </li>
+                <li>
+                  • <strong>Legal Authorities:</strong> When required by law or for safety purposes
                 </li>
               </ul>
               <p className="text-xs mt-3 text-gray-600 dark:text-gray-400">
@@ -159,26 +215,27 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
                 </h3>
               </div>
               <p className="text-xs leading-relaxed">
-                We implement industry-standard security measures including
-                encryption (SSL/TLS), secure data storage, and access controls.
-                While we strive to protect your information, no method of
-                electronic transmission is 100% secure.
+                We use secure cloud databases with access controls to ensure your data is
+                accessible only to authorized users. File uploads (documents, receipts, avatars)
+                are stored in access-controlled cloud storage. We use secure authentication
+                and do not store passwords. While we implement industry-standard security
+                measures, no electronic system is 100% secure.
               </p>
             </section>
 
             {/* Your Rights */}
             <section className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Users className="w-4 h-4 text-emerald-600" />
+                <Shield className="w-4 h-4 text-emerald-600" />
                 <h3 className="font-semibold text-gray-900 dark:text-white">
                   Your Rights
                 </h3>
               </div>
               <ul className="space-y-2 text-xs">
-                <li>• Access and review your personal data</li>
+                <li>• Access and review your personal data through your profile</li>
                 <li>• Request correction of inaccurate information</li>
-                <li>• Request deletion of your account and data</li>
-                <li>• Opt-out of non-essential data collection</li>
+                <li>• Request deletion of your account and associated data</li>
+                <li>• Revoke Google account permissions at any time via your Google account settings</li>
                 <li>• Lodge complaints with data protection authorities</li>
               </ul>
             </section>
@@ -193,8 +250,7 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
               </div>
               <div className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
                 <p>
-                  If you have questions about this Privacy Policy, please
-                  contact us:
+                  If you have questions about this Privacy Policy, please contact us:
                 </p>
                 <p>• Email: support@biyahero.online</p>
                 <p>• Phone: +63 945 110 6077</p>
@@ -216,9 +272,9 @@ export default function PrivacyPolicy({ isOpen, onClose, onShowTerms }: PrivacyP
             {/* Changes to Policy */}
             <section className="border-t border-gray-200 dark:border-zinc-700 pt-4">
               <p className="text-xs text-gray-500">
-                We may update this Privacy Policy from time to time. We will
-                notify you of material changes via the app. Your continued use
-                after changes constitutes acceptance of the updated policy.
+                We may update this Privacy Policy from time to time. We will notify you of
+                material changes via the app. Your continued use after changes constitutes
+                acceptance of the updated policy.
               </p>
             </section>
           </div>

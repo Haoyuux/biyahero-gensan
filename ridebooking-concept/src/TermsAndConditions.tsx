@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { X, FileText, Shield, AlertTriangle, Users, Car, CreditCard, Clock, Ban } from "lucide-react";
+import { X, FileText, Shield, AlertTriangle, Users, Car, CreditCard, Clock, Ban, MessageSquare, Bike } from "lucide-react";
 
 interface TermsAndConditionsProps {
   isOpen: boolean;
@@ -9,7 +9,7 @@ interface TermsAndConditionsProps {
 }
 
 export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps) {
-  const lastUpdated = "May 8, 2026";
+  const lastUpdated = "May 10, 2026";
 
   if (!isOpen) return null;
 
@@ -60,59 +60,92 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
             {/* Acceptance */}
             <section>
               <p className="leading-relaxed">
-                Welcome to Biyahero Online. By accessing or using our mobile application and services, 
-                you agree to be bound by these Terms & Conditions. If you do not agree to these terms, 
-                please do not use our services.
+                Welcome to Biyahero Online. By accessing or using our ride-booking application and
+                services, you agree to be bound by these Terms & Conditions. If you do not agree,
+                please do not use our services. Access requires a valid Google account for sign-in.
               </p>
             </section>
 
-            {/* User Responsibilities */}
+            {/* Ride Tiers */}
             <section className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Bike className="w-4 h-4 text-blue-600" />
+                <h3 className="font-semibold text-gray-900 dark:text-white">Available Ride Tiers</h3>
+              </div>
+              <ul className="space-y-2 text-xs">
+                <li>• <strong>Motorcycle</strong> — 1 passenger, lowest base fare</li>
+                <li>• <strong>Economy Car</strong> — up to 4 passengers, mid-range fare</li>
+                <li>• <strong>Premium Car</strong> — up to 4 passengers, premium fare</li>
+                <li>• Fares are calculated using base fare + per-km rate + per-minute rate + booking fee</li>
+                <li>• Specific tiers may be enabled or disabled by the platform at any time</li>
+                <li>• Voucher codes may be applied for eligible discounts on the total fare</li>
+              </ul>
+            </section>
+
+            {/* User Responsibilities */}
+            <section>
               <div className="flex items-center gap-2 mb-3">
                 <Users className="w-4 h-4 text-blue-600" />
                 <h3 className="font-semibold text-gray-900 dark:text-white">User Responsibilities</h3>
               </div>
               <ul className="space-y-2 text-xs">
-                <li>• Provide accurate and complete information during registration</li>
-                <li>• Maintain the security of your account credentials</li>
-                <li>• Ensure your pickup and dropoff locations are safe and accessible</li>
+                <li>• Provide accurate pickup and dropoff locations</li>
                 <li>• Treat drivers with respect and courtesy</li>
-                <li>• Pay for rides promptly through the app</li>
+                <li>• Pay for rides in cash directly to the driver upon completion</li>
+                <li>• Do not misuse voucher codes or attempt to exploit discount systems</li>
                 <li>• Not use the service for any illegal or unauthorized purpose</li>
+                <li>• Maintain the security of your Google account used to sign in</li>
               </ul>
             </section>
 
             {/* Driver Terms */}
-            <section>
+            <section className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Car className="w-4 h-4 text-blue-600" />
-                <h3 className="font-semibold text-gray-900 dark:text-white">Driver Terms</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Driver (Rider) Terms</h3>
               </div>
               <ul className="space-y-2 text-xs">
-                <li>• Must possess a valid driver's license and vehicle registration</li>
-                <li>• Maintain required insurance coverage for ride-hailing</li>
+                <li>• Must complete the platform's onboarding and document verification process</li>
+                <li>• Account activation requires admin approval; status may be <em>pending</em>, <em>approved</em>, or <em>rejected</em></li>
+                <li>• Must possess a valid driver's license and current vehicle registration</li>
+                <li>• Maintain required insurance coverage for ride-hailing operations</li>
                 <li>• Accept rides only when legally permitted to drive</li>
                 <li>• Provide safe, comfortable, and timely transportation</li>
                 <li>• Follow all traffic laws and regulations</li>
-                <li>• Maintain vehicle cleanliness and good condition</li>
-                <li>• Accept booking fees as outlined in the platform</li>
+                <li>• Submit daily booking fee remittances through the platform with valid receipt proof</li>
+                <li>• Riders assigned to a team are subject to team leader oversight and schedules</li>
               </ul>
             </section>
 
-            {/* Payments */}
-            <section className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
+            {/* Payments & Booking Fees */}
+            <section>
               <div className="flex items-center gap-2 mb-3">
                 <CreditCard className="w-4 h-4 text-blue-600" />
-                <h3 className="font-semibold text-gray-900 dark:text-white">Payments & Fees</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Payments & Booking Fees</h3>
               </div>
               <ul className="space-y-2 text-xs">
-                <li>• All payments are processed through the app's secure system</li>
-                <li>• Base fare, distance, and time-based charges apply per ride</li>
-                <li>• A booking fee is added to each completed ride</li>
-                <li>• Drivers receive their earnings minus the booking fee</li>
-                <li>• Refunds are processed according to our refund policy</li>
-                <li>• Pricing may vary based on demand and distance</li>
+                <li>• Ride fares are paid in <strong>cash</strong> directly to the driver upon ride completion</li>
+                <li>• The app calculates the fare based on distance, duration, and selected tier</li>
+                <li>• A booking fee is deducted from the driver's earnings per ride</li>
+                <li>• Drivers are required to remit collected booking fees to the platform daily</li>
+                <li>• Remittances must be submitted with a receipt photo via the app</li>
+                <li>• Remittances are subject to admin review and approval</li>
+                <li>• Pricing rates are set by the platform and may be updated by administrators</li>
               </ul>
+            </section>
+
+            {/* In-App Chat */}
+            <section className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+                <h3 className="font-semibold text-gray-900 dark:text-white">In-App Messaging</h3>
+              </div>
+              <p className="text-xs leading-relaxed">
+                Real-time in-app chat is available between users and drivers during an active ride.
+                Messages are stored and may be reviewed for safety or dispute resolution.
+                Messaging is limited to ride coordination. Misuse, harassment, or inappropriate
+                communication is grounds for account suspension.
+              </p>
             </section>
 
             {/* Cancellation Policy */}
@@ -122,8 +155,8 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
                 <h3 className="font-semibold text-gray-900 dark:text-white">Cancellation Policy</h3>
               </div>
               <ul className="space-y-2 text-xs">
-                <li>• Users may cancel a ride before driver arrival without penalty</li>
-                <li>• Cancellation after driver arrival may incur a fee</li>
+                <li>• Users may cancel a ride before driver arrival</li>
+                <li>• Cancellation after driver arrival may be subject to a fee</li>
                 <li>• Drivers may cancel only for valid safety reasons</li>
                 <li>• Repeated cancellations may result in account restrictions</li>
               </ul>
@@ -136,9 +169,9 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
                 <h3 className="font-semibold text-gray-900 dark:text-white">Limitation of Liability</h3>
               </div>
               <p className="text-xs leading-relaxed">
-                Biyahero Online acts as a platform connecting users with independent drivers. 
-                We are not responsible for the actions, negligence, or conduct of any driver or user. 
-                Users and drivers use the platform at their own risk. We do not guarantee the 
+                Biyahero Online acts as a platform connecting users with independent drivers.
+                We are not responsible for the actions, negligence, or conduct of any driver or user.
+                Users and drivers use the platform at their own risk. We do not guarantee the
                 availability, safety, or quality of any ride.
               </p>
             </section>
@@ -151,11 +184,13 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
               </div>
               <ul className="space-y-2 text-xs">
                 <li>• Harassment, discrimination, or abusive behavior toward drivers or users</li>
-                <li>• Attempting to bypass the app for cash transactions</li>
+                <li>• Bypassing the app to arrange rides outside the platform</li>
+                <li>• Falsifying remittance receipts or booking fee records</li>
                 <li>• Using the service under the influence of alcohol or drugs</li>
                 <li>• Transporting illegal items or substances</li>
                 <li>• Soliciting drivers for personal or commercial purposes outside the platform</li>
-                <li>• Impersonating another user or driver</li>
+                <li>• Impersonating another user, driver, or administrator</li>
+                <li>• Submitting fraudulent documents during driver verification</li>
               </ul>
             </section>
 
@@ -166,8 +201,9 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
                 <h3 className="font-semibold text-gray-900 dark:text-white">Account Termination</h3>
               </div>
               <p className="text-xs leading-relaxed">
-                We reserve the right to suspend or terminate your account at any time for 
-                violations of these terms, suspicious activity, or at our sole discretion. 
+                We reserve the right to suspend or terminate your account at any time for
+                violations of these terms, suspicious activity, or at our sole discretion.
+                Driver accounts may be rejected or revoked based on document review or conduct.
                 Users may request account deletion by contacting support.
               </p>
             </section>
@@ -179,8 +215,8 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
                 <h3 className="font-semibold text-gray-900 dark:text-white">Changes to Terms</h3>
               </div>
               <p className="text-xs leading-relaxed">
-                We may update these Terms & Conditions from time to time. We will notify you 
-                of material changes through the app. Your continued use after changes constitutes 
+                We may update these Terms & Conditions from time to time. We will notify you
+                of material changes through the app. Your continued use after changes constitutes
                 acceptance of the updated terms.
               </p>
             </section>
@@ -188,9 +224,11 @@ export default function TermsAndConditions({ isOpen, onClose }: TermsAndConditio
             {/* Contact */}
             <section className="border-t border-gray-200 dark:border-zinc-700 pt-4">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Contact Us</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                For questions about these terms, contact: support@biyahero.online
-              </p>
+              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                <p>• Email: support@biyahero.online</p>
+                <p>• Phone: +63 945 110 6077</p>
+                <p>• Address: General Santos City, Philippines</p>
+              </div>
             </section>
           </div>
 
