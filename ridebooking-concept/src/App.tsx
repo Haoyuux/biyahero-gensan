@@ -3883,7 +3883,7 @@ const UserApp = ({
                     // Store payload so the re-broadcast interval can keep sending it
                     pendingRequestRef.current = requestPayload;
                     // Persist pending ride so riders coming online later can see it via DB
-                    const { error: insertError } = await supabase
+                    const { error: insertError } = await supabaseAdmin
                       .from("rides")
                       .insert({
                         id: rideId,
