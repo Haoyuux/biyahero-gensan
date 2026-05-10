@@ -7358,17 +7358,23 @@ const RiderDashboard = ({
                           </div>
                         </div>
                         <div className="space-y-2 mb-4 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-1.5 h-1.5 bg-gray-900 rounded-full shrink-0" />
-                            <span className="text-[13px] text-gray-600 truncate">
-                              {currentRequest?.pickup?.label}
-                            </span>
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-1.5 h-1.5 bg-gray-900 rounded-full shrink-0 mt-1.5" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Pick up</p>
+                              <span className="text-[13px] text-gray-600 truncate block">
+                                {currentRequest?.pickup?.label}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
-                            <span className="text-[13px] text-gray-600 truncate">
-                              {currentRequest?.dropoff?.label}
-                            </span>
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0 mt-1.5" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Drop off</p>
+                              <span className="text-[13px] text-gray-600 truncate block">
+                                {currentRequest?.dropoff?.label}
+                              </span>
+                            </div>
                           </div>
                           {(() => {
                             const fareKm =
