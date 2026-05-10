@@ -2453,6 +2453,10 @@ const UserApp = ({
     () => _pr.current?.activeRider ?? null,
   );
   const [pendingRider, setPendingRider] = useState<any>(null);
+  const activeRiderRef = React.useRef<any>(null);
+  useEffect(() => { activeRiderRef.current = activeRider; }, [activeRider]);
+  const pendingRiderRef = React.useRef<any>(null);
+  useEffect(() => { pendingRiderRef.current = pendingRider; }, [pendingRider]);
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(() =>
     loadPricingConfig(),
   );
@@ -3059,6 +3063,37 @@ const UserApp = ({
         setStep("review");
       }
     });
+
+    // DB fallback: catches rider cancellation when broadcast is missed (network gap, channel churn)
+    if (currentRideId) {
+      channel.on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "rides",
+          filter: `id=eq.${currentRideId}`,
+        },
+        (payload: any) => {
+          const { status, rider_id } = payload.new;
+          // rider_id → null + pending means rider cancelled
+          if (status === "pending" && rider_id === null) {
+            const hadRider = activeRiderRef.current || pendingRiderRef.current;
+            if (hadRider) {
+              declinedRidersRef.current.add(hadRider.id);
+              setActiveRider(null);
+              setPendingRider(null);
+              setStep("searching");
+              showNotification("Your rider cancelled the booking.");
+              pushAppNotification(
+                "Ride cancelled 🛵",
+                "The rider cancelled. Searching for a new ride...",
+              );
+            }
+          }
+        },
+      );
+    }
 
     channel.subscribe();
     return () => {
@@ -6325,6 +6360,48 @@ const RiderDashboard = ({
       setIncomingRequests((prev) => prev.slice(1));
     }
   }, [incomingRequests, hasRequest, requestAccepted]);
+
+  // DB fallback: catches user cancellation when broadcast is missed (network gap, channel churn)
+  useEffect(() => {
+    const rideId = currentRequest?.rideId;
+    if (!rideId || !requestAccepted) return;
+    const pgCh = supabase
+      .channel("ride-cancel-pg-" + rideId)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "rides",
+          filter: `id=eq.${rideId}`,
+        },
+        (payload: any) => {
+          if (payload.new.status === "cancelled") {
+            myAcceptedRideIdRef.current = null;
+            setHasRequest(false);
+            setRequestAccepted(false);
+            setWaitingForUserConfirm(false);
+            setShowActiveRide(false);
+            setCurrentRequest(null);
+            setAppNotifications((prev) => [
+              {
+                id: genId(),
+                title: "Ride cancelled",
+                body: "The passenger cancelled their booking.",
+                time: Date.now(),
+                read: false,
+              },
+              ...prev,
+            ]);
+            showRiderNotification("Passenger cancelled the ride.");
+          }
+        },
+      );
+    pgCh.subscribe();
+    return () => {
+      supabase.removeChannel(pgCh);
+    };
+  }, [currentRequest?.rideId, requestAccepted]);
 
   if (showProfile) {
     return (
@@ -18105,8 +18182,18 @@ const SelectPanel = ({
     };
   });
 
+  // Auto-select first available tier on mount, or if current selection is disabled
+  useEffect(() => {
+    const available = dynamicRides.filter((r) => !r.disabled);
+    const currentIsDisabled = dynamicRides.find((r) => r.id === selectedRide)?.disabled;
+    if (available.length > 0 && (!selectedRide || currentIsDisabled)) {
+      setSelectedRide(available[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const selectedBreakdown = dynamicRides.find(
-    (r) => r.id === selectedRide,
+    (r) => r.id === selectedRide && !r.disabled,
   )?.breakdown;
   const [showVoucherPicker, setShowVoucherPicker] = useState(false);
   const [voucherCodeInput, setVoucherCodeInput] = useState("");
