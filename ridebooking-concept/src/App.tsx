@@ -7396,8 +7396,8 @@ const RiderDashboard = ({
                                     : null;
                             if (d === null) return null;
                             return (
-                              <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
-                                <span className="text-[11px] font-semibold text-gray-400">
+                              <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-200">
+                                <span className="text-[12px] font-bold text-gray-700">
                                   {d < 1
                                     ? (d * 1000).toFixed(0) + " m"
                                     : d.toFixed(1) + " km"}{" "}
