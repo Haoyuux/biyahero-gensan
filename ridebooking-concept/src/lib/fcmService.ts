@@ -24,11 +24,15 @@ export async function initFCM(): Promise<string | null> {
   const messaging = getMessaging(app);
   const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
-  const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-    serviceWorkerRegistration: registration,
-  });
-  return token ?? null;
+  try {
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+    return token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function saveFCMToken(userId: string, token: string): Promise<void> {
