@@ -1,31 +1,32 @@
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+// Uses native Web Push API — avoids Firebase compat CDN which can fail silently on mobile Chrome.
+// Firebase HTTP v1 API sends standard Web Push messages handled by native push events.
 
-// Service workers run outside Vite's build pipeline and cannot use import.meta.env.
-// Firebase frontend keys are public by design (security enforced via authorized domains).
-// Keep these in sync with VITE_FIREBASE_* values in .env.
-firebase.initializeApp({
-  apiKey: 'AIzaSyBKM_JifwVUUWs9sGwhtsKv3NZUGFbBdqI',
-  authDomain: 'biyahero-89e8f.firebaseapp.com',
-  projectId: 'biyahero-89e8f',
-  messagingSenderId: '683688974446',
-  appId: '1:683688974446:web:7113eed80bec51fd64ee7f',
+self.addEventListener('push', function (event) {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = {};
+  }
+
+  const notification = payload.notification ?? {};
+  const title = notification.title ?? 'New Booking!';
+  const body = notification.body ?? 'A new booking is available near you.';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'new-booking',
+      renotify: true,
+    })
+  );
 });
 
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-  const { title, body } = payload.notification ?? {};
-  self.registration.showNotification(title ?? 'New Booking!', {
-    body: body ?? 'A new booking is available near you.',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    tag: 'new-booking',
-    renotify: true,
-  });
-});
-
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', function (event) {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

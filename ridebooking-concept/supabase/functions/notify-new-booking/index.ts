@@ -19,9 +19,6 @@ async function getAccessToken(): Promise<string> {
     .replace(/[-\s]*BEGIN\s+PRIVATE\s+KEY[-\s]*/g, '')
     .replace(/[-\s]*END\s+PRIVATE\s+KEY[-\s]*/g, '')
     .replace(/\s/g, '');
-  console.log('b64_length:', b64.length);
-  console.log('b64_first20:', JSON.stringify(b64.substring(0, 20)));
-  console.log('b64_all_valid:', /^[A-Za-z0-9+/=]+$/.test(b64));
   const pem = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)!.join('\n')}\n-----END PRIVATE KEY-----`;
   const privateKey = await importPKCS8(pem, 'RS256');
 
@@ -108,9 +105,6 @@ Deno.serve(async (_req) => {
 
     const succeeded = results.filter((r) => r === 'success').length;
     const failed = results.length - succeeded;
-
-    console.log('results:', JSON.stringify(results));
-    console.log('attempted:', riders.length, 'succeeded:', succeeded, 'failed:', failed);
 
     return new Response(
       JSON.stringify({ attempted: riders.length, succeeded, failed }),
