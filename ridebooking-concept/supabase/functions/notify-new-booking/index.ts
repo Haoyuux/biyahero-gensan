@@ -13,10 +13,10 @@ async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (tokenCache && now < tokenCache.exp - 60) return tokenCache.token;
 
-  const raw = FIREBASE_SERVICE_ACCOUNT.private_key;
-  const pem = raw.replace(/\\n/g, '\n').replace(/\r/g, '').trim();
-  console.log('pem_first_char_codes:', [...pem.substring(0, 10)].map(c => c.charCodeAt(0)));
-  console.log('contains_header:', pem.includes('-----BEGIN PRIVATE KEY-----'));
+  const raw = FIREBASE_SERVICE_ACCOUNT.private_key.replace(/\\n/g, '\n');
+  // Extract raw base64 content — strip ALL header/footer/whitespace then reconstruct proper PEM
+  const b64 = raw.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+  const pem = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)!.join('\n')}\n-----END PRIVATE KEY-----`;
   const privateKey = await importPKCS8(pem, 'RS256');
 
   const jwt = await new SignJWT({
