@@ -7254,7 +7254,7 @@ const RiderDashboard = ({
                             return;
                           const newOnline = !isOnline;
                           setIsOnline(newOnline);
-                          if (newOnline && currentProfile?.id) {
+                          if (newOnline && currentProfile?.id && !isImpersonating) {
                             initFCM()
                               .then((token) => {
                                 if (!token) return;
