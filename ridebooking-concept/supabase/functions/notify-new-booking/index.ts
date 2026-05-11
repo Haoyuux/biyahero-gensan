@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { createSign } from 'node:crypto';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -29,16 +28,30 @@ async function getAccessToken(): Promise<string> {
   const body = encodeBase64Url(JSON.stringify(payload));
   const signingInput = `${header}.${body}`;
 
-  // Use Node.js crypto — handles PEM key natively, no manual base64 parsing needed
-  const raw = FIREBASE_SERVICE_ACCOUNT.private_key;
-  console.log('key_first50:', JSON.stringify(raw.substring(0, 50)));
-  console.log('has_real_newline:', raw.includes('\n'));
-  console.log('has_literal_slash_n:', raw.includes('\\n'));
-  const privateKey = raw.replace(/\\n/g, '\n');
-  const sign = createSign('RSA-SHA256');
-  sign.update(signingInput);
-  const sigBase64url = sign.sign(privateKey, 'base64')
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  // Parse PEM key line-by-line to extract clean base64 — avoids atob issues with full key
+  const pemLines = FIREBASE_SERVICE_ACCOUNT.private_key
+    .replace(/\\n/g, '\n')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l && !l.startsWith('-----'));
+  const pemBase64 = pemLines.join('');
+  const binaryKey = Uint8Array.from(atob(pemBase64), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    binaryKey,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(signingInput),
+  );
+  const sigBytes = new Uint8Array(signature);
+  let sigBinary = '';
+  for (let i = 0; i < sigBytes.length; i++) sigBinary += String.fromCharCode(sigBytes[i]);
+  const sigBase64url = btoa(sigBinary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
   const jwt = `${signingInput}.${sigBase64url}`;
 
