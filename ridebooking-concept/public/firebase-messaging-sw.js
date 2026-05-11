@@ -1,6 +1,9 @@
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
+// Service workers run outside Vite's build pipeline and cannot use import.meta.env.
+// Firebase frontend keys are public by design (security enforced via authorized domains).
+// Keep these in sync with VITE_FIREBASE_* values in .env.
 firebase.initializeApp({
   apiKey: 'AIzaSyBKM_JifwVUUWs9sGwhtsKv3NZUGFbBdqI',
   authDomain: 'biyahero-89e8f.firebaseapp.com',
