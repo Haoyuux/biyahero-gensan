@@ -11210,6 +11210,7 @@ const AdminDashboard = ({
   const [userPageSize, setUserPageSize] = useState(10);
   const [financePage, setFinancePage] = useState(1);
   const [selectedFinanceRide, setSelectedFinanceRide] = useState<any | null>(null);
+  const [financeRidePassenger, setFinanceRidePassenger] = useState<any | null>(null);
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(
@@ -11565,7 +11566,7 @@ const AdminDashboard = ({
       lastWeekStart.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from("rides")
-        .select("id, fare, rider_name, rider_avatar, rider_id, user_id, vehicle_info, pickup_label, dropoff_label, fare_breakdown, ride_type, original_fare, final_fare, voucher_code, voucher_discount, completed_at, profiles!rides_user_id_fkey(first_name, last_name, full_name, avatar_url)")
+        .select("id, fare, rider_name, rider_avatar, rider_id, user_id, vehicle_info, pickup_label, dropoff_label, fare_breakdown, ride_type, original_fare, final_fare, voucher_code, voucher_discount, completed_at")
         .eq("status", "completed")
         .order("completed_at", { ascending: false })
         .limit(200);
@@ -13317,7 +13318,13 @@ const AdminDashboard = ({
                                 {paginatedF.map((t: any) => (
                                   <div
                                     key={t.id}
-                                    onClick={() => setSelectedFinanceRide(t)}
+                                    onClick={() => {
+                                      setSelectedFinanceRide(t);
+                                      setFinanceRidePassenger(null);
+                                      if (t.user_id) {
+                                        supabase.from("profiles").select("first_name, last_name, full_name, avatar_url").eq("id", t.user_id).single().then(({ data }) => setFinanceRidePassenger(data));
+                                      }
+                                    }}
                                     className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/60 transition-colors cursor-pointer"
                                   >
                                     <div className="flex items-center gap-3.5">
@@ -17011,7 +17018,7 @@ const AdminDashboard = ({
         {selectedFinanceRide && (() => {
           const r = selectedFinanceRide;
           const fb = r.fare_breakdown as any;
-          const passenger = r.profiles as any;
+          const passenger = financeRidePassenger;
           const passengerName = passenger
             ? (`${passenger.first_name || ""} ${passenger.last_name || ""}`.trim() || passenger.full_name || "Passenger")
             : "Passenger";
@@ -17021,7 +17028,7 @@ const AdminDashboard = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedFinanceRide(null)}
+              onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); }}
               className="fixed inset-0 z-[500] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             >
               <motion.div
@@ -17038,7 +17045,7 @@ const AdminDashboard = ({
                     <p className="font-bold text-[15px] text-gray-900">Ride Details</p>
                     <p className="text-[11px] text-gray-400 font-normal mt-0.5">{r.id}</p>
                   </div>
-                  <button onClick={() => setSelectedFinanceRide(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                  <button onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); }} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
                     <X size={14} />
                   </button>
                 </div>
