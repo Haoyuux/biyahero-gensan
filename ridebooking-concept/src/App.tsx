@@ -193,6 +193,7 @@ import {
   type VoucherDiscountType,
 } from "@/src/lib/voucherService";
 import { initFCM, saveFCMToken, onForegroundMessage, clearFCMToken } from '@/src/lib/fcmService';
+import { sendRideRequestToTelegram } from '@/src/lib/telegramService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
@@ -3835,6 +3836,18 @@ const UserApp = ({
                     setSelectedUserVoucher(voucher);
                     setVoucherDiscount(discount);
                     setIsBooking(true);
+
+                    sendRideRequestToTelegram({
+                      passengerName:
+                        `${currentProfile.first_name || ""} ${currentProfile.last_name || ""}`.trim() ||
+                        currentProfile.full_name ||
+                        "Passenger",
+                      pickup,
+                      dropoff,
+                      tier: selectedRide,
+                      totalFare: breakdown.totalFare,
+                      rideId,
+                    });
 
                     // Fetch online approved riders and sort by distance to pickup
                     const pickupLL = pickupCoords || deviceLocation;
