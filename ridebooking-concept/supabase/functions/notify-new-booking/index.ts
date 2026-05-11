@@ -109,6 +109,9 @@ Deno.serve(async (_req) => {
     const succeeded = results.filter((r) => r === 'success').length;
     const failed = results.length - succeeded;
 
+    console.log('results:', JSON.stringify(results));
+    console.log('attempted:', riders.length, 'succeeded:', succeeded, 'failed:', failed);
+
     return new Response(
       JSON.stringify({ attempted: riders.length, succeeded, failed }),
       { status: 200 },
