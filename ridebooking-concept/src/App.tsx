@@ -192,6 +192,7 @@ import {
   type Voucher,
   type VoucherDiscountType,
 } from "@/src/lib/voucherService";
+import { initFCM, saveFCMToken, onForegroundMessage } from '@/src/lib/fcmService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
@@ -5628,6 +5629,14 @@ const RiderDashboard = ({
     setTimeout(() => setRiderNotification(null), 3500);
   };
   const [isOnline, setIsOnline] = useState(false);
+  useEffect(() => {
+    if (!isOnline) return;
+    return onForegroundMessage((payload) => {
+      const title = payload.notification?.title ?? 'New Booking!';
+      const body = payload.notification?.body ?? 'A new booking is available near you.';
+      showRiderNotification(`${title} — ${body}`);
+    });
+  }, [isOnline]);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   // ── Lazy-initialise rider ride state from localStorage (avoids useEffect race) ──
@@ -7242,7 +7251,13 @@ const RiderDashboard = ({
                               (remittanceRequired && hasPendingRemit))
                           )
                             return;
-                          setIsOnline((prev) => !prev);
+                          const newOnline = !isOnline;
+                          setIsOnline(newOnline);
+                          if (newOnline && currentProfile?.id) {
+                            initFCM()
+                              .then((token) => { if (token) saveFCMToken(currentProfile.id, token); })
+                              .catch(console.error);
+                          }
                         }}
                         className={`w-full py-[15px] rounded-xl font-normal text-[15px] transition-colors ${
                           isOnline
