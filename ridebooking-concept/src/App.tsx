@@ -5634,7 +5634,8 @@ const RiderDashboard = ({
     return onForegroundMessage((payload) => {
       const title = payload.notification?.title ?? 'New Booking!';
       const body = payload.notification?.body ?? 'A new booking is available near you.';
-      showRiderNotification(`${title} — ${body}`);
+      setRiderNotification(`${title} — ${body}`);
+      setTimeout(() => setRiderNotification(null), 3500);
     });
   }, [isOnline]);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
@@ -7255,7 +7256,13 @@ const RiderDashboard = ({
                           setIsOnline(newOnline);
                           if (newOnline && currentProfile?.id) {
                             initFCM()
-                              .then((token) => { if (token) saveFCMToken(currentProfile.id, token); })
+                              .then((token) => {
+                                if (!token) return;
+                                const lastToken = localStorage.getItem('fetch_fcm_token');
+                                if (token === lastToken) return;
+                                localStorage.setItem('fetch_fcm_token', token);
+                                saveFCMToken(currentProfile.id, token);
+                              })
                               .catch(console.error);
                           }
                         }}
