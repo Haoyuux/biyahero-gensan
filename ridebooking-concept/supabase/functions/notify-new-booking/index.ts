@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createSign } from 'node:crypto';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -21,37 +22,21 @@ async function getAccessToken(): Promise<string> {
     scope: 'https://www.googleapis.com/auth/firebase.messaging',
   };
 
-  const encode = (obj: unknown) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const encodeBase64Url = (str: string) =>
+    btoa(str).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-  const signingInput = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode(payload)}`;
+  const header = encodeBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const body = encodeBase64Url(JSON.stringify(payload));
+  const signingInput = `${header}.${body}`;
 
-  const pemKey = FIREBASE_SERVICE_ACCOUNT.private_key
-    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-    .replace(/-----END PRIVATE KEY-----/g, '')
-    .replace(/\\n/g, '')
-    .replace(/\s/g, '');
+  // Use Node.js crypto — handles PEM key natively, no manual base64 parsing needed
+  const privateKey = FIREBASE_SERVICE_ACCOUNT.private_key.replace(/\\n/g, '\n');
+  const sign = createSign('RSA-SHA256');
+  sign.update(signingInput);
+  const sigBase64url = sign.sign(privateKey, 'base64')
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-  const binaryKey = Uint8Array.from(atob(pemKey), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    binaryKey,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    new TextEncoder().encode(signingInput),
-  );
-
-  const bytes = new Uint8Array(signature);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-
-  const jwt = `${signingInput}.${btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+  const jwt = `${signingInput}.${sigBase64url}`;
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
