@@ -30,7 +30,11 @@ async function getAccessToken(): Promise<string> {
   const signingInput = `${header}.${body}`;
 
   // Use Node.js crypto — handles PEM key natively, no manual base64 parsing needed
-  const privateKey = FIREBASE_SERVICE_ACCOUNT.private_key.replace(/\\n/g, '\n');
+  const raw = FIREBASE_SERVICE_ACCOUNT.private_key;
+  console.log('key_first50:', JSON.stringify(raw.substring(0, 50)));
+  console.log('has_real_newline:', raw.includes('\n'));
+  console.log('has_literal_slash_n:', raw.includes('\\n'));
+  const privateKey = raw.replace(/\\n/g, '\n');
   const sign = createSign('RSA-SHA256');
   sign.update(signingInput);
   const sigBase64url = sign.sign(privateKey, 'base64')
