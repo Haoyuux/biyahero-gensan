@@ -103,7 +103,7 @@ Deno.serve(async (_req) => {
       .from('profiles')
       .select('id, fcm_token')
       .eq('is_online', true)
-      .eq('role', 'rider')
+      .in('role', ['rider', 'team_leader'])
       .not('fcm_token', 'is', null);
 
     if (!riders?.length) {
