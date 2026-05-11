@@ -7258,11 +7258,13 @@ const RiderDashboard = ({
                           if (newOnline && currentProfile?.id) {
                             initFCM()
                               .then((token) => {
-                                if (!token) { alert('FCM: token is null - check console'); return; }
+                                if (!token) { alert('FCM: null token'); return; }
                                 const lastToken = localStorage.getItem('fetch_fcm_token');
-                                if (token === lastToken) return;
+                                if (token === lastToken) { alert('FCM: same token, skipping save'); return; }
                                 localStorage.setItem('fetch_fcm_token', token);
-                                saveFCMToken(currentProfile.id, token);
+                                saveFCMToken(currentProfile.id, token)
+                                  .then(() => alert('FCM: saved!'))
+                                  .catch((e) => alert('FCM save error: ' + String(e)));
                               })
                               .catch((err) => alert('FCM Error: ' + String(err)));
                           }
