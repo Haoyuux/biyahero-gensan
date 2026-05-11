@@ -11209,6 +11209,7 @@ const AdminDashboard = ({
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(10);
   const [financePage, setFinancePage] = useState(1);
+  const [selectedFinanceRide, setSelectedFinanceRide] = useState<any | null>(null);
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(
@@ -11564,7 +11565,7 @@ const AdminDashboard = ({
       lastWeekStart.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from("rides")
-        .select("id, fare, rider_name, rider_avatar, completed_at")
+        .select("id, fare, rider_name, rider_avatar, rider_id, user_id, vehicle_info, pickup_label, dropoff_label, fare_breakdown, ride_type, original_fare, final_fare, voucher_code, voucher_discount, completed_at, profiles!rides_user_id_fkey(first_name, last_name, full_name, avatar_url)")
         .eq("status", "completed")
         .order("completed_at", { ascending: false })
         .limit(200);
@@ -13316,7 +13317,8 @@ const AdminDashboard = ({
                                 {paginatedF.map((t: any) => (
                                   <div
                                     key={t.id}
-                                    className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/60 transition-colors"
+                                    onClick={() => setSelectedFinanceRide(t)}
+                                    className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/60 transition-colors cursor-pointer"
                                   >
                                     <div className="flex items-center gap-3.5">
                                       <div className="w-8 h-8 bg-gray-100 rounded-xl overflow-hidden shrink-0">
@@ -17003,6 +17005,137 @@ const AdminDashboard = ({
 
         {activeTab === "vouchers" && <VouchersTab profile={profile} />}
       </div>
+
+      {/* Ride Detail Modal */}
+      <AnimatePresence>
+        {selectedFinanceRide && (() => {
+          const r = selectedFinanceRide;
+          const fb = r.fare_breakdown as any;
+          const passenger = r.profiles as any;
+          const passengerName = passenger
+            ? (`${passenger.first_name || ""} ${passenger.last_name || ""}`.trim() || passenger.full_name || "Passenger")
+            : "Passenger";
+          const tierLabel: Record<string, string> = { moto: "Motorcycle", eco: "Economy", premium: "Premium" };
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedFinanceRide(null)}
+              className="fixed inset-0 z-[500] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            >
+              <motion.div
+                initial={{ y: 60, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 60, opacity: 0 }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
+                  <div>
+                    <p className="font-bold text-[15px] text-gray-900">Ride Details</p>
+                    <p className="text-[11px] text-gray-400 font-normal mt-0.5">{r.id}</p>
+                  </div>
+                  <button onClick={() => setSelectedFinanceRide(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto max-h-[70vh]">
+                  {/* Route */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Route</p>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1 shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-medium">Pickup</p>
+                          <p className="text-sm font-semibold text-gray-900">{r.pickup_label || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-medium">Dropoff</p>
+                          <p className="text-sm font-semibold text-gray-900">{r.dropoff_label || "—"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ride Info */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Ride Info</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-medium">Type</p>
+                        <p className="text-sm font-semibold text-gray-900">{tierLabel[r.ride_type] || r.ride_type || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-medium">Completed</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {r.completed_at ? new Date(r.completed_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Passenger */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Passenger</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                        {passenger?.avatar_url
+                          ? <img src={passenger.avatar_url} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={16} /></div>}
+                      </div>
+                      <p className="font-semibold text-sm text-gray-900">{passengerName}</p>
+                    </div>
+                  </div>
+
+                  {/* Rider */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Rider</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                        {r.rider_avatar
+                          ? <img src={r.rider_avatar} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={16} /></div>}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-gray-900">{r.rider_name || "—"}</p>
+                        {r.vehicle_info && <p className="text-[11px] text-gray-400 font-normal">{r.vehicle_info}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fare Breakdown */}
+                  <div className="px-5 py-4">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
+                    <div className="space-y-2">
+                      {fb && <>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Base Fare</span><span className="font-semibold text-gray-900">₱{fb.baseFare?.toFixed(2) ?? "—"}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Distance Fee</span><span className="font-semibold text-gray-900">₱{fb.distanceFee?.toFixed(2) ?? "—"}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Time Fee</span><span className="font-semibold text-gray-900">₱{fb.timeFee?.toFixed(2) ?? "—"}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Booking Fee</span><span className="font-semibold text-gray-900">₱{fb.bookingFee?.toFixed(2) ?? "—"}</span></div>
+                      </>}
+                      {r.voucher_code && (
+                        <div className="flex justify-between text-sm"><span className="text-emerald-600 font-normal">Voucher ({r.voucher_code})</span><span className="font-semibold text-emerald-600">−₱{(r.voucher_discount || 0).toFixed(2)}</span></div>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-gray-100">
+                        <span className="font-bold text-gray-900">Total Paid</span>
+                        <span className="font-bold text-gray-900">₱{(r.final_fare ?? r.fare ?? 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 };
