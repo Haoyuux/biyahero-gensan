@@ -2572,6 +2572,8 @@ const UserApp = ({
   const completionDataRef = React.useRef({
     pickup: "",
     dropoff: "",
+    pickupCoords: null as [number, number] | null,
+    destinationCoords: null as [number, number] | null,
     fareBreakdown: null as FareBreakdown | null,
     selectedUserVoucher: null as UserVoucher | null,
     voucherDiscount: 0,
@@ -2583,6 +2585,8 @@ const UserApp = ({
   completionDataRef.current = {
     pickup,
     dropoff,
+    pickupCoords,
+    destinationCoords,
     fareBreakdown,
     selectedUserVoucher,
     voucherDiscount,
@@ -3034,6 +3038,10 @@ const UserApp = ({
               : null,
             pickup_label: d.pickup,
             dropoff_label: d.dropoff,
+            pickup_lat: d.pickupCoords?.[0] ?? null,
+            pickup_lng: d.pickupCoords?.[1] ?? null,
+            dropoff_lat: d.destinationCoords?.[0] ?? null,
+            dropoff_lng: d.destinationCoords?.[1] ?? null,
             fare: Math.max(
               0,
               (d.fareBreakdown?.totalFare ?? 0) - (d.voucherDiscount ?? 0),
@@ -11211,6 +11219,9 @@ const AdminDashboard = ({
   const [financePage, setFinancePage] = useState(1);
   const [selectedFinanceRide, setSelectedFinanceRide] = useState<any | null>(null);
   const [financeRidePassenger, setFinanceRidePassenger] = useState<any | null>(null);
+  const [financeMapRoute, setFinanceMapRoute] = useState<[number, number][] | null>(null);
+  const [financeMapLoading, setFinanceMapLoading] = useState(false);
+  const [showFinanceMap, setShowFinanceMap] = useState(false);
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(
@@ -11566,7 +11577,7 @@ const AdminDashboard = ({
       lastWeekStart.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from("rides")
-        .select("id, fare, rider_name, rider_avatar, rider_id, user_id, vehicle_info, pickup_label, dropoff_label, fare_breakdown, ride_type, original_fare, final_fare, voucher_code, voucher_discount, completed_at")
+        .select("id, fare, rider_name, rider_avatar, rider_id, user_id, vehicle_info, pickup_label, dropoff_label, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_breakdown, ride_type, original_fare, final_fare, voucher_code, voucher_discount, completed_at")
         .eq("status", "completed")
         .order("completed_at", { ascending: false })
         .limit(200);
@@ -17028,7 +17039,7 @@ const AdminDashboard = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); }}
+              onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); setShowFinanceMap(false); setFinanceMapRoute(null); }}
               className="fixed inset-0 z-[500] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             >
               <motion.div
@@ -17045,31 +17056,89 @@ const AdminDashboard = ({
                     <p className="font-bold text-[15px] text-gray-900">Ride Details</p>
                     <p className="text-[11px] text-gray-400 font-normal mt-0.5">{r.id}</p>
                   </div>
-                  <button onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); }} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                  <button onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); setShowFinanceMap(false); setFinanceMapRoute(null); }} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
                     <X size={14} />
                   </button>
                 </div>
 
                 <div className="overflow-y-auto max-h-[70vh]">
                   {/* Route */}
-                  <div className="px-5 py-4 border-b border-gray-50">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Route</p>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1 shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-gray-400 font-medium">Pickup</p>
-                          <p className="text-sm font-semibold text-gray-900">{r.pickup_label || "—"}</p>
-                        </div>
+                  <div className="border-b border-gray-50">
+                    <div className="px-5 py-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Route</p>
+                        {r.pickup_lat && r.dropoff_lat && (
+                          <button
+                            onClick={async () => {
+                              if (showFinanceMap) { setShowFinanceMap(false); return; }
+                              setShowFinanceMap(true);
+                              if (!financeMapRoute) {
+                                setFinanceMapLoading(true);
+                                try {
+                                  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${r.pickup_lng},${r.pickup_lat};${r.dropoff_lng},${r.dropoff_lat}?overview=full&geometries=geojson`);
+                                  const json = await res.json();
+                                  const coords: [number, number][] = json.routes?.[0]?.geometry?.coordinates?.map((c: number[]) => [c[1], c[0]]) ?? [];
+                                  setFinanceMapRoute(coords.length ? coords : null);
+                                } catch { setFinanceMapRoute(null); }
+                                setFinanceMapLoading(false);
+                              }
+                            }}
+                            className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            <MapPin size={11} />
+                            {showFinanceMap ? "Hide Map" : "View on Map"}
+                          </button>
+                        )}
                       </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-gray-400 font-medium">Dropoff</p>
-                          <p className="text-sm font-semibold text-gray-900">{r.dropoff_label || "—"}</p>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 mt-1 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-gray-400 font-medium">Pickup</p>
+                            <p className="text-sm font-semibold text-gray-900">{r.pickup_label || "—"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-gray-400 font-medium">Dropoff</p>
+                            <p className="text-sm font-semibold text-gray-900">{r.dropoff_label || "—"}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
+                    {showFinanceMap && r.pickup_lat && r.dropoff_lat && (
+                      <div className="h-52 w-full relative">
+                        {financeMapLoading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+                            <p className="text-sm text-gray-400">Loading map…</p>
+                          </div>
+                        )}
+                        <MapContainer
+                          key={`${r.id}-map`}
+                          center={[r.pickup_lat, r.pickup_lng] as [number, number]}
+                          zoom={14}
+                          style={{ height: "100%", width: "100%" }}
+                          zoomControl={false}
+                          attributionControl={false}
+                        >
+                          <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                          {(() => {
+                            const FinanceMapFit = () => {
+                              const map = useMap();
+                              useEffect(() => {
+                                map.fitBounds([[r.pickup_lat, r.pickup_lng], [r.dropoff_lat, r.dropoff_lng]], { padding: [30, 30] });
+                              }, [map]);
+                              return null;
+                            };
+                            return <FinanceMapFit />;
+                          })()}
+                          <Marker position={[r.pickup_lat, r.pickup_lng] as [number, number]} icon={new (window as any).L.DivIcon({ className: "", html: '<div style="width:12px;height:12px;border-radius:50%;background:#3b82f6;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>', iconSize: [12, 12], iconAnchor: [6, 6] })} />
+                          <Marker position={[r.dropoff_lat, r.dropoff_lng] as [number, number]} icon={new (window as any).L.DivIcon({ className: "", html: '<div style="width:12px;height:12px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>', iconSize: [12, 12], iconAnchor: [6, 6] })} />
+                          {financeMapRoute && <Polyline positions={financeMapRoute} color="#3b82f6" weight={3} opacity={0.8} />}
+                        </MapContainer>
+                      </div>
+                    )}
                   </div>
 
                   {/* Ride Info */}
