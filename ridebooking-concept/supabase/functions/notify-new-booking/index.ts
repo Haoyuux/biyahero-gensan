@@ -27,9 +27,9 @@ async function getAccessToken(): Promise<string> {
   const signingInput = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode(payload)}`;
 
   const pemKey = FIREBASE_SERVICE_ACCOUNT.private_key
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\n/g, '');
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
 
   const binaryKey = Uint8Array.from(atob(pemKey), (c) => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey(
