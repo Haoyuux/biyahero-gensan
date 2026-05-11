@@ -13267,17 +13267,19 @@ const AdminDashboard = ({
                           </p>
                         )}
                       </div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                        <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
-                          Platform Revenue (20%)
-                        </p>
-                        <h3 className="text-3xl font-bold tracking-tight text-gray-950 mb-3">
-                          {fmt(Math.round(gross * 0.2))}
-                        </h3>
-                        <p className="text-[12px] text-gray-400 font-semibold">
-                          This week: {fmt(Math.round(thisWeek * 0.2))}
-                        </p>
-                      </div>
+                      {settings?.remittance_enabled && (
+                        <div className="bg-white p-5 rounded-2xl border border-gray-100">
+                          <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
+                            Platform Revenue (20%)
+                          </p>
+                          <h3 className="text-3xl font-bold tracking-tight text-gray-950 mb-3">
+                            {fmt(Math.round(gross * 0.2))}
+                          </h3>
+                          <p className="text-[12px] text-gray-400 font-semibold">
+                            This week: {fmt(Math.round(thisWeek * 0.2))}
+                          </p>
+                        </div>
+                      )}
                       <div className="bg-white p-5 rounded-2xl border border-gray-100">
                         <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           This Week Gross
@@ -13376,9 +13378,11 @@ const AdminDashboard = ({
                                       <p className="font-normal text-sm text-gray-900">
                                         ₱{t.fare}
                                       </p>
-                                      <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-                                        Fee: ₱{Math.round((t.fare || 0) * 0.2)}
-                                      </p>
+                                      {settings?.remittance_enabled && (
+                                        <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                                          Fee: ₱{Math.round((t.fare || 0) * 0.2)}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 ))}
