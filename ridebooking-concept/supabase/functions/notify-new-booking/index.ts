@@ -28,13 +28,10 @@ async function getAccessToken(): Promise<string> {
   const body = encodeBase64Url(JSON.stringify(payload));
   const signingInput = `${header}.${body}`;
 
-  // Parse PEM key line-by-line to extract clean base64 — avoids atob issues with full key
-  const pemLines = FIREBASE_SERVICE_ACCOUNT.private_key
+  // Extract base64 from PEM — strip ALL non-base64 characters to handle any encoding quirks
+  const pemBase64 = FIREBASE_SERVICE_ACCOUNT.private_key
     .replace(/\\n/g, '\n')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('-----'));
-  const pemBase64 = pemLines.join('');
+    .replace(/[^A-Za-z0-9+/=]/g, '');
   const binaryKey = Uint8Array.from(atob(pemBase64), (c) => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
