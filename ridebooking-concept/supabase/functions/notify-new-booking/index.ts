@@ -29,6 +29,7 @@ async function getAccessToken(): Promise<string> {
   const pemKey = FIREBASE_SERVICE_ACCOUNT.private_key
     .replace(/-----BEGIN PRIVATE KEY-----/g, '')
     .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\\n/g, '')
     .replace(/\s/g, '');
 
   const binaryKey = Uint8Array.from(atob(pemKey), (c) => c.charCodeAt(0));
