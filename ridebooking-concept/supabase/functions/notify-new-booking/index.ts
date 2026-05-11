@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { importPKCS8, SignJWT } from 'npm:jose@5';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -12,45 +13,19 @@ async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (tokenCache && now < tokenCache.exp - 60) return tokenCache.token;
 
-  const payload = {
-    iss: FIREBASE_SERVICE_ACCOUNT.client_email,
-    sub: FIREBASE_SERVICE_ACCOUNT.client_email,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
+  const pem = FIREBASE_SERVICE_ACCOUNT.private_key.replace(/\\n/g, '\n');
+  const privateKey = await importPKCS8(pem, 'RS256');
+
+  const jwt = await new SignJWT({
     scope: 'https://www.googleapis.com/auth/firebase.messaging',
-  };
-
-  const encodeBase64Url = (str: string) =>
-    btoa(str).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  const header = encodeBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const body = encodeBase64Url(JSON.stringify(payload));
-  const signingInput = `${header}.${body}`;
-
-  // Extract base64 from PEM — strip ALL non-base64 characters to handle any encoding quirks
-  const pemBase64 = FIREBASE_SERVICE_ACCOUNT.private_key
-    .replace(/\\n/g, '\n')
-    .replace(/[^A-Za-z0-9+/=]/g, '');
-  const binaryKey = Uint8Array.from(atob(pemBase64), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    binaryKey,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    new TextEncoder().encode(signingInput),
-  );
-  const sigBytes = new Uint8Array(signature);
-  let sigBinary = '';
-  for (let i = 0; i < sigBytes.length; i++) sigBinary += String.fromCharCode(sigBytes[i]);
-  const sigBase64url = btoa(sigBinary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  const jwt = `${signingInput}.${sigBase64url}`;
+  })
+    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+    .setIssuer(FIREBASE_SERVICE_ACCOUNT.client_email)
+    .setSubject(FIREBASE_SERVICE_ACCOUNT.client_email)
+    .setAudience('https://oauth2.googleapis.com/token')
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(privateKey);
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
