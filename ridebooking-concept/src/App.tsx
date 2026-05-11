@@ -192,7 +192,7 @@ import {
   type Voucher,
   type VoucherDiscountType,
 } from "@/src/lib/voucherService";
-import { initFCM, saveFCMToken, onForegroundMessage } from '@/src/lib/fcmService';
+import { initFCM, saveFCMToken, onForegroundMessage, clearFCMToken } from '@/src/lib/fcmService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
@@ -1356,7 +1356,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
 
         {/* Sign Out */}
         <button
-          onClick={() => signOut()}
+          onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
           className="w-full bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white font-semibold py-[14px] rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-150 border border-white/[0.06]"
         >
           <LogOut size={16} />
@@ -1942,7 +1942,7 @@ const UserProfileScreen = ({
               </button>
             )}
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
               className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
             >
               <LogOut size={13} /> Sign out
@@ -3497,6 +3497,7 @@ const UserApp = ({
                   <button
                     onClick={() => {
                       setShowMenu(false);
+                      if (currentProfile?.id) clearFCMToken(currentProfile.id).catch(console.error);
                       signOut();
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-colors text-red-500 font-normal text-sm"
@@ -4381,7 +4382,7 @@ const RiderProfileScreen = ({
               </button>
             )}
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
               className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
             >
               <LogOut size={13} /> Sign out
@@ -6577,7 +6578,7 @@ const RiderDashboard = ({
               )}
             </button>
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (currentProfile?.id) clearFCMToken(currentProfile.id).catch(console.error); signOut(); }}
               className="hidden md:flex w-9 h-9 rounded-xl items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-colors"
             >
               <LogOut size={16} />
@@ -11705,7 +11706,7 @@ const AdminDashboard = ({
 
         <div className="p-3 border-t border-white/[0.06]">
           <button
-            onClick={() => signOut()}
+            onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
             className="w-full flex items-center justify-center gap-2 bg-white/[0.05] hover:bg-red-500/10 text-white/40 hover:text-red-400 py-2.5 rounded-xl transition-colors font-semibold text-[13px]"
           >
             <LogOut size={14} /> Sign Out

@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, onMessage, MessagePayload } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, deleteToken, MessagePayload } from 'firebase/messaging';
 import { supabase, supabaseAdmin } from './supabase';
 
 const firebaseConfig = {
@@ -44,4 +44,19 @@ export function onForegroundMessage(callback: (payload: MessagePayload) => void)
   const app = getFirebaseApp();
   const messaging = getMessaging(app);
   return onMessage(messaging, callback);
+}
+
+export async function clearFCMToken(userId: string): Promise<void> {
+  const app = getFirebaseApp();
+  const messaging = getMessaging(app);
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+    if (registration) {
+      await deleteToken(messaging);
+    }
+  } catch {
+    // ignore — token may already be expired
+  }
+  localStorage.removeItem('fetch_fcm_token');
+  await supabaseAdmin.from('profiles').update({ fcm_token: null }).eq('id', userId);
 }
