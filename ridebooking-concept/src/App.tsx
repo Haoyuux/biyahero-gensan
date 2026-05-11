@@ -5741,6 +5741,7 @@ const RiderDashboard = ({
   const [riderCurrentLoc, setRiderCurrentLoc] = useState<
     [number, number] | null
   >(null);
+  const riderCurrentLocRef = React.useRef<[number, number] | null>(null);
   // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
   const pendingTimersRef = React.useRef<
     Map<string, ReturnType<typeof setTimeout>>
@@ -6099,6 +6100,7 @@ const RiderDashboard = ({
           pos.coords.longitude,
         ];
         setRiderCurrentLoc(loc);
+        riderCurrentLocRef.current = loc;
         const elapsed = Date.now() - lastWriteTime;
         const moved =
           lastWrittenLat != null && lastWrittenLng != null
@@ -6175,9 +6177,19 @@ const RiderDashboard = ({
       return;
     }
 
+    const RIDER_SEARCH_RADIUS_KM = 10;
+
     // Schedule request immediately (UserApp orchestrates the sequence delay now)
     const scheduleRequest = (req: any) => {
       if (usedRideIdsRef.current.has(req.rideId)) return;
+
+      // Ignore requests where pickup is beyond the search radius
+      const myLoc = riderCurrentLocRef.current;
+      const pickupCoords = req.pickup?.coords;
+      if (myLoc && pickupCoords) {
+        const distKm = haversineKm(myLoc[0], myLoc[1], pickupCoords[0], pickupCoords[1]);
+        if (distKm > RIDER_SEARCH_RADIUS_KM) return;
+      }
 
       setIncomingRequests((prev) => {
         if (prev.some((r: any) => r.rideId === req.rideId)) return prev;
