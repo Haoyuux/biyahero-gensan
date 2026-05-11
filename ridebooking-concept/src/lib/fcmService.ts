@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, onMessage, MessagePayload } from 'firebase/messaging';
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -24,16 +24,20 @@ export async function initFCM(): Promise<string | null> {
   const messaging = getMessaging(app);
   const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
-  const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-    serviceWorkerRegistration: registration,
-  });
-
-  return token ?? null;
+  try {
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+    return token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function saveFCMToken(userId: string, token: string): Promise<void> {
-  await supabase.from('profiles').update({ fcm_token: token }).eq('id', userId);
+  const { error } = await supabaseAdmin.from('profiles').update({ fcm_token: token }).eq('id', userId);
+  if (error) throw error;
 }
 
 export function onForegroundMessage(callback: (payload: MessagePayload) => void): () => void {
