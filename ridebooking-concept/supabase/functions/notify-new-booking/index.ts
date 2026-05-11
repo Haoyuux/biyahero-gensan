@@ -14,8 +14,14 @@ async function getAccessToken(): Promise<string> {
   if (tokenCache && now < tokenCache.exp - 60) return tokenCache.token;
 
   const raw = FIREBASE_SERVICE_ACCOUNT.private_key.replace(/\\n/g, '\n');
-  // Extract raw base64 content — strip ALL header/footer/whitespace then reconstruct proper PEM
-  const b64 = raw.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+  // Strip header/footer using flexible regex — handles corrupted dashes/spaces
+  const b64 = raw
+    .replace(/[-\s]*BEGIN\s+PRIVATE\s+KEY[-\s]*/g, '')
+    .replace(/[-\s]*END\s+PRIVATE\s+KEY[-\s]*/g, '')
+    .replace(/\s/g, '');
+  console.log('b64_length:', b64.length);
+  console.log('b64_first20:', JSON.stringify(b64.substring(0, 20)));
+  console.log('b64_all_valid:', /^[A-Za-z0-9+/=]+$/.test(b64));
   const pem = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g)!.join('\n')}\n-----END PRIVATE KEY-----`;
   const privateKey = await importPKCS8(pem, 'RS256');
 
