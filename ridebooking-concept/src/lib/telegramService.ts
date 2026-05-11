@@ -19,7 +19,11 @@ const TIER_LABEL: Record<string, string> = {
 export async function sendRideRequestToTelegram(
   payload: RideRequestPayload,
 ): Promise<void> {
-  if (!BOT_TOKEN || !CHAT_ID) return;
+  console.log("[Telegram] token set:", !!BOT_TOKEN, "chat set:", !!CHAT_ID);
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.warn("[Telegram] Missing env vars — skipping");
+    return;
+  }
 
   const { passengerName, pickup, dropoff, tier, totalFare, rideId } = payload;
   const tierLabel = TIER_LABEL[tier] ?? tier;
@@ -36,7 +40,7 @@ export async function sendRideRequestToTelegram(
   ].join("\n");
 
   try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -45,7 +49,9 @@ export async function sendRideRequestToTelegram(
         parse_mode: "Markdown",
       }),
     });
-  } catch {
-    // Non-critical — don't block booking flow on Telegram failure
+    const json = await res.json();
+    console.log("[Telegram] response:", JSON.stringify(json));
+  } catch (err) {
+    console.error("[Telegram] fetch error:", err);
   }
 }
