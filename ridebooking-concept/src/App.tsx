@@ -7256,6 +7256,8 @@ const RiderDashboard = ({
                           const newOnline = !isOnline;
                           setIsOnline(newOnline);
                           if (newOnline && currentProfile?.id) {
+                            // Clear cached token to force fresh registration after SW change
+                            localStorage.removeItem('fetch_fcm_token');
                             initFCM()
                               .then((token) => {
                                 if (!token) return;
