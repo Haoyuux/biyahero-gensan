@@ -5633,6 +5633,7 @@ const RiderDashboard = ({
   useEffect(() => {
     if (!isOnline) return;
     return onForegroundMessage((payload) => {
+      alert('FCM foreground received: ' + JSON.stringify(payload.notification));
       const title = payload.notification?.title ?? 'New Booking!';
       const body = payload.notification?.body ?? 'A new booking is available near you.';
       setRiderNotification(`${title} — ${body}`);
