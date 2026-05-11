@@ -2,15 +2,19 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const FIREBASE_SERVICE_ACCOUNT = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')!;
+const FIREBASE_SERVICE_ACCOUNT = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT')!) as Record<string, string>;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-async function getAccessToken(serviceAccount: Record<string, string>): Promise<string> {
+let tokenCache: { token: string; exp: number } | null = null;
+
+async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
+  if (tokenCache && now < tokenCache.exp - 60) return tokenCache.token;
+
   const payload = {
-    iss: serviceAccount.client_email,
-    sub: serviceAccount.client_email,
+    iss: FIREBASE_SERVICE_ACCOUNT.client_email,
+    sub: FIREBASE_SERVICE_ACCOUNT.client_email,
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
@@ -22,7 +26,7 @@ async function getAccessToken(serviceAccount: Record<string, string>): Promise<s
 
   const signingInput = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode(payload)}`;
 
-  const pemKey = serviceAccount.private_key
+  const pemKey = FIREBASE_SERVICE_ACCOUNT.private_key
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
     .replace(/\n/g, '');
@@ -42,8 +46,11 @@ async function getAccessToken(serviceAccount: Record<string, string>): Promise<s
     new TextEncoder().encode(signingInput),
   );
 
-  const jwt = `${signingInput}.${btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+  const bytes = new Uint8Array(signature);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+
+  const jwt = `${signingInput}.${btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -52,11 +59,16 @@ async function getAccessToken(serviceAccount: Record<string, string>): Promise<s
   });
 
   const tokenData = await tokenRes.json();
-  return tokenData.access_token as string;
+  tokenCache = { token: tokenData.access_token as string, exp: now + 3600 };
+  return tokenCache.token;
 }
 
-async function sendFCM(token: string, accessToken: string, projectId: string): Promise<void> {
-  await fetch(
+async function sendFCM(
+  token: string,
+  accessToken: string,
+  projectId: string,
+): Promise<'success' | 'unregistered' | 'error'> {
+  const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
     {
       method: 'POST',
@@ -75,33 +87,48 @@ async function sendFCM(token: string, accessToken: string, projectId: string): P
       }),
     },
   );
+
+  if (res.ok) return 'success';
+
+  const body = await res.json().catch(() => ({}));
+  const status = body?.error?.status as string | undefined;
+  return status === 'UNREGISTERED' ? 'unregistered' : 'error';
 }
 
 Deno.serve(async (_req) => {
   try {
-    const serviceAccount = JSON.parse(FIREBASE_SERVICE_ACCOUNT) as Record<string, string>;
-    const projectId = serviceAccount.project_id;
+    const projectId = FIREBASE_SERVICE_ACCOUNT.project_id;
 
     const { data: riders } = await supabase
       .from('profiles')
-      .select('fcm_token')
+      .select('id, fcm_token')
       .eq('is_online', true)
       .eq('role', 'rider')
       .not('fcm_token', 'is', null);
 
     if (!riders?.length) {
-      return new Response(JSON.stringify({ sent: 0 }), { status: 200 });
+      return new Response(JSON.stringify({ attempted: 0, succeeded: 0, failed: 0 }), { status: 200 });
     }
 
-    const accessToken = await getAccessToken(serviceAccount);
+    const accessToken = await getAccessToken();
 
-    await Promise.all(
-      riders.map(({ fcm_token }: { fcm_token: string }) =>
-        sendFCM(fcm_token, accessToken, projectId)
-      ),
+    const results = await Promise.all(
+      riders.map(async ({ id, fcm_token }: { id: string; fcm_token: string }) => {
+        const result = await sendFCM(fcm_token, accessToken, projectId);
+        if (result === 'unregistered') {
+          await supabase.from('profiles').update({ fcm_token: null }).eq('id', id);
+        }
+        return result;
+      }),
     );
 
-    return new Response(JSON.stringify({ sent: riders.length }), { status: 200 });
+    const succeeded = results.filter((r) => r === 'success').length;
+    const failed = results.length - succeeded;
+
+    return new Response(
+      JSON.stringify({ attempted: riders.length, succeeded, failed }),
+      { status: 200 },
+    );
   } catch (err) {
     console.error('notify-new-booking error:', err);
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
