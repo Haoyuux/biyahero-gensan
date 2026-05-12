@@ -14,8 +14,11 @@ export default function App() {
   const { session, profile, loading, signOut, refetchProfile } = useAuth();
 
   useEffect(() => {
+    const hasAuthCode = (url: string) =>
+      /[?&]code=[^&]+/.test(url) && !url.includes('error=');
+
     const handleUrl = async ({ url }: { url: string }) => {
-      if (url.includes('code=')) {
+      if (hasAuthCode(url)) {
         await supabase.auth.exchangeCodeForSession(url);
       }
     };

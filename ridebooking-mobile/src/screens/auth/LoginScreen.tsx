@@ -4,7 +4,10 @@ import {
   Alert, ActivityIndicator, TextInput, Platform,
 } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../../lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
@@ -16,7 +19,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const redirectTo = Linking.createURL('auth');
-      console.log('[AUTH] redirectTo:', redirectTo);
+      console.log('[AUTH] redirectTo (add this exact URL to Supabase allowed list):', redirectTo);
 
       if (Platform.OS === 'web') {
         await supabase.auth.signInWithOAuth({
@@ -30,7 +33,11 @@ export default function LoginScreen() {
         });
         if (error || !data.url) throw error ?? new Error('No OAuth URL');
         console.log('[AUTH] oauth url:', data.url);
-        await Linking.openURL(data.url);
+
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (result.type === 'success') {
+          await supabase.auth.exchangeCodeForSession(result.url);
+        }
       }
     } catch (e: any) {
       Alert.alert('Sign in failed', e?.message ?? 'Something went wrong.');
