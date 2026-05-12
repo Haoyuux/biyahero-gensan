@@ -12,7 +12,9 @@
       "Bash(git -C \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\" diff HEAD -- ridebooking-concept/src/App.tsx)",
       "Bash(findstr /n \"onForegroundMessage\" \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-concept\\\\src\\\\App.tsx\")",
       "Bash(Select-String -Path \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-concept\\\\src\\\\App.tsx\" -Pattern \"onForegroundMessage\")",
-      "Bash(Select-Object -First 5)"
+      "Bash(Select-Object -First 5)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-concept\\\\src\" -Recurse)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }
