@@ -192,6 +192,8 @@ import {
   type Voucher,
   type VoucherDiscountType,
 } from "@/src/lib/voucherService";
+import { initFCM, saveFCMToken, onForegroundMessage, clearFCMToken } from '@/src/lib/fcmService';
+import { sendRideRequestToTelegram } from '@/src/lib/telegramService';
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
@@ -1355,7 +1357,7 @@ const BlockedScreen = ({ profile }: { profile: Profile }) => {
 
         {/* Sign Out */}
         <button
-          onClick={() => signOut()}
+          onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
           className="w-full bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white font-semibold py-[14px] rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-150 border border-white/[0.06]"
         >
           <LogOut size={16} />
@@ -1941,7 +1943,7 @@ const UserProfileScreen = ({
               </button>
             )}
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
               className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
             >
               <LogOut size={13} /> Sign out
@@ -2570,6 +2572,8 @@ const UserApp = ({
   const completionDataRef = React.useRef({
     pickup: "",
     dropoff: "",
+    pickupCoords: null as [number, number] | null,
+    destinationCoords: null as [number, number] | null,
     fareBreakdown: null as FareBreakdown | null,
     selectedUserVoucher: null as UserVoucher | null,
     voucherDiscount: 0,
@@ -2581,6 +2585,8 @@ const UserApp = ({
   completionDataRef.current = {
     pickup,
     dropoff,
+    pickupCoords,
+    destinationCoords,
     fareBreakdown,
     selectedUserVoucher,
     voucherDiscount,
@@ -2641,8 +2647,8 @@ const UserApp = ({
 
   // Orchestration loop: broadcasts to top 5 (or more) nearest riders simultaneously
   useEffect(() => {
-    if (step !== "searching" || pendingRider) {
-      if (step !== "searching") pendingRequestRef.current = null;
+    if (step !== "searching") {
+      pendingRequestRef.current = null;
       return;
     }
 
@@ -2669,7 +2675,7 @@ const UserApp = ({
     broadcastCycle();
     const interval = setInterval(broadcastCycle, 4000);
     return () => clearInterval(interval);
-  }, [step, currentRideId, targetLimit, pendingRider]);
+  }, [step, currentRideId, targetLimit]);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -2947,15 +2953,21 @@ const UserApp = ({
 
     channel.on("broadcast", { event: "RIDE_ACCEPTED" }, (payload) => {
       if (payload.payload.rideId === currentRideId) {
-        setPendingRider(payload.payload.rider);
-        showNotification("A rider accepted! Review details to confirm.");
+        const rider = payload.payload.rider;
+        setActiveRider(rider);
+        setStep("matched");
+        supabase.channel("rides").send({
+          type: "broadcast",
+          event: "USER_CONFIRMED_RIDER",
+          payload: { rideId: currentRideId },
+        });
         pushNotification(
           "Rider found! 🛵",
-          "Review driver details and confirm your booking.",
+          `${rider?.first_name || rider?.full_name || "Your rider"} is on the way.`,
         );
         pushAppNotification(
-          "Rider found! 🛵",
-          "Tap to review and confirm your driver.",
+          "Rider on the way 🛵",
+          "Your rider is heading to you now.",
         );
       }
     });
@@ -3026,6 +3038,10 @@ const UserApp = ({
               : null,
             pickup_label: d.pickup,
             dropoff_label: d.dropoff,
+            pickup_lat: d.pickupCoords?.[0] ?? null,
+            pickup_lng: d.pickupCoords?.[1] ?? null,
+            dropoff_lat: d.destinationCoords?.[0] ?? null,
+            dropoff_lng: d.destinationCoords?.[1] ?? null,
             fare: Math.max(
               0,
               (d.fareBreakdown?.totalFare ?? 0) - (d.voucherDiscount ?? 0),
@@ -3490,6 +3506,7 @@ const UserApp = ({
                   <button
                     onClick={() => {
                       setShowMenu(false);
+                      if (currentProfile?.id) clearFCMToken(currentProfile.id).catch(console.error);
                       signOut();
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-colors text-red-500 font-normal text-sm"
@@ -3828,6 +3845,18 @@ const UserApp = ({
                     setVoucherDiscount(discount);
                     setIsBooking(true);
 
+                    sendRideRequestToTelegram({
+                      passengerName:
+                        `${currentProfile.first_name || ""} ${currentProfile.last_name || ""}`.trim() ||
+                        currentProfile.full_name ||
+                        "Passenger",
+                      pickup,
+                      dropoff,
+                      tier: selectedRide,
+                      totalFare: breakdown.totalFare,
+                      rideId,
+                    });
+
                     // Fetch online approved riders and sort by distance to pickup
                     const pickupLL = pickupCoords || deviceLocation;
                     let priorityRiderIds: string[] = [];
@@ -3883,7 +3912,7 @@ const UserApp = ({
                     // Store payload so the re-broadcast interval can keep sending it
                     pendingRequestRef.current = requestPayload;
                     // Persist pending ride so riders coming online later can see it via DB
-                    const { error: insertError } = await supabase
+                    const { error: insertError } = await supabaseAdmin
                       .from("rides")
                       .insert({
                         id: rideId,
@@ -3929,9 +3958,7 @@ const UserApp = ({
               {step === "searching" && (
                 <SearchingPanel
                   key="search"
-                  onCancel={
-                    pendingRider ? undefined : () => handleCancelBooking(true)
-                  }
+                  onCancel={() => handleCancelBooking(true)}
                 />
               )}
               {step === "matched" && (
@@ -3971,43 +3998,6 @@ const UserApp = ({
           </div>
         </div>
 
-        {pendingRider && (
-          <RiderConfirmModal
-            rider={pendingRider}
-            rideId={currentRideId}
-            onAccept={() => {
-              setActiveRider(pendingRider);
-              setPendingRider(null);
-              setStep("matched");
-              if (currentRideId) {
-                supabase.channel("rides").send({
-                  type: "broadcast",
-                  event: "USER_CONFIRMED_RIDER",
-                  payload: { rideId: currentRideId },
-                });
-              }
-              pushAppNotification(
-                "Rider on the way 🛵",
-                "Your rider is heading to you now.",
-              );
-            }}
-            onCancel={() => {
-              if (currentRideId) {
-                supabase.channel("rides").send({
-                  type: "broadcast",
-                  event: "CANCEL_RIDE",
-                  payload: { rideId: currentRideId },
-                });
-                supabase
-                  .from("rides")
-                  .update({ status: "cancelled" })
-                  .eq("id", currentRideId);
-              }
-              setPendingRider(null);
-              handleCancelBooking();
-            }}
-          />
-        )}
 
         {/* Map — full screen on mobile (behind panels), fills right on desktop */}
         <div className="absolute inset-0 md:relative md:inset-auto md:flex-1 md:min-h-0 md:order-2">
@@ -4413,7 +4403,7 @@ const RiderProfileScreen = ({
               </button>
             )}
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
               className="bg-black/30 hover:bg-red-500/70 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-normal flex items-center gap-1.5 transition-colors"
             >
               <LogOut size={13} /> Sign out
@@ -5661,6 +5651,15 @@ const RiderDashboard = ({
     setTimeout(() => setRiderNotification(null), 3500);
   };
   const [isOnline, setIsOnline] = useState(false);
+  useEffect(() => {
+    if (!isOnline) return;
+    return onForegroundMessage((payload) => {
+      const title = payload.notification?.title ?? 'New Booking!';
+      const body = payload.notification?.body ?? 'A new booking is available near you.';
+      setRiderNotification(`${title} — ${body}`);
+      setTimeout(() => setRiderNotification(null), 3500);
+    });
+  }, [isOnline]);
   const [riderLocationDenied, setRiderLocationDenied] = useState(false);
   const [hasRequest, setHasRequest] = useState(false);
   // ── Lazy-initialise rider ride state from localStorage (avoids useEffect race) ──
@@ -5763,6 +5762,7 @@ const RiderDashboard = ({
   const [riderCurrentLoc, setRiderCurrentLoc] = useState<
     [number, number] | null
   >(null);
+  const riderCurrentLocRef = React.useRef<[number, number] | null>(null);
   // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
   const pendingTimersRef = React.useRef<
     Map<string, ReturnType<typeof setTimeout>>
@@ -6121,6 +6121,7 @@ const RiderDashboard = ({
           pos.coords.longitude,
         ];
         setRiderCurrentLoc(loc);
+        riderCurrentLocRef.current = loc;
         const elapsed = Date.now() - lastWriteTime;
         const moved =
           lastWrittenLat != null && lastWrittenLng != null
@@ -6197,9 +6198,19 @@ const RiderDashboard = ({
       return;
     }
 
+    const RIDER_SEARCH_RADIUS_KM = 10;
+
     // Schedule request immediately (UserApp orchestrates the sequence delay now)
     const scheduleRequest = (req: any) => {
       if (usedRideIdsRef.current.has(req.rideId)) return;
+
+      // Ignore requests where pickup is beyond the search radius
+      const myLoc = riderCurrentLocRef.current;
+      const pickupCoords = req.pickup?.coords;
+      if (myLoc && pickupCoords) {
+        const distKm = haversineKm(myLoc[0], myLoc[1], pickupCoords[0], pickupCoords[1]);
+        if (distKm > RIDER_SEARCH_RADIUS_KM) return;
+      }
 
       setIncomingRequests((prev) => {
         if (prev.some((r: any) => r.rideId === req.rideId)) return prev;
@@ -6551,11 +6562,9 @@ const RiderDashboard = ({
           </div>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             <div
-              className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-bold tracking-wide ${waitingForUserConfirm ? "bg-amber-100 text-amber-700" : isOnline && !requestAccepted ? "bg-emerald-50 text-emerald-700" : requestAccepted ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-500"}`}
+              className={`px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-bold tracking-wide ${isOnline && !requestAccepted ? "bg-emerald-50 text-emerald-700" : requestAccepted ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-500"}`}
             >
-              {waitingForUserConfirm
-                ? "PENDING"
-                : requestAccepted
+              {requestAccepted
                   ? "ON TRIP"
                   : isOnline
                     ? "ONLINE"
@@ -6602,7 +6611,7 @@ const RiderDashboard = ({
               )}
             </button>
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (currentProfile?.id) clearFCMToken(currentProfile.id).catch(console.error); signOut(); }}
               className="hidden md:flex w-9 h-9 rounded-xl items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 transition-colors"
             >
               <LogOut size={16} />
@@ -6712,30 +6721,26 @@ const RiderDashboard = ({
                 exit={{ opacity: 0, y: -10 }}
               >
                 <div
-                  className={`${waitingForUserConfirm ? "bg-amber-500" : "bg-gray-950"} text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20`}
+                  className="bg-gray-950 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-black/20"
                 >
                   <div
-                    className={`w-2 h-2 rounded-full ${waitingForUserConfirm ? "bg-white animate-pulse" : "bg-emerald-400 animate-pulse"} shrink-0`}
+                    className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-normal text-[13px] leading-tight">
-                      {waitingForUserConfirm
-                        ? "Waiting for passenger..."
-                        : "Ongoing trip"}
+                      Ongoing trip
                     </p>
                     <p className="text-white/70 text-[11px] font-medium truncate mt-0.5">
                       {currentRequest.user?.first_name || "Passenger"} ·{" "}
                       {currentRequest.pickup?.label}
                     </p>
                   </div>
-                  {!waitingForUserConfirm && (
-                    <button
-                      onClick={() => setShowActiveRide(true)}
-                      className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-normal text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
-                    >
-                      View
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setShowActiveRide(true)}
+                    className="shrink-0 bg-white/10 hover:bg-white/20 text-white font-normal text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    View
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -7281,7 +7286,19 @@ const RiderDashboard = ({
                               (remittanceRequired && hasPendingRemit))
                           )
                             return;
-                          setIsOnline((prev) => !prev);
+                          const newOnline = !isOnline;
+                          setIsOnline(newOnline);
+                          if (newOnline && currentProfile?.id) {
+                            // Clear cached token to force fresh registration after SW change
+                            localStorage.removeItem('fetch_fcm_token');
+                            initFCM()
+                              .then((token) => {
+                                if (!token) return;
+                                localStorage.setItem('fetch_fcm_token', token);
+                                saveFCMToken(currentProfile.id, token);
+                              })
+                              .catch(console.error);
+                          }
                         }}
                         className={`w-full py-[15px] rounded-xl font-normal text-[15px] transition-colors ${
                           isOnline
@@ -7397,17 +7414,23 @@ const RiderDashboard = ({
                           </div>
                         </div>
                         <div className="space-y-2 mb-4 bg-gray-50 rounded-xl p-3.5 border border-gray-100">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-1.5 h-1.5 bg-gray-900 rounded-full shrink-0" />
-                            <span className="text-[13px] text-gray-600 truncate">
-                              {currentRequest?.pickup?.label}
-                            </span>
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-1.5 h-1.5 bg-gray-900 rounded-full shrink-0 mt-1.5" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Pick up</p>
+                              <span className="text-[13px] text-gray-600 truncate block">
+                                {currentRequest?.pickup?.label}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0" />
-                            <span className="text-[13px] text-gray-600 truncate">
-                              {currentRequest?.dropoff?.label}
-                            </span>
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0 mt-1.5" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-0.5">Drop off</p>
+                              <span className="text-[13px] text-gray-600 truncate block">
+                                {currentRequest?.dropoff?.label}
+                              </span>
+                            </div>
                           </div>
                           {(() => {
                             const fareKm =
@@ -7429,8 +7452,8 @@ const RiderDashboard = ({
                                     : null;
                             if (d === null) return null;
                             return (
-                              <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200">
-                                <span className="text-[11px] font-semibold text-gray-400">
+                              <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-200">
+                                <span className="text-[12px] font-bold text-gray-700">
                                   {d < 1
                                     ? (d * 1000).toFixed(0) + " m"
                                     : d.toFixed(1) + " km"}{" "}
@@ -7560,8 +7583,8 @@ const RiderDashboard = ({
                               usedRideIdsRef.current.add(rid);
                               myAcceptedRideIdRef.current = rid;
                               setRequestAccepted(true);
-                              setWaitingForUserConfirm(true);
                               setHasRequest(false);
+                              setShowActiveRide(true);
                               supabase.channel("rides").send({
                                 type: "broadcast",
                                 event: "RIDE_ACCEPTED",
@@ -11194,6 +11217,11 @@ const AdminDashboard = ({
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(10);
   const [financePage, setFinancePage] = useState(1);
+  const [selectedFinanceRide, setSelectedFinanceRide] = useState<any | null>(null);
+  const [financeRidePassenger, setFinanceRidePassenger] = useState<any | null>(null);
+  const [financeMapRoute, setFinanceMapRoute] = useState<[number, number][] | null>(null);
+  const [financeMapLoading, setFinanceMapLoading] = useState(false);
+  const [showFinanceMap, setShowFinanceMap] = useState(false);
   const [userDetailModal, setUserDetailModal] = useState<Profile | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [userStatusToggling, setUserStatusToggling] = useState<string | null>(
@@ -11549,7 +11577,7 @@ const AdminDashboard = ({
       lastWeekStart.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from("rides")
-        .select("id, fare, rider_name, rider_avatar, completed_at")
+        .select("id, fare, rider_name, rider_avatar, rider_id, user_id, vehicle_info, pickup_label, dropoff_label, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_breakdown, ride_type, original_fare, final_fare, voucher_code, voucher_discount, completed_at")
         .eq("status", "completed")
         .order("completed_at", { ascending: false })
         .limit(200);
@@ -11716,7 +11744,7 @@ const AdminDashboard = ({
 
         <div className="p-3 border-t border-white/[0.06]">
           <button
-            onClick={() => signOut()}
+            onClick={() => { if (profile?.id) clearFCMToken(profile.id).catch(console.error); signOut(); }}
             className="w-full flex items-center justify-center gap-2 bg-white/[0.05] hover:bg-red-500/10 text-white/40 hover:text-red-400 py-2.5 rounded-xl transition-colors font-semibold text-[13px]"
           >
             <LogOut size={14} /> Sign Out
@@ -13239,17 +13267,19 @@ const AdminDashboard = ({
                           </p>
                         )}
                       </div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100">
-                        <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
-                          Platform Revenue (20%)
-                        </p>
-                        <h3 className="text-3xl font-bold tracking-tight text-gray-950 mb-3">
-                          {fmt(Math.round(gross * 0.2))}
-                        </h3>
-                        <p className="text-[12px] text-gray-400 font-semibold">
-                          This week: {fmt(Math.round(thisWeek * 0.2))}
-                        </p>
-                      </div>
+                      {settings?.remittance_enabled && (
+                        <div className="bg-white p-5 rounded-2xl border border-gray-100">
+                          <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
+                            Platform Revenue (20%)
+                          </p>
+                          <h3 className="text-3xl font-bold tracking-tight text-gray-950 mb-3">
+                            {fmt(Math.round(gross * 0.2))}
+                          </h3>
+                          <p className="text-[12px] text-gray-400 font-semibold">
+                            This week: {fmt(Math.round(thisWeek * 0.2))}
+                          </p>
+                        </div>
+                      )}
                       <div className="bg-white p-5 rounded-2xl border border-gray-100">
                         <p className="text-[11px] font-normal text-gray-400 uppercase tracking-widest mb-3">
                           This Week Gross
@@ -13301,7 +13331,14 @@ const AdminDashboard = ({
                                 {paginatedF.map((t: any) => (
                                   <div
                                     key={t.id}
-                                    className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/60 transition-colors"
+                                    onClick={() => {
+                                      setSelectedFinanceRide(t);
+                                      setFinanceRidePassenger(null);
+                                      if (t.user_id) {
+                                        supabase.from("profiles").select("first_name, last_name, full_name, avatar_url").eq("id", t.user_id).single().then(({ data }) => setFinanceRidePassenger(data));
+                                      }
+                                    }}
+                                    className="px-5 py-4 flex items-center justify-between hover:bg-gray-50/60 transition-colors cursor-pointer"
                                   >
                                     <div className="flex items-center gap-3.5">
                                       <div className="w-8 h-8 bg-gray-100 rounded-xl overflow-hidden shrink-0">
@@ -13341,9 +13378,11 @@ const AdminDashboard = ({
                                       <p className="font-normal text-sm text-gray-900">
                                         ₱{t.fare}
                                       </p>
-                                      <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-                                        Fee: ₱{Math.round((t.fare || 0) * 0.2)}
-                                      </p>
+                                      {settings?.remittance_enabled && (
+                                        <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                                          Fee: ₱{Math.round((t.fare || 0) * 0.2)}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 ))}
@@ -16988,6 +17027,195 @@ const AdminDashboard = ({
 
         {activeTab === "vouchers" && <VouchersTab profile={profile} />}
       </div>
+
+      {/* Ride Detail Modal */}
+      <AnimatePresence>
+        {selectedFinanceRide && (() => {
+          const r = selectedFinanceRide;
+          const fb = r.fare_breakdown as any;
+          const passenger = financeRidePassenger;
+          const passengerName = passenger
+            ? (`${passenger.first_name || ""} ${passenger.last_name || ""}`.trim() || passenger.full_name || "Passenger")
+            : "Passenger";
+          const tierLabel: Record<string, string> = { moto: "Motorcycle", eco: "Economy", premium: "Premium" };
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); setShowFinanceMap(false); setFinanceMapRoute(null); }}
+              className="fixed inset-0 z-[500] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            >
+              <motion.div
+                initial={{ y: 60, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 60, opacity: 0 }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
+                  <div>
+                    <p className="font-bold text-[15px] text-gray-900">Ride Details</p>
+                    <p className="text-[11px] text-gray-400 font-normal mt-0.5">{r.id}</p>
+                  </div>
+                  <button onClick={() => { setSelectedFinanceRide(null); setFinanceRidePassenger(null); setShowFinanceMap(false); setFinanceMapRoute(null); }} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto max-h-[70vh]">
+                  {/* Route */}
+                  <div className="border-b border-gray-50">
+                    <div className="px-5 py-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Route</p>
+                        {r.pickup_lat && r.dropoff_lat && (
+                          <button
+                            onClick={async () => {
+                              if (showFinanceMap) { setShowFinanceMap(false); return; }
+                              setShowFinanceMap(true);
+                              if (!financeMapRoute) {
+                                setFinanceMapLoading(true);
+                                try {
+                                  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${r.pickup_lng},${r.pickup_lat};${r.dropoff_lng},${r.dropoff_lat}?overview=full&geometries=geojson`);
+                                  const json = await res.json();
+                                  const coords: [number, number][] = json.routes?.[0]?.geometry?.coordinates?.map((c: number[]) => [c[1], c[0]]) ?? [];
+                                  setFinanceMapRoute(coords.length ? coords : null);
+                                } catch { setFinanceMapRoute(null); }
+                                setFinanceMapLoading(false);
+                              }
+                            }}
+                            className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            <MapPin size={11} />
+                            {showFinanceMap ? "Hide Map" : "View on Map"}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 mt-1 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-gray-400 font-medium">Pickup</p>
+                            <p className="text-sm font-semibold text-gray-900">{r.pickup_label || "—"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                          <div>
+                            <p className="text-[10px] text-gray-400 font-medium">Dropoff</p>
+                            <p className="text-sm font-semibold text-gray-900">{r.dropoff_label || "—"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {showFinanceMap && r.pickup_lat && r.dropoff_lat && (
+                      <div className="h-52 w-full relative">
+                        {financeMapLoading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+                            <p className="text-sm text-gray-400">Loading map…</p>
+                          </div>
+                        )}
+                        <MapContainer
+                          key={`${r.id}-map`}
+                          center={[r.pickup_lat, r.pickup_lng] as [number, number]}
+                          zoom={14}
+                          style={{ height: "100%", width: "100%" }}
+                          zoomControl={false}
+                          attributionControl={false}
+                        >
+                          <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                          {(() => {
+                            const FinanceMapFit = () => {
+                              const map = useMap();
+                              useEffect(() => {
+                                map.fitBounds([[r.pickup_lat, r.pickup_lng], [r.dropoff_lat, r.dropoff_lng]], { padding: [30, 30] });
+                              }, [map]);
+                              return null;
+                            };
+                            return <FinanceMapFit />;
+                          })()}
+                          <Marker position={[r.pickup_lat, r.pickup_lng] as [number, number]} icon={new (window as any).L.DivIcon({ className: "", html: '<div style="width:12px;height:12px;border-radius:50%;background:#3b82f6;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>', iconSize: [12, 12], iconAnchor: [6, 6] })} />
+                          <Marker position={[r.dropoff_lat, r.dropoff_lng] as [number, number]} icon={new (window as any).L.DivIcon({ className: "", html: '<div style="width:12px;height:12px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>', iconSize: [12, 12], iconAnchor: [6, 6] })} />
+                          {financeMapRoute && <Polyline positions={financeMapRoute} color="#3b82f6" weight={3} opacity={0.8} />}
+                        </MapContainer>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ride Info */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Ride Info</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-medium">Type</p>
+                        <p className="text-sm font-semibold text-gray-900">{tierLabel[r.ride_type] || r.ride_type || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-medium">Completed</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {r.completed_at ? new Date(r.completed_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Passenger */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Passenger</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                        {passenger?.avatar_url
+                          ? <img src={passenger.avatar_url} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={16} /></div>}
+                      </div>
+                      <p className="font-semibold text-sm text-gray-900">{passengerName}</p>
+                    </div>
+                  </div>
+
+                  {/* Rider */}
+                  <div className="px-5 py-4 border-b border-gray-50">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Rider</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                        {r.rider_avatar
+                          ? <img src={r.rider_avatar} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={16} /></div>}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-gray-900">{r.rider_name || "—"}</p>
+                        {r.vehicle_info && <p className="text-[11px] text-gray-400 font-normal">{r.vehicle_info}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fare Breakdown */}
+                  <div className="px-5 py-4">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Fare Breakdown</p>
+                    <div className="space-y-2">
+                      {fb && <>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Base Fare</span><span className="font-semibold text-gray-900">₱{fb.baseFare?.toFixed(2) ?? "—"}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Distance Fee</span><span className="font-semibold text-gray-900">₱{fb.distanceFee?.toFixed(2) ?? "—"}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Time Fee</span><span className="font-semibold text-gray-900">₱{fb.timeFee?.toFixed(2) ?? "—"}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500 font-normal">Booking Fee</span><span className="font-semibold text-gray-900">₱{fb.bookingFee?.toFixed(2) ?? "—"}</span></div>
+                      </>}
+                      {r.voucher_code && (
+                        <div className="flex justify-between text-sm"><span className="text-emerald-600 font-normal">Voucher ({r.voucher_code})</span><span className="font-semibold text-emerald-600">−₱{(r.voucher_discount || 0).toFixed(2)}</span></div>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-gray-100">
+                        <span className="font-bold text-gray-900">Total Paid</span>
+                        <span className="font-bold text-gray-900">₱{(r.final_fare ?? r.fare ?? 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 };

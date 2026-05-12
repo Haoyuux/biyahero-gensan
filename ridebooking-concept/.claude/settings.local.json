@@ -23,6 +23,11 @@
       "PowerShell($content = Get-Content \"C:\\\\Users\\\\MYPC\\\\.claude\\\\projects\\\\C--Files-Project-fetch-fetch-gensan-ridebooking-concept\\\\e39683a4-714c-48c8-9353-145893f48f97.jsonl\" -Tail 30; $content | ForEach-Object { $_ | ConvertFrom-Json | Select-Object -Property role, @{N='text';E={if \\($_.content -is [array]\\) { \\($_.content | Where-Object {$_.type -eq 'text'} | Select-Object -First 1\\).text } else { $_.content }}} } | ForEach-Object { if \\($_.text\\) { Write-Output \"[$\\($_.role\\)]: $\\($_.text.Substring\\(0, [Math]::Min\\(400, $_.text.Length\\)\\)\\)\" } })",
       "PowerShell($lines = Get-Content \"C:\\\\Users\\\\MYPC\\\\.claude\\\\projects\\\\C--Files-Project-fetch-fetch-gensan-ridebooking-concept\\\\e39683a4-714c-48c8-9353-145893f48f97.jsonl\" -Tail 50; Write-Output \"Line count: $\\($lines.Count\\)\"; $lines | Select-Object -Last 5 | ForEach-Object { Write-Output $_.Substring\\(0, [Math]::Min\\(500, $_.Length\\)\\) })",
       "PowerShell(git *)"
+      "Bash(findstr /n \"onForegroundMessage\" \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-concept\\\\src\\\\App.tsx\")",
+      "Bash(Select-String -Path \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-concept\\\\src\\\\App.tsx\" -Pattern \"onForegroundMessage\")",
+      "Bash(Select-Object -First 5)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-concept\\\\src\" -Recurse)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }
