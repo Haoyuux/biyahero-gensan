@@ -2,6 +2,32 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import * as Crypto from 'expo-crypto';
+
+// Polyfill WebCrypto so Supabase PKCE uses SHA-256 instead of plain
+if (typeof global.crypto === 'undefined' || !global.crypto.subtle) {
+  (global as any).crypto = {
+    getRandomValues: (array: Uint8Array) => {
+      const bytes = Crypto.getRandomBytes(array.length);
+      array.set(bytes);
+      return array;
+    },
+    subtle: {
+      digest: async (_algorithm: string, data: ArrayBuffer) => {
+        const base64 = Buffer.from(data).toString('base64');
+        const hash = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          base64,
+          { encoding: Crypto.CryptoEncoding.BASE64 },
+        );
+        const binary = atob(hash);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes.buffer;
+      },
+    },
+  };
+}
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
