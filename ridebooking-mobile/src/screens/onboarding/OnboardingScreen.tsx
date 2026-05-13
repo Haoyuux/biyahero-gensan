@@ -12,7 +12,7 @@ export default function OnboardingScreen() {
   const [firstName, setFirstName] = useState(profile.first_name ?? '');
   const [lastName, setLastName] = useState(profile.last_name ?? '');
   const [phone, setPhone] = useState(profile.phone ?? '');
-  const [dob, setDob] = useState(profile.date_of_birth ?? '');
+  const [dob, setDob] = useState(profile.birthday ?? '');
   const [sex, setSex] = useState(profile.sex ?? '');
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +27,7 @@ export default function OnboardingScreen() {
       last_name: lastName.trim(),
       full_name: `${firstName.trim()} ${lastName.trim()}`,
       phone: phone.trim() || null,
-      date_of_birth: dob.trim() || null,
+      birthday: dob.trim() || null,
       sex: sex.trim() || null,
       profile_completed: true,
       onboarded: true,

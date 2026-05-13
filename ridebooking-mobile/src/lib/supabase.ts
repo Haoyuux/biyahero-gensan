@@ -72,7 +72,7 @@ export interface Profile {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
-  date_of_birth: string | null;
+  birthday: string | null;
   rider_status: RiderStatus | null;
   is_online: boolean;
   last_lat: number | null;
