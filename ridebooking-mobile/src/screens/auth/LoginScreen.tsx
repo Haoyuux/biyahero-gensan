@@ -25,9 +25,10 @@ export default function LoginScreen() {
           options: { redirectTo },
         });
       } else {
-        // Local dev redirect — phone accesses the Metro dev server on the same WiFi.
-        // Update the IP when your network changes (check metro output: "exp://IP:8082").
-        const redirectTo = 'http://10.50.66.114:8082/auth';
+        // Use the same redirectTo as web — already proven to work with Supabase.
+        // openAuthSessionAsync intercepts at navigation level before the page loads,
+        // so the phone never actually needs to reach localhost:8082.
+        const redirectTo = 'http://localhost:8082/auth';
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
