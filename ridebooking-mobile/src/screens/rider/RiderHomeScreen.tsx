@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
-  useWindowDimensions,
+  useWindowDimensions, Image,
 } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -497,9 +497,13 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
           <View style={styles.handle} />
           <View style={styles.riderRow}>
             <View style={styles.driverAvatarPro}>
-              <Text style={[styles.driverAvatarProText, { fontSize: fs(20) }]}>
-                {(profile.first_name?.[0] ?? 'R').toUpperCase()}
-              </Text>
+              {profile.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.driverAvatarImg} />
+              ) : (
+                <Text style={[styles.driverAvatarProText, { fontSize: fs(20) }]}>
+                  {(profile.first_name?.[0] ?? 'R').toUpperCase()}
+                </Text>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.driverName, { fontSize: fs(15) }]} numberOfLines={1}>
@@ -555,7 +559,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
       {/* Profile button — top right */}
       <TouchableOpacity style={styles.profileBtn} onPress={() => setShowProfileMenu(true)} activeOpacity={0.85}>
-        <Text style={styles.profileBtnText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+        {profile.avatar_url ? (
+          <Image source={{ uri: profile.avatar_url }} style={styles.profileBtnImg} />
+        ) : (
+          <Text style={styles.profileBtnText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+        )}
       </TouchableOpacity>
 
       {/* Profile menu modal */}
@@ -563,7 +571,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         <TouchableOpacity style={styles.profileMenuOverlay} activeOpacity={1} onPress={() => setShowProfileMenu(false)}>
           <View style={styles.profileMenuCard}>
             <View style={styles.profileMenuAvatar}>
-              <Text style={styles.profileMenuAvatarText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+              {profile.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.profileMenuAvatarImg} />
+              ) : (
+                <Text style={styles.profileMenuAvatarText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+              )}
             </View>
             <Text style={styles.profileMenuName}>{profile.first_name} {profile.last_name}</Text>
             <Text style={styles.profileMenuEmail}>{profile.email}</Text>
@@ -670,7 +682,8 @@ const styles = StyleSheet.create({
   riderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   driverAvatar: { width: 48, height: 48, borderRadius: 99, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
   driverAvatarText: { fontSize: 18, fontWeight: '700', color: '#374151' },
-  driverAvatarPro: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center' },
+  driverAvatarPro: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  driverAvatarImg: { width: 48, height: 48, borderRadius: 14 },
   driverAvatarProText: { fontWeight: '700', color: '#fff' },
   driverName: { fontWeight: '700', color: '#030712' },
   driverMeta: { color: '#9ca3af', marginTop: 1 },
@@ -679,7 +692,9 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
+    overflow: 'hidden',
   },
+  profileBtnImg: { width: 44, height: 44, borderRadius: 22 },
   profileBtnText: { fontSize: 17, fontWeight: '700', color: '#fff' },
   profileMenuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'flex-end', paddingTop: 100, paddingRight: 16 },
   profileMenuCard: {
@@ -687,7 +702,8 @@ const styles = StyleSheet.create({
     width: 220, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, elevation: 10,
     alignItems: 'center',
   },
-  profileMenuAvatar: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  profileMenuAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', marginBottom: 10, overflow: 'hidden' },
+  profileMenuAvatarImg: { width: 64, height: 64, borderRadius: 32 },
   profileMenuAvatarText: { fontSize: 22, fontWeight: '700', color: '#fff' },
   profileMenuName: { fontSize: 15, fontWeight: '700', color: '#030712', textAlign: 'center' },
   profileMenuEmail: { fontSize: 12, color: '#9ca3af', marginTop: 2, textAlign: 'center' },
