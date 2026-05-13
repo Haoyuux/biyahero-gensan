@@ -14,16 +14,25 @@ if (typeof global.crypto === 'undefined' || !global.crypto.subtle) {
     },
     subtle: {
       digest: async (_algorithm: string, data: ArrayBuffer) => {
-        const base64 = Buffer.from(data).toString('base64');
-        const hash = await Crypto.digestStringAsync(
+        // Convert ArrayBuffer → string (code verifier is ASCII-safe)
+        const bytes = new Uint8Array(data);
+        let inputStr = '';
+        for (let i = 0; i < bytes.length; i++) {
+          inputStr += String.fromCharCode(bytes[i]);
+        }
+        // Hash with SHA-256 via expo-crypto
+        const hashBase64 = await Crypto.digestStringAsync(
           Crypto.CryptoDigestAlgorithm.SHA256,
-          base64,
+          inputStr,
           { encoding: Crypto.CryptoEncoding.BASE64 },
         );
-        const binary = atob(hash);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        return bytes.buffer;
+        // Convert base64 result → ArrayBuffer
+        const binary = atob(hashBase64);
+        const result = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          result[i] = binary.charCodeAt(i);
+        }
+        return result.buffer;
       },
     },
   };
