@@ -296,6 +296,22 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     } catch { /* ignore */ }
   }, []);
 
+  // Draw route from rider's current position to the user's pickup point (no state side-effects)
+  const drawRiderToPickupRoute = async (riderLat: number, riderLng: number) => {
+    if (!pickupCoords) return;
+    try {
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${pickupCoords.lng},${pickupCoords.lat}?overview=full&geometries=geojson`,
+      );
+      const data = await res.json();
+      if (!data.routes?.[0]) return;
+      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+        ([lng, lat]: [number, number]) => [lat, lng],
+      );
+      mapRef.current?.drawRoute(coords);
+    } catch { /* ignore */ }
+  };
+
   // Toggle drag on step change
   useEffect(() => {
     const canDrag = step === 'home' || step === 'select';
@@ -344,6 +360,9 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       if (payload.rideId !== currentRideId) return;
       setRidePhase('arrived');
       showToast('Your rider has arrived! 🏍️', 'success');
+      // Switch map to show pickup → destination route
+      if (pickupCoords && destinationCoords) fetchRoute(pickupCoords, destinationCoords);
+      if (pickupCoords) mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
     });
     ch.on('broadcast', { event: 'RIDE_CANCELLED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
@@ -1326,6 +1345,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
                 if (rider.last_lat && rider.last_lng) {
                   mapRef.current?.setRiderLocation(rider.last_lat, rider.last_lng);
                   setLastRiderCoords({ lat: rider.last_lat, lng: rider.last_lng });
+                  mapRef.current?.flyTo(rider.last_lat, rider.last_lng, 15);
+                  drawRiderToPickupRoute(rider.last_lat, rider.last_lng);
                 }
                 if (currentRideId) {
                   supabase.channel('rides').send({ type: 'broadcast', event: 'USER_CONFIRMED_RIDER', payload: { rideId: currentRideId } });
