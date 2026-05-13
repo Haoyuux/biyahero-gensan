@@ -11,6 +11,13 @@ import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
 import { supabase, Profile } from '../../lib/supabase';
 import { calculateFare, FareBreakdown, DEFAULT_PRICING, PricingConfig, loadPricingConfigFromDB } from '../../lib/fareService';
 import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
+import {
+  fetchUserVouchers,
+  addVoucherToUser,
+  markVoucherUsed,
+  quoteVoucher,
+  UserVoucher,
+} from '../../lib/voucherService';
 
 type Step = 'home' | 'select' | 'searching' | 'matched' | 'review';
 type TierId = 'moto' | 'eco' | 'premium';
@@ -96,6 +103,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [voucherMsg, setVoucherMsg] = useState('');
+  const [userVouchers, setUserVouchers] = useState<UserVoucher[]>([]);
+  const [selectedVoucherUv, setSelectedVoucherUv] = useState<UserVoucher | null>(null);
 
   // Chat
   const [showChat, setShowChat] = useState(false);
@@ -388,6 +397,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       user_avatar: profile.avatar_url, status: 'pending',
       pickup_label: pickupLabel, dropoff_label: destination,
       fare: finalFare, fare_breakdown: bd, ride_type: selectedTier, request_data: payload,
+      voucher_id: selectedVoucherUv?.voucher_id ?? null,
+      voucher_discount: voucherDiscount,
     });
     supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload });
     setIsBooking(false);
@@ -407,6 +418,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     setShowChat(false); setShowCancelConfirm(false); setMessages([]); setUnreadCount(0);
     setDestination(''); setDestinationCoords(null); setDropoffQuery('');
     setVoucherDiscount(0); setAppliedVoucher(null); setVoucherCode(''); setVoucherMsg('');
+    setSelectedVoucherUv(null); setUserVouchers([]);
     setPendingRider(null); setRiderReviews([]); setShowVehiclePhoto(false); setLastRiderCoords(null);
     mapRef.current?.clearRider(); mapRef.current?.clearRoute(); mapRef.current?.clearDestination();
   };
@@ -424,6 +436,9 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     if (rating === 0) return;
     const fullComment = [selectedTags.join(', '), ratingComment.trim()].filter(Boolean).join('. ');
     if (currentRideId) await supabase.from('rides').update({ rating, comment: fullComment || null }).eq('id', currentRideId);
+    if (selectedVoucherUv && voucherDiscount > 0 && currentRideId) {
+      await markVoucherUsed(selectedVoucherUv.id, currentRideId);
+    }
     setRatingSubmitted(true);
     setTimeout(resetToHome, 1800);
   };
@@ -601,7 +616,15 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
 
           <TouchableOpacity
             style={[styles.primaryBtn, !destinationCoords && styles.primaryBtnInactive]}
-            onPress={() => { if (destinationCoords) setStep('select'); else { setActiveField('dropoff'); setIsExpanded(true); } }}
+            onPress={() => {
+              if (destinationCoords) {
+                setStep('select');
+                fetchUserVouchers(profile.id).then(setUserVouchers);
+              } else {
+                setActiveField('dropoff');
+                setIsExpanded(true);
+              }
+            }}
             activeOpacity={0.85}
           >
             <Text style={[styles.primaryBtnText, !destinationCoords && styles.primaryBtnTextInactive]}>
@@ -1206,21 +1229,86 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
                 style={styles.voucherAddBtn}
                 onPress={async () => {
                   if (!voucherCode.trim()) return;
-                  const { data } = await supabase.from('vouchers').select('*').eq('code', voucherCode.trim()).eq('is_active', true).single();
-                  if (!data) { setVoucherMsg('Voucher not found or expired.'); return; }
-                  const discount = data.discount_value ?? data.discount_amount ?? 0;
-                  setVoucherDiscount(discount);
-                  setAppliedVoucher(voucherCode.trim());
-                  setVoucherMsg(`Voucher applied! Saves ₱${discount}`);
-                  setShowVoucherPicker(false);
+                  const { userVoucher, error } = await addVoucherToUser(profile.id, voucherCode);
+                  if (error) { setVoucherMsg(error); return; }
+                  if (userVoucher) {
+                    setUserVouchers(prev => [userVoucher, ...prev.filter(v => v.id !== userVoucher.id)]);
+                    setVoucherCode('');
+                    setVoucherMsg('Voucher added to your list!');
+                  }
                 }}
               >
                 <Text style={styles.voucherAddBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
             {!!voucherMsg && <Text style={styles.voucherMsgText}>{voucherMsg}</Text>}
+
+            {userVouchers.length > 0 && (
+              <ScrollView style={{ maxHeight: 260, marginTop: 8 }} showsVerticalScrollIndicator={false}>
+                {appliedVoucher && (
+                  <TouchableOpacity
+                    style={styles.voucherListItem}
+                    onPress={() => {
+                      setAppliedVoucher(null);
+                      setVoucherDiscount(0);
+                      setSelectedVoucherUv(null);
+                      setVoucherMsg('');
+                      setShowVoucherPicker(false);
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.voucherListCode}>No voucher</Text>
+                    </View>
+                    {!appliedVoucher && <Text style={styles.voucherListCheck}>✓</Text>}
+                  </TouchableOpacity>
+                )}
+                {userVouchers.map(uv => {
+                  const bd = calculateFare(selectedTier, routeDistance, routeDuration, pricingConfig);
+                  const q = uv.voucher ? quoteVoucher(uv.voucher, bd) : null;
+                  const isSelected = selectedVoucherUv?.id === uv.id;
+                  const isInvalid = !!q?.reason;
+                  return (
+                    <TouchableOpacity
+                      key={uv.id}
+                      style={[styles.voucherListItem, isSelected && styles.voucherListItemSelected, isInvalid && { opacity: 0.5 }]}
+                      onPress={() => {
+                        if (isInvalid || !q || !uv.voucher) return;
+                        setSelectedVoucherUv(uv);
+                        setAppliedVoucher(uv.code);
+                        setVoucherDiscount(q.discount);
+                        setShowVoucherPicker(false);
+                      }}
+                      disabled={isInvalid}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.voucherListCode}>{uv.code}</Text>
+                        <Text style={styles.voucherListDesc}>
+                          {uv.voucher?.discount_type === 'percentage'
+                            ? `${uv.voucher.discount_value}% off`
+                            : `₱${uv.voucher?.discount_value} off`}
+                          {q && !isInvalid ? ` · saves ₱${q.discount}` : ''}
+                        </Text>
+                        {isInvalid && <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 1 }}>{q?.reason}</Text>}
+                      </View>
+                      {isSelected && <Text style={styles.voucherListCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
             {appliedVoucher && (
-              <TouchableOpacity style={styles.removeVoucherBtn} onPress={() => { setAppliedVoucher(null); setVoucherDiscount(0); setVoucherCode(''); setVoucherMsg(''); setShowVoucherPicker(false); }}>
+              <TouchableOpacity
+                style={styles.removeVoucherBtn}
+                onPress={() => {
+                  setAppliedVoucher(null);
+                  setVoucherDiscount(0);
+                  setSelectedVoucherUv(null);
+                  setVoucherCode('');
+                  setVoucherMsg('');
+                  setShowVoucherPicker(false);
+                }}
+              >
                 <Text style={styles.removeVoucherText}>Remove voucher</Text>
               </TouchableOpacity>
             )}
@@ -1601,4 +1689,14 @@ const styles = StyleSheet.create({
   voucherMsgText: { fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 8 },
   removeVoucherBtn: { marginTop: 12, paddingVertical: 14, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center' },
   removeVoucherText: { fontSize: 14, color: '#6b7280', fontWeight: '500' },
+
+  voucherListItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+  },
+  voucherListItemSelected: { backgroundColor: '#ecfdf5' },
+  voucherListCode: { fontSize: 13, fontWeight: '700', color: '#030712' },
+  voucherListDesc: { fontSize: 11, color: '#6b7280', marginTop: 1 },
+  voucherListCheck: { fontSize: 16, color: '#10b981', marginLeft: 8 },
 });
