@@ -4,10 +4,12 @@ import {
   ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../contexts/AuthContext';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const { profile, refetchProfile, signOut } = useProfile();
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(profile.first_name ?? '');
@@ -85,6 +87,11 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Back button */}
+      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
+        <Text style={styles.backBtnText}>← Back to map</Text>
+      </TouchableOpacity>
+
       {/* Avatar + name */}
       <View style={styles.profileHeader}>
         <TouchableOpacity onPress={pickAvatar} style={styles.avatarWrap}>
@@ -269,6 +276,8 @@ const styles = StyleSheet.create({
   rideFare: { fontSize: 15, fontWeight: '700', color: '#030712' },
   statusDot: { width: 8, height: 8, borderRadius: 99 },
 
+  backBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginBottom: 4 },
+  backBtnText: { fontSize: 14, fontWeight: '600', color: '#10b981' },
   signOutBtn: { backgroundColor: '#fff', borderRadius: 16, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
   signOutText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
 });
