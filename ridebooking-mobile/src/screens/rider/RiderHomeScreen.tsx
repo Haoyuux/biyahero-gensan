@@ -65,11 +65,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         : (await Notifications.requestPermissionsAsync()).status;
       if (finalStatus !== 'granted') return;
 
-      const tokenData = await Notifications.getExpoPushTokenAsync();
-      await supabase.from('fcm_tokens').upsert(
-        { rider_id: profile.id, token: tokenData.data, platform: Platform.OS },
-        { onConflict: 'rider_id' },
-      );
+      const { data: tokenData } = await Notifications.getExpoPushTokenAsync();
+      await supabase
+        .from('profiles')
+        .update({ expo_push_token: tokenData })
+        .eq('id', profile.id);
     } catch (e) {
       console.warn('registerPushToken:', e);
     }
@@ -77,7 +77,10 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const unregisterPushToken = async () => {
     try {
-      await supabase.from('fcm_tokens').delete().eq('rider_id', profile.id);
+      await supabase
+        .from('profiles')
+        .update({ expo_push_token: null })
+        .eq('id', profile.id);
     } catch { /* silent */ }
   };
 

@@ -50,4 +50,5 @@ export interface Profile {
   vehicle_image_url: string | null;
   sex: string | null;
   birthday: string | null;
+  expo_push_token: string | null;
 }
