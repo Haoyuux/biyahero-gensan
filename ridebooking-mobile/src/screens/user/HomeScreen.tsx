@@ -18,6 +18,8 @@ import {
   quoteVoucher,
   UserVoucher,
 } from '../../lib/voucherService';
+import { fetchNewsPosts, NewsPost } from '../../lib/newsService';
+import ChatHistoryScreen from './ChatHistoryScreen';
 
 type Step = 'home' | 'select' | 'searching' | 'matched' | 'review';
 type TierId = 'moto' | 'eco' | 'premium';
@@ -59,6 +61,9 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const navigation = useNavigation<any>();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ridesChannel = useRef<any>(null);
+  const broadcastIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const broadcastPayloadRef = useRef<any>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dotAnims = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
   const ringAnims = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
 
@@ -97,9 +102,15 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [activeRider, setActiveRider] = useState<Profile | null>(null);
   const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [ridePhase, setRidePhase] = useState<'going_to_pickup' | 'arrived'>('going_to_pickup');
 
   // Voucher
   const [showVoucherPicker, setShowVoucherPicker] = useState(false);
+  const [showNews, setShowNews] = useState(false);
+  const [newsPosts, setNewsPosts] = useState<NewsPost[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [showChatHistory, setShowChatHistory] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
@@ -113,6 +124,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const chatScrollRef = useRef<ScrollView>(null);
+  const [toast, setToast] = useState<{ msg: string; type: 'info' | 'success' | 'warn' | 'error' } | null>(null);
 
   // Drawer
   const [showDrawer, setShowDrawer] = useState(false);
@@ -120,6 +132,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   // Rider confirm + reviews + vehicle photo
   const [pendingRider, setPendingRider] = useState<Profile | null>(null);
   const [riderReviews, setRiderReviews] = useState<{ rating: number; comment: string | null; user_name: string; completed_at: string | null }[]>([]);
+  const [riderStats, setRiderStats] = useState<{ avgRating: number; rideCount: number } | null>(null);
   const [showVehiclePhoto, setShowVehiclePhoto] = useState(false);
   const [lastRiderCoords, setLastRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -152,6 +165,19 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
 
   const clearRideState = async () => {
     try { await AsyncStorage.removeItem(USER_RIDE_KEY); } catch { /* silent */ }
+  };
+
+  const showToast = (msg: string, type: 'info' | 'success' | 'warn' | 'error' = 'info') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, type });
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  };
+
+  const stopBroadcasting = () => {
+    if (broadcastIntervalRef.current) {
+      clearInterval(broadcastIntervalRef.current);
+      broadcastIntervalRef.current = null;
+    }
   };
 
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
@@ -305,19 +331,33 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     const ch = supabase.channel('rides');
     ch.on('broadcast', { event: 'RIDE_ACCEPTED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
+      stopBroadcasting();
       setPendingRider(payload.rider as Profile);
+      showToast('Rider found! Confirming...', 'success');
     });
     ch.on('broadcast', { event: 'RIDER_LOCATION' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
       mapRef.current?.setRiderLocation(payload.lat, payload.lng);
       setLastRiderCoords({ lat: payload.lat, lng: payload.lng });
     });
+    ch.on('broadcast', { event: 'RIDER_ARRIVED' }, ({ payload }) => {
+      if (payload.rideId !== currentRideId) return;
+      setRidePhase('arrived');
+      showToast('Your rider has arrived! 🏍️', 'success');
+    });
     ch.on('broadcast', { event: 'RIDE_CANCELLED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
-      Alert.alert('Ride cancelled', 'The rider cancelled your booking.');
+      showToast('Rider cancelled. Finding a new rider...', 'warn');
       setActiveRider(null);
+      setRidePhase('going_to_pickup');
       setStep('searching');
       supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', currentRideId);
+      stopBroadcasting();
+      broadcastIntervalRef.current = setInterval(() => {
+        if (broadcastPayloadRef.current) {
+          supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload: broadcastPayloadRef.current });
+        }
+      }, 4000);
     });
     ch.on('broadcast', { event: 'RIDE_COMPLETED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
@@ -335,8 +375,18 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
 
   // Rider reviews
   useEffect(() => {
-    if (!activeRider?.id) { setRiderReviews([]); return; }
+    if (!activeRider?.id) { setRiderReviews([]); setRiderStats(null); return; }
     (async () => {
+      const { data: allRides } = await supabase
+        .from('rides').select('rating')
+        .eq('rider_id', activeRider.id).eq('status', 'completed').not('rating', 'is', null);
+      const rated = allRides ?? [];
+      const avgRating = rated.length > 0
+        ? rated.reduce((s, r) => s + (r.rating ?? 0), 0) / rated.length : 0;
+      const { count: totalRides } = await supabase
+        .from('rides').select('id', { count: 'exact', head: true })
+        .eq('rider_id', activeRider.id).eq('status', 'completed');
+      setRiderStats({ avgRating: Math.round(avgRating * 10) / 10, rideCount: totalRides ?? 0 });
       const { data: rides } = await supabase
         .from('rides')
         .select('rating, comment, completed_at, user_id')
@@ -451,13 +501,21 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       voucher_id: selectedVoucherUv?.voucher_id ?? null,
       voucher_discount: voucherDiscount,
     });
+    broadcastPayloadRef.current = payload;
     supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload });
+    stopBroadcasting();
+    broadcastIntervalRef.current = setInterval(() => {
+      if (broadcastPayloadRef.current) {
+        supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload: broadcastPayloadRef.current });
+      }
+    }, 4000);
     setIsBooking(false);
     setStep('searching');
     saveRideState({ step: 'searching' });
   };
 
   const cancelBooking = async () => {
+    stopBroadcasting();
     if (currentRideId) {
       supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
       await supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
@@ -467,12 +525,14 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   };
 
   const resetToHome = () => {
+    stopBroadcasting();
+    setRidePhase('going_to_pickup');
     setStep('home'); setCurrentRideId(null); setActiveRider(null); setFareBreakdown(null);
     setShowChat(false); setShowCancelConfirm(false); setMessages([]); setUnreadCount(0);
     setDestination(''); setDestinationCoords(null); setDropoffQuery('');
     setVoucherDiscount(0); setAppliedVoucher(null); setVoucherCode(''); setVoucherMsg('');
     setSelectedVoucherUv(null); setUserVouchers([]);
-    setPendingRider(null); setRiderReviews([]); setShowVehiclePhoto(false); setLastRiderCoords(null);
+    setPendingRider(null); setRiderReviews([]); setRiderStats(null); setShowVehiclePhoto(false); setLastRiderCoords(null);
     mapRef.current?.clearRider(); mapRef.current?.clearRoute(); mapRef.current?.clearDestination();
     clearRideState();
   };
@@ -672,13 +732,13 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
           <TouchableOpacity
             style={[styles.primaryBtn, !destinationCoords && styles.primaryBtnInactive]}
             onPress={() => {
-              if (destinationCoords) {
-                setStep('select');
-                fetchUserVouchers(profile.id).then(setUserVouchers);
-              } else {
-                setActiveField('dropoff');
-                setIsExpanded(true);
+              if (!destinationCoords) { setActiveField('dropoff'); setIsExpanded(true); return; }
+              if (!profile.first_name || !profile.last_name || !profile.phone) {
+                Alert.alert('Complete your profile', 'Please add your first name, last name, and phone number before booking.');
+                return;
               }
+              setStep('select');
+              fetchUserVouchers(profile.id).then(setUserVouchers);
             }}
             activeOpacity={0.85}
           >
@@ -837,8 +897,14 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
           <View style={styles.matchedHandle} />
           <View style={styles.matchedHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.matchedStatusLbl}>ON THE WAY</Text>
-              <Text style={styles.matchedEta}>{etaMin ? `Arriving in ${etaMin} min` : 'On the way to pickup'}</Text>
+              <Text style={[styles.matchedStatusLbl, ridePhase === 'arrived' && { color: '#10b981' }]}>
+                {ridePhase === 'arrived' ? 'RIDER ARRIVED' : 'ON THE WAY'}
+              </Text>
+              <Text style={styles.matchedEta}>
+                {ridePhase === 'arrived'
+                  ? 'Your rider has arrived!'
+                  : etaMin ? `Arriving in ${etaMin} min` : 'On the way to pickup'}
+              </Text>
               {(distKm || destination) && <Text style={styles.matchedSub}>{[distKm && `${distKm} km`, destination].filter(Boolean).join(' · ')}</Text>}
             </View>
             <View style={styles.farePill}><Text style={styles.farePillText}>₱{finalFare}</Text></View>
@@ -858,7 +924,11 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
                   <Text style={styles.driverName}>{activeRider.first_name} {activeRider.last_name}</Text>
                   <View style={styles.ratingRow}>
                     <Text style={styles.star}>★</Text>
-                    <Text style={styles.ratingText}>4.9 · 1.2k rides</Text>
+                    <Text style={styles.ratingText}>
+                      {riderStats
+                        ? `${riderStats.avgRating > 0 ? riderStats.avgRating.toFixed(1) : 'New'} · ${riderStats.rideCount} rides`
+                        : '...'}
+                    </Text>
                   </View>
                   {(activeRider.vehicle_make || activeRider.vehicle_plate) && (
                     <Text style={styles.vehiclePlate}>
@@ -953,8 +1023,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
                   <TouchableOpacity style={styles.keepBtn} onPress={() => setShowCancelConfirm(false)}>
                     <Text style={styles.keepBtnText}>Keep Ride</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmCancelBtn} onPress={cancelBooking}>
-                    <Text style={styles.confirmCancelText}>Yes, Cancel</Text>
+                  <TouchableOpacity style={styles.cancelYesBtn} onPress={cancelBooking}>
+                    <Text style={styles.cancelYesText}>Yes, Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1043,9 +1113,14 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   };
 
   const DRAWER_ITEMS = [
-    { icon: '📋', label: 'News & Updates', onPress: () => Alert.alert('Coming soon') },
+    { icon: '📋', label: 'News & Updates', onPress: () => {
+      setShowDrawer(false);
+      setNewsLoading(true);
+      setShowNews(true);
+      fetchNewsPosts().then(posts => { setNewsPosts(posts); setNewsLoading(false); });
+    }},
     { icon: '🔔', label: 'Notifications', onPress: () => Alert.alert('Coming soon') },
-    { icon: '💬', label: 'Messages', onPress: () => Alert.alert('Coming soon') },
+    { icon: '💬', label: 'Messages', onPress: () => { setShowDrawer(false); setShowChatHistory(true); } },
     { icon: '🕐', label: 'Trip History', onPress: () => { setShowDrawer(false); navigation.navigate('Profile'); } },
     { icon: '🏷️', label: 'My Vouchers', onPress: () => { setShowDrawer(false); setShowVoucherPicker(true); } },
     { icon: '👤', label: 'Profile', onPress: () => { setShowDrawer(false); navigation.navigate('Profile'); } },
@@ -1126,6 +1201,17 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       )}
 
       {renderPanel()}
+
+      {toast && (
+        <View style={[styles.toastBanner, {
+          backgroundColor:
+            toast.type === 'success' ? '#10b981' :
+            toast.type === 'warn'    ? '#f59e0b' :
+            toast.type === 'error'   ? '#ef4444' : '#1e293b',
+        }]}>
+          <Text style={styles.toastText}>{toast.msg}</Text>
+        </View>
+      )}
 
       {/* Drawer */}
       <Modal visible={showDrawer} transparent animationType="fade" onRequestClose={() => setShowDrawer(false)}>
@@ -1371,6 +1457,64 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* News Modal */}
+      <Modal visible={showNews} animationType="slide" onRequestClose={() => setShowNews(false)}>
+        <View style={styles.newsContainer}>
+          <View style={styles.newsHeader}>
+            <TouchableOpacity onPress={() => setShowNews(false)} style={styles.newsCloseBtn}>
+              <Text style={styles.newsCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.newsHeaderTitle}>News & Updates</Text>
+            <View style={{ width: 36 }} />
+          </View>
+          {newsLoading ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator size="large" color="#10b981" />
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+              {newsPosts.length === 0 ? (
+                <Text style={{ color: '#9ca3af', textAlign: 'center', marginTop: 40 }}>No announcements yet.</Text>
+              ) : newsPosts.map(post => {
+                const isOpen = expandedPost === post.id;
+                const catColors: Record<string, string> = {
+                  Announcement: '#6366f1', Update: '#3b82f6', Promo: '#10b981',
+                  Event: '#f59e0b', Important: '#ef4444',
+                };
+                const color = catColors[post.category] ?? '#6b7280';
+                return (
+                  <TouchableOpacity key={post.id} style={styles.newsCard}
+                    onPress={() => setExpandedPost(isOpen ? null : post.id)} activeOpacity={0.85}>
+                    {post.image_url && <Image source={{ uri: post.image_url }} style={styles.newsImage} />}
+                    <View style={styles.newsCardBody}>
+                      <View style={styles.newsMetaRow}>
+                        <View style={[styles.newsCatBadge, { backgroundColor: color + '20' }]}>
+                          <Text style={[styles.newsCatText, { color }]}>{post.category}</Text>
+                        </View>
+                        <Text style={styles.newsDateText}>
+                          {new Date(post.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Text>
+                      </View>
+                      <Text style={styles.newsTitle}>{post.title}</Text>
+                      {isOpen
+                        ? <Text style={styles.newsContent}>{post.content}</Text>
+                        : <Text style={styles.newsExcerpt} numberOfLines={2}>{post.content}</Text>}
+                      <Text style={styles.newsReadMore}>{isOpen ? 'Show less ↑' : 'Read more ↓'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
+      <ChatHistoryScreen
+        visible={showChatHistory}
+        userId={profile.id}
+        onClose={() => setShowChatHistory(false)}
+      />
     </View>
   );
 }
@@ -1673,8 +1817,8 @@ const styles = StyleSheet.create({
   cancelConfirmBtns: { flexDirection: 'row', gap: 10 },
   keepBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center' },
   keepBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  confirmCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#dc2626', alignItems: 'center' },
-  confirmCancelText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  cancelYesBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#dc2626', alignItems: 'center' },
+  cancelYesText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   // Review
   ratingHeader: { alignItems: 'center', marginBottom: 20, paddingTop: 8 },
@@ -1755,4 +1899,33 @@ const styles = StyleSheet.create({
   voucherListCode: { fontSize: 13, fontWeight: '700', color: '#030712' },
   voucherListDesc: { fontSize: 11, color: '#6b7280', marginTop: 1 },
   voucherListCheck: { fontSize: 16, color: '#10b981', marginLeft: 8 },
+
+  toastBanner: {
+    position: 'absolute', top: 52, left: 16, right: 16,
+    borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12,
+    elevation: 8, zIndex: 999,
+  },
+  toastText: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  newsContainer: { flex: 1, backgroundColor: '#f9fafb' },
+  newsHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    backgroundColor: '#fff', paddingTop: 52,
+  },
+  newsCloseBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  newsCloseText: { fontSize: 18, color: '#030712' },
+  newsHeaderTitle: { fontSize: 17, fontWeight: '700', color: '#030712' },
+  newsCard: { backgroundColor: '#fff', borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#f3f4f6', overflow: 'hidden' },
+  newsImage: { width: '100%', height: 160 },
+  newsCardBody: { padding: 16 },
+  newsMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  newsCatBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  newsCatText: { fontSize: 11, fontWeight: '700' },
+  newsDateText: { fontSize: 11, color: '#d1d5db' },
+  newsTitle: { fontSize: 16, fontWeight: '700', color: '#030712', marginBottom: 6, letterSpacing: -0.2 },
+  newsExcerpt: { fontSize: 13, color: '#6b7280', lineHeight: 19 },
+  newsContent: { fontSize: 13, color: '#374151', lineHeight: 20, marginBottom: 4 },
+  newsReadMore: { fontSize: 12, color: '#10b981', fontWeight: '600', marginTop: 6 },
 });
