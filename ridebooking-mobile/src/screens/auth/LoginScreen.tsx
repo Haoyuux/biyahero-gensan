@@ -25,10 +25,10 @@ export default function LoginScreen() {
           options: { redirectTo },
         });
       } else {
-        // Use the same redirectTo as web — already proven to work with Supabase.
-        // openAuthSessionAsync intercepts at navigation level before the page loads,
-        // so the phone never actually needs to reach localhost:8082.
-        const redirectTo = 'http://localhost:8082/auth';
+        // Supabase redirects to the Metro web server (same WiFi).
+        // The web app relays the code to exp:// deep link which Expo Go handles.
+        // Update the IP if your network changes (matches metro output IP).
+        const redirectTo = 'http://10.50.66.114:8082/auth';
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -36,25 +36,8 @@ export default function LoginScreen() {
         });
         if (error || !data.url) throw error ?? new Error('No OAuth URL');
 
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        if (result.type === 'success') {
-          const url = result.url;
-          if (url.includes('access_token=')) {
-            const fragment = url.split('#')[1] ?? url.split('?')[1] ?? '';
-            const params = new URLSearchParams(fragment);
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
-            if (access_token && refresh_token) {
-              const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-              if (error) Alert.alert('Login failed', error.message);
-            }
-          } else {
-            const { error } = await supabase.auth.exchangeCodeForSession(url);
-            if (error) Alert.alert('Login failed', error.message);
-          }
-        } else {
-          Alert.alert('Login cancelled', `Could not complete sign in (${result.type}). Please try again.`);
-        }
+        // Open system browser — relay handled by web app → Linking.addEventListener in App.tsx
+        await Linking.openURL(data.url);
       }
     } catch (e: any) {
       Alert.alert('Sign in failed', e?.message ?? 'Something went wrong.');

@@ -1,6 +1,17 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Linking, Platform } from 'react-native';
+
+// Web relay: when Supabase redirects to the Metro dev server (http://IP:8082/auth?code=xxx),
+// the Expo web app immediately relays the code to the native app via exp:// deep link.
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const href = window.location.href;
+  if (href.includes('/auth') && (href.includes('?code=') || href.includes('access_token='))) {
+    const host = window.location.host; // e.g. "10.50.66.114:8082"
+    const nativeUrl = `exp://${host}/--${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.replace(nativeUrl);
+  }
+}
 import { getAppSettings, AppSettings } from './src/lib/settingsService';
 import { NavigationContainer } from '@react-navigation/native';
 import { useAuth } from './src/hooks/useAuth';
