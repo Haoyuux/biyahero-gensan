@@ -272,6 +272,25 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setCurrentRequest(null);
   };
 
+  const handleCancelRide = async () => {
+    if (!acceptedRideIdRef.current) return;
+    const rideId = acceptedRideIdRef.current;
+    supabase.channel('rides').send({
+      type: 'broadcast', event: 'RIDE_CANCELLED',
+      payload: { rideId, riderId: profile.id },
+    });
+    await supabase.from('rides')
+      .update({ status: 'pending', rider_id: null })
+      .eq('id', rideId);
+    acceptedRideIdRef.current = null;
+    clearRiderRide();
+    setRequestAccepted(false);
+    setActiveRide(null);
+    setCurrentRequest(null);
+    setMessages([]);
+    setRideStatus('going_to_pickup');
+  };
+
   const handleArrivedAtPickup = () => {
     if (!acceptedRideIdRef.current) return;
     supabase.channel('rides').send({
@@ -447,6 +466,22 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
               <Text style={styles.primaryBtnText}>Complete Ride ✓</Text>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={styles.cancelRideBtn}
+            onPress={() =>
+              Alert.alert(
+                'Cancel ride?',
+                'The passenger will be notified and the ride will go back to searching.',
+                [
+                  { text: 'Keep Ride', style: 'cancel' },
+                  { text: 'Yes, Cancel', style: 'destructive', onPress: handleCancelRide },
+                ],
+              )
+            }
+          >
+            <Text style={styles.cancelRideBtnText}>Cancel Booking</Text>
+          </TouchableOpacity>
           <View style={{ height: 32 }} />
         </ScrollView>
       ) : (
@@ -647,6 +682,8 @@ const styles = StyleSheet.create({
 
   primaryBtn: { backgroundColor: '#030712', borderRadius: 16, paddingVertical: 17, alignItems: 'center', marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
   primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  cancelRideBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
+  cancelRideBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
