@@ -112,7 +112,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         mapRef.current?.flyTo(loc.coords.latitude, loc.coords.longitude, 15);
       }
     })();
-    return () => { locationSub.current?.remove(); };
+    return () => { try { locationSub.current?.remove(); } catch { /* web compat */ } };
   }, [mapReady]);
 
   // Today stats
@@ -123,8 +123,8 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       .select('fare')
       .eq('rider_id', profile.id)
       .eq('status', 'completed')
-      .gte('created_at', `${date}T00:00:00`)
-      .lte('created_at', `${date}T23:59:59`);
+      .gte('completed_at', `${date}T00:00:00.000Z`)
+      .lte('completed_at', `${date}T23:59:59.999Z`);
     const rides = data ?? [];
     setTodayRides(rides.length);
     setTodayEarnings(rides.reduce((sum, r) => sum + (r.fare ?? 0), 0));
