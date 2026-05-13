@@ -36,8 +36,18 @@ export default function LoginScreen() {
 
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         if (result.type === 'success') {
-          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
-          if (sessionError) Alert.alert('Login failed', sessionError.message);
+          const url = result.url;
+          // Implicit flow: tokens in URL fragment (#access_token=...&refresh_token=...)
+          const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? '';
+          const params = new URLSearchParams(fragment);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+            if (error) Alert.alert('Login failed', error.message);
+          } else {
+            Alert.alert('Login failed', 'Could not retrieve tokens from redirect URL.');
+          }
         }
       }
     } catch (e: any) {
