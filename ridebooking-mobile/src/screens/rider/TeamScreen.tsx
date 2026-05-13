@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../contexts/AuthContext';
+import { fetchMyTeam, fetchRiderMembership, fetchTeamWithMembers, Team } from '../../lib/teamService';
 
-interface TeamMember {
+interface MemberDisplay {
   id: string;
   full_name: string | null;
   first_name: string | null;
@@ -16,13 +16,6 @@ interface TeamMember {
   rider_status: string | null;
 }
 
-interface Team {
-  id: string;
-  name: string;
-  capacity: number;
-  schedule_days: number[];
-}
-
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function TeamScreen() {
@@ -30,69 +23,37 @@ export default function TeamScreen() {
   const isLeader = profile.role === 'team_leader';
 
   const [team, setTeam] = useState<Team | null>(null);
-  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [members, setMembers] = useState<MemberDisplay[]>([]);
   const [myTeam, setMyTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
     if (isLeader) {
-      // Team leader: fetch their team
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('id, name, capacity, schedule_days')
-        .eq('leader_id', profile.id)
-        .single();
-
+      const teamData = await fetchMyTeam(profile.id);
       if (teamData) {
-        setTeam(teamData as Team);
-        const { data: memberData } = await supabase
-          .from('team_members')
-          .select('rider_id')
-          .eq('team_id', teamData.id);
-
-        if (memberData && memberData.length > 0) {
-          const riderIds = memberData.map(m => m.rider_id);
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, full_name, first_name, last_name, phone, avatar_url, is_online, rider_status')
-            .in('id', riderIds);
-          setMembers((profiles ?? []) as TeamMember[]);
-        } else {
-          setMembers([]);
-        }
+        setTeam(teamData);
+        setMembers(
+          (teamData.members ?? [])
+            .map(m => m.rider)
+            .filter(Boolean) as MemberDisplay[],
+        );
+      } else {
+        setTeam(null);
+        setMembers([]);
       }
     } else {
-      // Regular rider: find their team membership
-      const { data: membership } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('rider_id', profile.id)
-        .single();
-
+      const membership = await fetchRiderMembership(profile.id);
+      setMyTeam(membership);
       if (membership) {
-        const { data: teamData } = await supabase
-          .from('teams')
-          .select('id, name, capacity, schedule_days')
-          .eq('id', membership.team_id)
-          .single();
-        setMyTeam(teamData as Team ?? null);
-
-        if (teamData) {
-          const { data: memberData } = await supabase
-            .from('team_members')
-            .select('rider_id')
-            .eq('team_id', teamData.id);
-
-          if (memberData && memberData.length > 0) {
-            const riderIds = memberData.map(m => m.rider_id);
-            const { data: profiles } = await supabase
-              .from('profiles')
-              .select('id, full_name, first_name, last_name, phone, avatar_url, is_online, rider_status')
-              .in('id', riderIds);
-            setMembers((profiles ?? []) as TeamMember[]);
-          }
-        }
+        const teamWithMembers = await fetchTeamWithMembers(membership.id);
+        setMembers(
+          (teamWithMembers?.members ?? [])
+            .map(m => m.rider)
+            .filter(Boolean) as MemberDisplay[],
+        );
+      } else {
+        setMembers([]);
       }
     }
   };

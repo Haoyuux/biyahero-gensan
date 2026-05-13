@@ -3,17 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator,
   RefreshControl, Image, TouchableOpacity,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
-
-interface NewsPost {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  image_url: string | null;
-  author_name: string | null;
-  created_at: string;
-}
+import { fetchNewsPosts, NewsPost } from '../../lib/newsService';
 
 const categoryColor: Record<string, string> = {
   Announcement: '#6366f1',
@@ -30,14 +20,8 @@ export default function NewsScreen() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const fetchPosts = async () => {
-    const { data } = await supabase
-      .from('news_posts')
-      .select('id, title, content, category, image_url, author_name, created_at')
-      .eq('published', true)
-      .eq('is_archived', false)
-      .order('created_at', { ascending: false })
-      .limit(30);
-    setPosts(data ?? []);
+    const data = await fetchNewsPosts();
+    setPosts(data);
   };
 
   useEffect(() => {

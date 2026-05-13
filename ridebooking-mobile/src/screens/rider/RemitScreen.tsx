@@ -4,23 +4,20 @@ import {
   ActivityIndicator, Alert, RefreshControl, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../contexts/AuthContext';
+import {
+  getRiderDailyStats,
+  getRiderRemittances,
+  uploadReceipt,
+  createRemittance,
+  Remittance,
+} from '../../lib/remittanceService';
+import { getAppSettings } from '../../lib/settingsService';
 
 interface DailyStats {
   totalEarnings: number;
   totalBookingFee: number;
   rideCount: number;
-}
-
-interface Remittance {
-  id: string;
-  remittance_date: string;
-  total_earnings: number;
-  total_booking_fee: number;
-  amount_remitted: number;
-  receipt_url: string | null;
-  status: 'pending' | 'approved' | 'rejected';
 }
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -44,37 +41,20 @@ export default function RemitScreen() {
   const fetchData = async () => {
     const date = today();
 
-    const [ridesRes, remitRes, settingsRes] = await Promise.all([
-      supabase
-        .from('rides')
-        .select('fare, ride_type')
-        .eq('rider_id', profile.id)
-        .eq('status', 'completed')
-        .gte('created_at', `${date}T00:00:00`)
-        .lte('created_at', `${date}T23:59:59`),
-      supabase
-        .from('remittances')
-        .select('*')
-        .eq('rider_id', profile.id)
-        .order('remittance_date', { ascending: false })
-        .limit(20),
-      supabase
-        .from('app_settings')
-        .select('remittance_qr_url')
-        .eq('id', 1)
-        .single(),
+    const [dailyStats, allRemits, settings] = await Promise.all([
+      getRiderDailyStats(profile.id, date),
+      getRiderRemittances(profile.id),
+      getAppSettings(),
     ]);
 
-    const rides = ridesRes.data ?? [];
-    const totalEarnings = rides.reduce((sum, r) => sum + (r.fare ?? 0), 0);
-    const bookingFees: Record<string, number> = { moto: 5, eco: 8, premium: 12 };
-    const totalBookingFee = rides.reduce((sum, r) => sum + (bookingFees[r.ride_type] ?? 5), 0);
-    setStats({ totalEarnings, totalBookingFee, rideCount: rides.length });
-
-    const allRemits = (remitRes.data ?? []) as Remittance[];
+    setStats({
+      totalEarnings: dailyStats.totalEarnings,
+      totalBookingFee: dailyStats.totalBookingFee,
+      rideCount: dailyStats.ridesCount,
+    });
     setRemittances(allRemits);
     setTodayRemit(allRemits.find(r => r.remittance_date === date) ?? null);
-    setQrUrl(settingsRes.data?.remittance_qr_url ?? null);
+    setQrUrl(settings?.remittance_qr_url ?? null);
   };
 
   useEffect(() => {
@@ -107,30 +87,32 @@ export default function RemitScreen() {
     if (result.canceled || !result.assets[0]) return;
 
     setSubmitting(true);
-    const asset = result.assets[0];
-    const ext = asset.uri.split('.').pop() ?? 'jpg';
-    const path = `remittances/${profile.id}/${today()}.${ext}`;
+    const uri = result.assets[0].uri;
 
-    const formData = new FormData();
-    formData.append('file', { uri: asset.uri, name: `receipt.${ext}`, type: `image/${ext}` } as any);
+    const receiptUrl = await uploadReceipt(profile.id, uri);
+    if (!receiptUrl) {
+      setSubmitting(false);
+      Alert.alert('Upload failed', 'Could not upload receipt. Try again.');
+      return;
+    }
 
-    const { error: upErr } = await supabase.storage.from('documents').upload(path, formData, { upsert: true });
-    if (upErr) { setSubmitting(false); Alert.alert('Upload failed', upErr.message); return; }
-
-    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
-
-    const { error } = await supabase.from('remittances').insert({
-      rider_id: profile.id,
-      remittance_date: today(),
-      total_earnings: stats.totalEarnings,
-      total_booking_fee: stats.totalBookingFee,
-      amount_remitted: stats.totalBookingFee,
-      receipt_url: urlData.publicUrl,
-      status: 'pending',
-    });
+    const remittance = await createRemittance(
+      profile.id,
+      `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim(),
+      profile.avatar_url ?? null,
+      today(),
+      stats.totalEarnings,
+      stats.totalBookingFee,
+      stats.totalBookingFee,
+      receiptUrl,
+      stats.rideCount,
+    );
 
     setSubmitting(false);
-    if (error) { Alert.alert('Error', error.message); return; }
+    if (!remittance) {
+      Alert.alert('Error', 'Failed to submit remittance. Try again.');
+      return;
+    }
     Alert.alert('Submitted!', 'Your remittance is pending admin approval.');
     await fetchData();
   };

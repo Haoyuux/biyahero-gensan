@@ -11,6 +11,7 @@ export interface TeamMember {
     first_name: string | null;
     last_name: string | null;
     avatar_url: string | null;
+    phone: string | null;
     is_online: boolean;
     rider_status: string | null;
   };
@@ -28,7 +29,7 @@ export interface Team {
 }
 
 const TEAM_SELECT = 'id, name, capacity, schedule_days, is_active, leader_id, created_at';
-const MEMBER_SELECT = `id, team_id, rider_id, joined_at, rider:profiles!team_members_rider_id_fkey(id, full_name, first_name, last_name, avatar_url, is_online, rider_status)`;
+const MEMBER_SELECT = `id, team_id, rider_id, joined_at, rider:profiles!team_members_rider_id_fkey(id, full_name, first_name, last_name, avatar_url, phone, is_online, rider_status)`;
 
 export async function fetchMyTeam(leaderId: string): Promise<Team | null> {
   const { data } = await supabase
