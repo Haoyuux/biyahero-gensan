@@ -16,7 +16,7 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 const TabIcon = ({ icon, label, focused }: { icon: IoniconsName; label: string; focused: boolean }) => (
   <View style={tabStyles.iconWrap}>
     <Ionicons name={icon} size={22} color={focused ? '#030712' : '#9ca3af'} />
-    <Text style={[tabStyles.label, focused && tabStyles.labelActive]}>{label}</Text>
+    <Text style={[tabStyles.label, focused && tabStyles.labelActive]} numberOfLines={1} adjustsFontSizeToFit>{label}</Text>
   </View>
 );
 
@@ -92,10 +92,10 @@ const tabStyles = StyleSheet.create({
     elevation: 0,
     shadowOpacity: 0,
   },
-  iconWrap: { alignItems: 'center', justifyContent: 'center', gap: 3 },
+  iconWrap: { alignItems: 'center', justifyContent: 'center', gap: 2, width: 60 },
   icon: { fontSize: 22, opacity: 0.35 },
   iconActive: { opacity: 1 },
-  label: { fontSize: 10, fontWeight: '600', color: '#9ca3af' },
+  label: { fontSize: 9, fontWeight: '600', color: '#9ca3af', textAlign: 'center' },
   labelActive: { color: '#030712' },
   maintenanceBanner: {
     backgroundColor: '#fef3c7',
