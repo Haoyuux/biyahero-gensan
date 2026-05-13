@@ -18,27 +18,27 @@ export default function LoginScreen() {
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
-      const redirectTo = Linking.createURL('auth');
-      console.log('[AUTH] redirectTo (add this exact URL to Supabase allowed list):', redirectTo);
-
       if (Platform.OS === 'web') {
+        const redirectTo = Linking.createURL('auth');
         await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo },
         });
       } else {
+        // Use an HTTPS redirect URL — custom schemes (exp://, biyahero://) are
+        // rejected by Chrome Custom Tab on Android. HTTPS URLs are intercepted reliably.
+        const redirectTo = 'https://biyahero.online/auth-callback';
+
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo, skipBrowserRedirect: true },
         });
         if (error || !data.url) throw error ?? new Error('No OAuth URL');
-        console.log('[AUTH] oauth url:', data.url);
 
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         if (result.type === 'success') {
           const url = result.url;
           if (url.includes('access_token=')) {
-            // Implicit flow — tokens are in the URL fragment
             const fragment = url.split('#')[1] ?? url.split('?')[1] ?? '';
             const params = new URLSearchParams(fragment);
             const access_token = params.get('access_token');
@@ -48,7 +48,6 @@ export default function LoginScreen() {
               if (error) Alert.alert('Login failed', error.message);
             }
           } else {
-            // PKCE flow — exchange code for session
             const { error } = await supabase.auth.exchangeCodeForSession(url);
             if (error) Alert.alert('Login failed', error.message);
           }
