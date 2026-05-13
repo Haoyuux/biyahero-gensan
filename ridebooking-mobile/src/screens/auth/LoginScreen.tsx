@@ -25,10 +25,8 @@ export default function LoginScreen() {
           options: { redirectTo },
         });
       } else {
-        // Supabase redirects to the Metro web server (same WiFi).
-        // The web app relays the code to exp:// deep link which Expo Go handles.
-        // Update the IP if your network changes (matches metro output IP).
-        const redirectTo = 'http://10.50.66.114:8082/auth';
+        // biyahero://auth in APK build; exp://IP:8082/--/auth in Expo Go
+        const redirectTo = Linking.createURL('auth');
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -36,8 +34,11 @@ export default function LoginScreen() {
         });
         if (error || !data.url) throw error ?? new Error('No OAuth URL');
 
-        // Open system browser — relay handled by web app → Linking.addEventListener in App.tsx
-        await Linking.openURL(data.url);
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (result.type === 'success') {
+          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
+          if (sessionError) Alert.alert('Login failed', sessionError.message);
+        }
       }
     } catch (e: any) {
       Alert.alert('Sign in failed', e?.message ?? 'Something went wrong.');
