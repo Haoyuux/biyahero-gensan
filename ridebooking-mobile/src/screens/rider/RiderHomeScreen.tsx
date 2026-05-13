@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
-  useWindowDimensions, Image,
+  useWindowDimensions, Image, BackHandler,
 } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -153,6 +153,15 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   useEffect(() => { fetchTodayStats(); }, []);
 
+  // Prevent Android back button from exiting app during active ride
+  useEffect(() => {
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (requestAccepted) return true; // block back during active ride
+      return false;
+    });
+    return () => handler.remove();
+  }, [requestAccepted]);
+
   useEffect(() => {
     (async () => {
       const raw = await AsyncStorage.getItem(RIDER_RIDE_KEY);
@@ -282,6 +291,13 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setActiveRide(currentRequest);
     saveRiderRide(currentRequest, true);
 
+    // Show pickup location on map
+    const pickupCoords = currentRequest.pickup?.coords;
+    if (pickupCoords) {
+      mapRef.current?.setDestination(pickupCoords.lat, pickupCoords.lng, currentRequest.pickup?.label ?? 'Pickup');
+      mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
+    }
+
     supabase.channel('rides').send({
       type: 'broadcast', event: 'RIDE_ACCEPTED',
       payload: { rideId, rider: profile },
@@ -310,6 +326,8 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setCurrentRequest(null);
     setMessages([]);
     setRideStatus('going_to_pickup');
+    mapRef.current?.clearDestination();
+    mapRef.current?.clearRoute();
   };
 
   const handleArrivedAtPickup = () => {
@@ -319,6 +337,14 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       payload: { rideId: acceptedRideIdRef.current },
     });
     setRideStatus('picked_up');
+
+    // Switch map to show dropoff location
+    const dropoffCoords = activeRide?.dropoff?.coords;
+    if (dropoffCoords) {
+      mapRef.current?.clearDestination();
+      mapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, activeRide?.dropoff?.label ?? 'Dropoff');
+      mapRef.current?.flyTo(dropoffCoords.lat, dropoffCoords.lng, 15);
+    }
   };
 
   const handleCompleteRide = async () => {
