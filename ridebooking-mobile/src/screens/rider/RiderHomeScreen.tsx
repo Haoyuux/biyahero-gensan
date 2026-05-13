@@ -64,14 +64,32 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const registerPushToken = async () => {
     try {
-      if (Platform.OS === 'web') return; // Push not supported on web
+      if (Platform.OS === 'web') return;
+
+      // Expo Go does not support remote push notifications from SDK 53+
+      if (Constants.appOwnership === 'expo') {
+        console.warn('[PUSH] Expo Go detected — push tokens not supported. Build an APK to test push.');
+        return;
+      }
+
+      // Create Android notification channel (required for Android 8+)
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('ride-requests', {
+          name: 'Ride Requests',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+        });
+      }
 
       const { status: existing } = await Notifications.getPermissionsAsync();
       const finalStatus = existing === 'granted'
         ? existing
         : (await Notifications.requestPermissionsAsync()).status;
+
       if (finalStatus !== 'granted') {
-        console.warn('registerPushToken: permission not granted');
+        console.warn('[PUSH] Permission denied');
+        Alert.alert('Notifications disabled', 'Enable notifications in your phone settings to receive ride requests.');
         return;
       }
 
@@ -87,9 +105,14 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         .from('profiles')
         .update({ expo_push_token: tokenData })
         .eq('id', profile.id);
-      if (error) console.warn('registerPushToken save error:', error.message);
-    } catch (e) {
-      console.warn('registerPushToken:', e);
+
+      if (error) {
+        console.warn('[PUSH] save error:', error.message);
+      } else {
+        console.log('[PUSH] token saved successfully');
+      }
+    } catch (e: any) {
+      console.warn('[PUSH] registerPushToken error:', e?.message ?? e);
     }
   };
 
