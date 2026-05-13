@@ -50,6 +50,7 @@ const isInMindanao = (lat: number, lon: number) =>
 
 const genId = () => `ride_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const FAVORITES_KEY = 'biyahero_favorites';
+const USER_RIDE_KEY = 'biyahero_user_ride';
 
 interface Props { profile: Profile; onSignOut: () => void; }
 
@@ -129,6 +130,30 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
+  const saveRideState = async (overrides?: Record<string, any>) => {
+    if (!currentRideId) return;
+    try {
+      await AsyncStorage.setItem(USER_RIDE_KEY, JSON.stringify({
+        currentRideId,
+        step,
+        pickup: pickupLabel,
+        pickupCoords,
+        dropoff: destination,
+        destinationCoords,
+        selectedTier,
+        fareBreakdown,
+        selectedVoucherUv,
+        voucherDiscount,
+        activeRider,
+        ...overrides,
+      }));
+    } catch { /* silent */ }
+  };
+
+  const clearRideState = async () => {
+    try { await AsyncStorage.removeItem(USER_RIDE_KEY); } catch { /* silent */ }
+  };
+
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
     try {
       const r = await fetch(
@@ -148,6 +173,32 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     AsyncStorage.getItem(FAVORITES_KEY).then(val => {
       if (val) setFavorites(JSON.parse(val));
     });
+    (async () => {
+      const raw = await AsyncStorage.getItem(USER_RIDE_KEY);
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        if (!saved.currentRideId) return;
+        const { data } = await supabase.from('rides').select('status').eq('id', saved.currentRideId).single();
+        if (!data || data.status === 'completed' || data.status === 'cancelled') {
+          await AsyncStorage.removeItem(USER_RIDE_KEY);
+          return;
+        }
+        setCurrentRideId(saved.currentRideId);
+        setStep(saved.step ?? 'searching');
+        if (saved.pickup) setPickupLabel(saved.pickup);
+        if (saved.pickupCoords) setPickupCoords(saved.pickupCoords);
+        if (saved.dropoff) setDestination(saved.dropoff);
+        if (saved.destinationCoords) setDestinationCoords(saved.destinationCoords);
+        if (saved.selectedTier) setSelectedTier(saved.selectedTier);
+        if (saved.fareBreakdown) setFareBreakdown(saved.fareBreakdown);
+        if (saved.activeRider) setActiveRider(saved.activeRider);
+        if (saved.selectedVoucherUv) setSelectedVoucherUv(saved.selectedVoucherUv);
+        if (saved.voucherDiscount) setVoucherDiscount(saved.voucherDiscount);
+      } catch {
+        await AsyncStorage.removeItem(USER_RIDE_KEY);
+      }
+    })();
   }, []);
 
   // GPS + reverse geocode — runs once, independent of mapReady
@@ -403,6 +454,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload });
     setIsBooking(false);
     setStep('searching');
+    saveRideState({ step: 'searching' });
   };
 
   const cancelBooking = async () => {
@@ -411,6 +463,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       await supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
     }
     resetToHome();
+    clearRideState();
   };
 
   const resetToHome = () => {
@@ -421,6 +474,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     setSelectedVoucherUv(null); setUserVouchers([]);
     setPendingRider(null); setRiderReviews([]); setShowVehiclePhoto(false); setLastRiderCoords(null);
     mapRef.current?.clearRider(); mapRef.current?.clearRoute(); mapRef.current?.clearDestination();
+    clearRideState();
   };
 
   const handleSendChat = async () => {
@@ -440,6 +494,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       await markVoucherUsed(selectedVoucherUv.id, currentRideId);
     }
     setRatingSubmitted(true);
+    clearRideState();
     setTimeout(resetToHome, 1800);
   };
 
@@ -1181,6 +1236,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
                 const bd = calculateFare(selectedTier, routeDistance, routeDuration, pricingConfig);
                 setFareBreakdown(bd);
                 setStep('matched');
+                saveRideState({ step: 'matched', activeRider: rider });
                 if (rider.last_lat && rider.last_lng) {
                   mapRef.current?.setRiderLocation(rider.last_lat, rider.last_lng);
                   setLastRiderCoords({ lat: rider.last_lat, lng: rider.last_lng });

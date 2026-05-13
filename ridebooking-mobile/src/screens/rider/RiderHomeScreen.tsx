@@ -4,6 +4,7 @@ import {
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
 } from 'react-native';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
 import { supabase, Profile } from '../../lib/supabase';
 import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
@@ -12,6 +13,8 @@ interface Props {
   profile: Profile;
   onSignOut: () => void;
 }
+
+const RIDER_RIDE_KEY = 'biyahero_rider_ride';
 
 export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const mapRef = useRef<OsmMapHandle>(null);
@@ -42,6 +45,16 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const chatScrollRef = useRef<ScrollView>(null);
+
+  const saveRiderRide = async (request: any, accepted: boolean) => {
+    try {
+      await AsyncStorage.setItem(RIDER_RIDE_KEY, JSON.stringify({ currentRequest: request, requestAccepted: accepted }));
+    } catch { /* silent */ }
+  };
+
+  const clearRiderRide = async () => {
+    try { await AsyncStorage.removeItem(RIDER_RIDE_KEY); } catch { /* silent */ }
+  };
 
   // GPS
   useEffect(() => {
@@ -93,6 +106,28 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   };
 
   useEffect(() => { fetchTodayStats(); }, []);
+
+  useEffect(() => {
+    (async () => {
+      const raw = await AsyncStorage.getItem(RIDER_RIDE_KEY);
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        if (!saved.currentRequest?.rideId) { await AsyncStorage.removeItem(RIDER_RIDE_KEY); return; }
+        const { data } = await supabase.from('rides').select('status').eq('id', saved.currentRequest.rideId).single();
+        if (!data || ['completed', 'cancelled', 'pending'].includes(data.status)) {
+          await AsyncStorage.removeItem(RIDER_RIDE_KEY);
+          return;
+        }
+        setCurrentRequest(saved.currentRequest);
+        setRequestAccepted(saved.requestAccepted ?? false);
+        setActiveRide(saved.currentRequest);
+        acceptedRideIdRef.current = saved.currentRequest.rideId;
+      } catch {
+        await AsyncStorage.removeItem(RIDER_RIDE_KEY);
+      }
+    })();
+  }, []);
 
   // Rides channel
   useEffect(() => {
@@ -196,6 +231,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setHasRequest(false);
     setRequestAccepted(true);
     setActiveRide(currentRequest);
+    saveRiderRide(currentRequest, true);
 
     supabase.channel('rides').send({
       type: 'broadcast', event: 'RIDE_ACCEPTED',
@@ -228,6 +264,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', rideId);
     acceptedRideIdRef.current = null;
+    clearRiderRide();
     setRequestAccepted(false);
     setActiveRide(null);
     setCurrentRequest(null);
@@ -441,7 +478,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             </View>
           )}
 
-          <TouchableOpacity onPress={onSignOut} style={styles.signOut}>
+          <TouchableOpacity onPress={() => { clearRiderRide(); onSignOut(); }} style={styles.signOut}>
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
