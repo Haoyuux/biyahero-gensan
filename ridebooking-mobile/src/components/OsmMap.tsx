@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 
 export interface OsmMapHandle {
   setUserLocation: (lat: number, lng: number) => void;
+  clearPickup: () => void;
   setDestination: (lat: number, lng: number, label?: string) => void;
   clearDestination: () => void;
   flyTo: (lat: number, lng: number, zoom?: number) => void;
@@ -109,6 +110,9 @@ const buildHtml = () => `
       }
     };
 
+    window.clearPickup = () => {
+      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+    };
     window.clearDestination = () => {
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
     };
@@ -180,6 +184,7 @@ const OsmMap = forwardRef<OsmMapHandle, Props>(({ style, onMapReady, onLocationT
 
   useImperativeHandle(ref, () => ({
     setUserLocation: (lat, lng) => send(`window.setUserLocation(${lat}, ${lng})`),
+    clearPickup: () => send('window.clearPickup()'),
     setDestination: (lat, lng, label = '') =>
       send(`window.setDestination(${lat}, ${lng}, '${label.replace(/'/g, "\\'")}')`),
     clearDestination: () => send('window.clearDestination()'),

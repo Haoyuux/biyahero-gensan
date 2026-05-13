@@ -103,6 +103,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [fareBreakdown, setFareBreakdown] = useState<FareBreakdown | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [ridePhase, setRidePhase] = useState<'going_to_pickup' | 'arrived'>('going_to_pickup');
+  const ridePhaseRef = useRef<'going_to_pickup' | 'arrived'>('going_to_pickup');
+  const userRouteTickRef = useRef(0);
 
   // Voucher
   const [showVoucherPicker, setShowVoucherPicker] = useState(false);
@@ -135,6 +137,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [riderStats, setRiderStats] = useState<{ avgRating: number; rideCount: number } | null>(null);
   const [showVehiclePhoto, setShowVehiclePhoto] = useState(false);
   const [lastRiderCoords, setLastRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const lastRiderCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // Review
   const [completedRider, setCompletedRider] = useState<Profile | null>(null);
@@ -312,6 +315,21 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     } catch { /* ignore */ }
   };
 
+  const drawRiderToDropoffRoute = async (riderLat: number, riderLng: number) => {
+    if (!destinationCoords) return;
+    try {
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${destinationCoords.lng},${destinationCoords.lat}?overview=full&geometries=geojson`,
+      );
+      const data = await res.json();
+      if (!data.routes?.[0]) return;
+      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+        ([lng, lat]: [number, number]) => [lat, lng],
+      );
+      mapRef.current?.drawRoute(coords);
+    } catch { /* ignore */ }
+  };
+
   // Toggle drag on step change
   useEffect(() => {
     const canDrag = step === 'home' || step === 'select';
@@ -354,20 +372,42 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     ch.on('broadcast', { event: 'RIDER_LOCATION' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
       mapRef.current?.setRiderLocation(payload.lat, payload.lng);
+      lastRiderCoordsRef.current = { lat: payload.lat, lng: payload.lng };
       setLastRiderCoords({ lat: payload.lat, lng: payload.lng });
+      // Live route: once rider has picked up passenger, redraw rider → dropoff every 5 updates
+      if (ridePhaseRef.current === 'arrived') {
+        userRouteTickRef.current++;
+        if (userRouteTickRef.current >= 5) {
+          userRouteTickRef.current = 0;
+          drawRiderToDropoffRoute(payload.lat, payload.lng);
+        }
+      }
     });
     ch.on('broadcast', { event: 'RIDER_ARRIVED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
+      ridePhaseRef.current = 'arrived';
+      userRouteTickRef.current = 0;
       setRidePhase('arrived');
       showToast('Your rider has arrived! 🏍️', 'success');
-      // Switch map to show pickup → destination route
-      if (pickupCoords && destinationCoords) fetchRoute(pickupCoords, destinationCoords);
-      if (pickupCoords) mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
+      // Remove pickup marker; keep/re-set destination; draw rider → dropoff route
+      mapRef.current?.clearPickup();
+      mapRef.current?.clearDestination();
+      if (destinationCoords) {
+        mapRef.current?.setDestination(destinationCoords.lat, destinationCoords.lng, destination || 'Destination');
+      }
+      const riderLoc = lastRiderCoordsRef.current;
+      if (riderLoc && destinationCoords) {
+        drawRiderToDropoffRoute(riderLoc.lat, riderLoc.lng);
+        mapRef.current?.flyTo(riderLoc.lat, riderLoc.lng, 15);
+      } else if (destinationCoords) {
+        mapRef.current?.flyTo(destinationCoords.lat, destinationCoords.lng, 14);
+      }
     });
     ch.on('broadcast', { event: 'RIDE_CANCELLED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
       showToast('Rider cancelled. Finding a new rider...', 'warn');
       setActiveRider(null);
+      ridePhaseRef.current = 'going_to_pickup';
       setRidePhase('going_to_pickup');
       setStep('searching');
       supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', currentRideId);
@@ -545,14 +585,16 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
 
   const resetToHome = () => {
     stopBroadcasting();
+    ridePhaseRef.current = 'going_to_pickup';
     setRidePhase('going_to_pickup');
     setStep('home'); setCurrentRideId(null); setActiveRider(null); setFareBreakdown(null);
     setShowChat(false); setShowCancelConfirm(false); setMessages([]); setUnreadCount(0);
     setDestination(''); setDestinationCoords(null); setDropoffQuery('');
     setVoucherDiscount(0); setAppliedVoucher(null); setVoucherCode(''); setVoucherMsg('');
     setSelectedVoucherUv(null); setUserVouchers([]);
-    setPendingRider(null); setRiderReviews([]); setRiderStats(null); setShowVehiclePhoto(false); setLastRiderCoords(null);
-    mapRef.current?.clearRider(); mapRef.current?.clearRoute(); mapRef.current?.clearDestination();
+    setPendingRider(null); setRiderReviews([]); setRiderStats(null); setShowVehiclePhoto(false);
+    setLastRiderCoords(null); lastRiderCoordsRef.current = null;
+    mapRef.current?.clearRider(); mapRef.current?.clearRoute(); mapRef.current?.clearDestination(); mapRef.current?.clearPickup();
     clearRideState();
   };
 

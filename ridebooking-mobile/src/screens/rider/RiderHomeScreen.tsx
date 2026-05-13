@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
-  useWindowDimensions, Image, BackHandler,
+  useWindowDimensions, Image, BackHandler, Alert,
 } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,6 +25,9 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const mapRef = useRef<OsmMapHandle>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
+  const riderCurrentLocRef = useRef<{ lat: number; lng: number } | null>(null);
+  const riderTargetRef = useRef<{ lat: number; lng: number } | null>(null);
+  const routeTickRef = useRef(0);
   const isOnlineRef = useRef(profile.is_online ?? false);
   const acceptedRideIdRef = useRef<string | null>(null);
 
@@ -60,6 +63,20 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const clearRiderRide = async () => {
     try { await AsyncStorage.removeItem(RIDER_RIDE_KEY); } catch { /* silent */ }
+  };
+
+  const fetchRiderRoute = async (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
+    try {
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`,
+      );
+      const data = await res.json();
+      if (!data.routes?.[0]) return;
+      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+        ([lng, lat]: [number, number]) => [lat, lng],
+      );
+      mapRef.current?.drawRoute(coords);
+    } catch { /* ignore */ }
   };
 
   const registerPushToken = async () => {
@@ -135,6 +152,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
         async (loc) => {
           const { latitude, longitude } = loc.coords;
+          riderCurrentLocRef.current = { lat: latitude, lng: longitude };
           if (mapReady) mapRef.current?.setRiderLocation(latitude, longitude);
           if (isOnlineRef.current) {
             await supabase.from('profiles')
@@ -145,6 +163,14 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
                 type: 'broadcast', event: 'RIDER_LOCATION',
                 payload: { rideId: acceptedRideIdRef.current, lat: latitude, lng: longitude },
               });
+              // Update route every 5 GPS ticks (~15s) while on a trip
+              if (riderTargetRef.current) {
+                routeTickRef.current++;
+                if (routeTickRef.current >= 5) {
+                  routeTickRef.current = 0;
+                  fetchRiderRoute({ lat: latitude, lng: longitude }, riderTargetRef.current);
+                }
+              }
             }
           }
         },
@@ -224,11 +250,16 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       setRequestQueue(prev => prev.filter(r => r.rideId !== rideId));
       if (acceptedRideIdRef.current === rideId) {
         acceptedRideIdRef.current = null;
+        riderTargetRef.current = null;
+        clearRiderRide();
         setRequestAccepted(false);
         setCurrentRequest(null);
         setActiveRide(null);
         setHasRequest(false);
         setMessages([]);
+        setRideStatus('going_to_pickup');
+        mapRef.current?.clearDestination();
+        mapRef.current?.clearRoute();
       } else if (currentRequest?.rideId === rideId) {
         setHasRequest(false);
         setCurrentRequest(null);
@@ -314,11 +345,16 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setActiveRide(currentRequest);
     saveRiderRide(currentRequest, true);
 
-    // Show pickup location on map
+    // Show pickup on map + draw route from rider to pickup
     const pickupCoords = currentRequest.pickup?.coords;
     if (pickupCoords) {
+      riderTargetRef.current = pickupCoords;
+      routeTickRef.current = 0;
       mapRef.current?.setDestination(pickupCoords.lat, pickupCoords.lng, '📍 Pickup: ' + (currentRequest.pickup?.label ?? 'Passenger Pickup'));
       mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
+      if (riderCurrentLocRef.current) {
+        fetchRiderRoute(riderCurrentLocRef.current, pickupCoords);
+      }
     }
 
     supabase.channel('rides').send({
@@ -343,6 +379,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       .update({ status: 'pending', rider_id: null })
       .eq('id', rideId);
     acceptedRideIdRef.current = null;
+    riderTargetRef.current = null;
     clearRiderRide();
     setRequestAccepted(false);
     setActiveRide(null);
@@ -361,12 +398,17 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     });
     setRideStatus('picked_up');
 
-    // Switch map to show dropoff location
+    // Switch map to show dropoff + draw initial route + enable live route updates
     const dropoffCoords = activeRide?.dropoff?.coords;
     if (dropoffCoords) {
+      riderTargetRef.current = dropoffCoords;
+      routeTickRef.current = 0;
       mapRef.current?.clearDestination();
       mapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, '🏁 Dropoff: ' + (activeRide?.dropoff?.label ?? 'Destination'));
       mapRef.current?.flyTo(dropoffCoords.lat, dropoffCoords.lng, 15);
+      if (riderCurrentLocRef.current) {
+        fetchRiderRoute(riderCurrentLocRef.current, dropoffCoords);
+      }
     }
   };
 
