@@ -16,11 +16,19 @@ export default function App() {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
-    const hasAuthCode = (url: string) =>
-      /[?&]code=[^&]+/.test(url) && !url.includes('error=');
-
     const handleUrl = async ({ url }: { url: string }) => {
-      if (hasAuthCode(url)) {
+      if (url.includes('error=')) return;
+      if (url.includes('access_token=')) {
+        // Implicit flow — tokens in fragment
+        const fragment = url.split('#')[1] ?? url.split('?')[1] ?? '';
+        const params = new URLSearchParams(fragment);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+        }
+      } else if (/[?&]code=[^&]+/.test(url)) {
+        // PKCE flow — exchange code
         await supabase.auth.exchangeCodeForSession(url);
       }
     };

@@ -36,7 +36,24 @@ export default function LoginScreen() {
 
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         if (result.type === 'success') {
-          await supabase.auth.exchangeCodeForSession(result.url);
+          const url = result.url;
+          if (url.includes('access_token=')) {
+            // Implicit flow — tokens are in the URL fragment
+            const fragment = url.split('#')[1] ?? url.split('?')[1] ?? '';
+            const params = new URLSearchParams(fragment);
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+            if (access_token && refresh_token) {
+              const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+              if (error) Alert.alert('Login failed', error.message);
+            }
+          } else {
+            // PKCE flow — exchange code for session
+            const { error } = await supabase.auth.exchangeCodeForSession(url);
+            if (error) Alert.alert('Login failed', error.message);
+          }
+        } else {
+          Alert.alert('Login cancelled', `Could not complete sign in (${result.type}). Please try again.`);
         }
       }
     } catch (e: any) {
