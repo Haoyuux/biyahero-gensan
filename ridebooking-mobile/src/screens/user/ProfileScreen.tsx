@@ -13,6 +13,7 @@ export default function ProfileScreen() {
   const [firstName, setFirstName] = useState(profile.first_name ?? '');
   const [lastName, setLastName] = useState(profile.last_name ?? '');
   const [phone, setPhone] = useState(profile.phone ?? '');
+  const [dob, setDob] = useState(profile.date_of_birth ?? '');
   const [loading, setLoading] = useState(false);
   const [rides, setRides] = useState<any[]>([]);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '');
@@ -38,6 +39,7 @@ export default function ProfileScreen() {
       last_name: lastName.trim(),
       full_name: `${firstName.trim()} ${lastName.trim()}`,
       phone: phone.trim() || null,
+      date_of_birth: dob.trim() || null,
     }).eq('id', profile.id);
     setLoading(false);
     if (error) { Alert.alert('Error', error.message); return; }
@@ -126,6 +128,8 @@ export default function ProfileScreen() {
             <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholderTextColor="#9ca3af" />
             <Text style={styles.fieldLabel}>PHONE</Text>
             <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholderTextColor="#9ca3af" />
+            <Text style={styles.fieldLabel}>DATE OF BIRTH</Text>
+            <TextInput style={styles.input} value={dob} onChangeText={setDob} placeholder="YYYY-MM-DD" placeholderTextColor="#9ca3af" />
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
