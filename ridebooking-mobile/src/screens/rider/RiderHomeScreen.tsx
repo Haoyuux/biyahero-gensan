@@ -135,7 +135,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
         async (loc) => {
           const { latitude, longitude } = loc.coords;
-          if (mapReady) mapRef.current?.setUserLocation(latitude, longitude);
+          if (mapReady) mapRef.current?.setRiderLocation(latitude, longitude);
           if (isOnlineRef.current) {
             await supabase.from('profiles')
               .update({ last_lat: latitude, last_lng: longitude })
@@ -152,7 +152,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (mapReady) {
-        mapRef.current?.setUserLocation(loc.coords.latitude, loc.coords.longitude);
+        mapRef.current?.setRiderLocation(loc.coords.latitude, loc.coords.longitude);
         mapRef.current?.flyTo(loc.coords.latitude, loc.coords.longitude, 15);
       }
     })();
@@ -317,7 +317,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     // Show pickup location on map
     const pickupCoords = currentRequest.pickup?.coords;
     if (pickupCoords) {
-      mapRef.current?.setDestination(pickupCoords.lat, pickupCoords.lng, currentRequest.pickup?.label ?? 'Pickup');
+      mapRef.current?.setDestination(pickupCoords.lat, pickupCoords.lng, '📍 Pickup: ' + (currentRequest.pickup?.label ?? 'Passenger Pickup'));
       mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
     }
 
@@ -365,7 +365,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     const dropoffCoords = activeRide?.dropoff?.coords;
     if (dropoffCoords) {
       mapRef.current?.clearDestination();
-      mapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, activeRide?.dropoff?.label ?? 'Dropoff');
+      mapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, '🏁 Dropoff: ' + (activeRide?.dropoff?.label ?? 'Destination'));
       mapRef.current?.flyTo(dropoffCoords.lat, dropoffCoords.lng, 15);
     }
   };

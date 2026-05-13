@@ -90,10 +90,18 @@ const buildHtml = () => `
     };
 
     window.setDestination = (lat, lng, label) => {
+      const txt = label || 'Where to?';
+      const icon = L.divIcon({
+        html: '<div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="background:#fff;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.18);white-space:nowrap;color:#111">● ' + txt + '</div><div style="width:16px;height:16px;background:#10b981;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:grab"></div></div>',
+        iconSize: [Math.max(100, txt.length * 8), 44],
+        iconAnchor: [Math.max(50, txt.length * 4), 44],
+        className: '',
+      });
       if (destMarker) {
+        destMarker.setIcon(icon);
         destMarker.setLatLng([lat, lng]);
       } else {
-        destMarker = L.marker([lat, lng], { icon: destIcon, draggable: true }).addTo(map);
+        destMarker = L.marker([lat, lng], { icon, draggable: true }).addTo(map);
         destMarker.on('dragend', (e) => {
           const ll = e.target.getLatLng();
           post({ type: 'destDragged', lat: ll.lat, lng: ll.lng });
