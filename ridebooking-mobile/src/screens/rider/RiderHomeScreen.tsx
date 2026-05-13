@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
+  useWindowDimensions,
 } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,7 +19,10 @@ interface Props {
 const RIDER_RIDE_KEY = 'biyahero_rider_ride';
 
 export default function RiderHomeScreen({ profile, onSignOut }: Props) {
+  const { width } = useWindowDimensions();
+  const fs = (base: number) => Math.round(base * (width / 390)); // responsive font scale
   const mapRef = useRef<OsmMapHandle>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
   const isOnlineRef = useRef(profile.is_online ?? false);
   const acceptedRideIdRef = useRef<string | null>(null);
@@ -492,14 +496,16 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         <View style={styles.sheet}>
           <View style={styles.handle} />
           <View style={styles.riderRow}>
-            <View style={styles.driverAvatar}>
-              <Text style={styles.driverAvatarText}>
+            <View style={styles.driverAvatarPro}>
+              <Text style={[styles.driverAvatarProText, { fontSize: fs(20) }]}>
                 {(profile.first_name?.[0] ?? 'R').toUpperCase()}
               </Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.driverName}>{profile.first_name} {profile.last_name}</Text>
-              <Text style={styles.driverMeta}>
+              <Text style={[styles.driverName, { fontSize: fs(15) }]} numberOfLines={1}>
+                {profile.first_name} {profile.last_name}
+              </Text>
+              <Text style={[styles.driverMeta, { fontSize: fs(12) }]} numberOfLines={1}>
                 {[profile.vehicle_make, profile.vehicle_model, profile.vehicle_plate].filter(Boolean).join(' · ') || 'No vehicle info'}
               </Text>
             </View>
@@ -544,11 +550,33 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             </View>
           )}
 
-          <TouchableOpacity onPress={() => { clearRiderRide(); unregisterPushToken(); onSignOut(); }} style={styles.signOut}>
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
         </View>
       )}
+
+      {/* Profile button — top right */}
+      <TouchableOpacity style={styles.profileBtn} onPress={() => setShowProfileMenu(true)} activeOpacity={0.85}>
+        <Text style={styles.profileBtnText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+      </TouchableOpacity>
+
+      {/* Profile menu modal */}
+      <Modal visible={showProfileMenu} transparent animationType="fade" onRequestClose={() => setShowProfileMenu(false)}>
+        <TouchableOpacity style={styles.profileMenuOverlay} activeOpacity={1} onPress={() => setShowProfileMenu(false)}>
+          <View style={styles.profileMenuCard}>
+            <View style={styles.profileMenuAvatar}>
+              <Text style={styles.profileMenuAvatarText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+            </View>
+            <Text style={styles.profileMenuName}>{profile.first_name} {profile.last_name}</Text>
+            <Text style={styles.profileMenuEmail}>{profile.email}</Text>
+            <View style={styles.profileMenuDivider} />
+            <TouchableOpacity
+              style={styles.profileMenuSignOut}
+              onPress={() => { setShowProfileMenu(false); clearRiderRide(); unregisterPushToken(); onSignOut(); }}
+            >
+              <Text style={styles.profileMenuSignOutText}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Incoming request modal */}
       <Modal visible={hasRequest && !!currentRequest} transparent animationType="slide">
@@ -642,8 +670,30 @@ const styles = StyleSheet.create({
   riderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   driverAvatar: { width: 48, height: 48, borderRadius: 99, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
   driverAvatarText: { fontSize: 18, fontWeight: '700', color: '#374151' },
-  driverName: { fontSize: 15, fontWeight: '700', color: '#030712' },
-  driverMeta: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  driverAvatarPro: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center' },
+  driverAvatarProText: { fontWeight: '700', color: '#fff' },
+  driverName: { fontWeight: '700', color: '#030712' },
+  driverMeta: { color: '#9ca3af', marginTop: 1 },
+  profileBtn: {
+    position: 'absolute', top: 52, right: 16,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
+  },
+  profileBtnText: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  profileMenuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'flex-end', paddingTop: 100, paddingRight: 16 },
+  profileMenuCard: {
+    backgroundColor: '#fff', borderRadius: 20, padding: 20,
+    width: 220, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, elevation: 10,
+    alignItems: 'center',
+  },
+  profileMenuAvatar: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  profileMenuAvatarText: { fontSize: 22, fontWeight: '700', color: '#fff' },
+  profileMenuName: { fontSize: 15, fontWeight: '700', color: '#030712', textAlign: 'center' },
+  profileMenuEmail: { fontSize: 12, color: '#9ca3af', marginTop: 2, textAlign: 'center' },
+  profileMenuDivider: { height: 1, backgroundColor: '#f3f4f6', width: '100%', marginVertical: 14 },
+  profileMenuSignOut: { backgroundColor: '#fef2f2', borderRadius: 12, paddingVertical: 11, paddingHorizontal: 28 },
+  profileMenuSignOutText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
   fareText: { fontSize: 15, fontWeight: '700', color: '#10b981', marginTop: 2 },
 
   onlineCard: {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AppSettings } from '../lib/settingsService';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import RiderHomeScreen from '../screens/rider/RiderHomeScreen';
@@ -11,9 +12,10 @@ import { useProfile } from '../contexts/AuthContext';
 
 const Tab = createBottomTabNavigator();
 
-const TabIcon = ({ icon, label, focused }: { icon: string; label: string; focused: boolean }) => (
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+const TabIcon = ({ icon, label, focused }: { icon: IoniconsName; label: string; focused: boolean }) => (
   <View style={tabStyles.iconWrap}>
-    <Text style={[tabStyles.icon, focused && tabStyles.iconActive]}>{icon}</Text>
+    <Ionicons name={icon} size={22} color={focused ? '#030712' : '#9ca3af'} />
     <Text style={[tabStyles.label, focused && tabStyles.labelActive]}>{label}</Text>
   </View>
 );
@@ -42,21 +44,21 @@ export default function RiderNavigator({ appSettings }: Props) {
       >
         <Tab.Screen
           name="RiderHome"
-          options={{ tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="Home" focused={focused} /> }}
+          options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'home' : 'home-outline'} label="Home" focused={focused} /> }}
         >
           {() => <RiderHomeScreen profile={profile} onSignOut={signOut} />}
         </Tab.Screen>
 
         <Tab.Screen
           name="History"
-          options={{ tabBarIcon: ({ focused }) => <TabIcon icon="🕐" label="History" focused={focused} /> }}
+          options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'time' : 'time-outline'} label="History" focused={focused} /> }}
           component={HistoryScreen}
         />
 
         {(appSettings?.remittance_enabled !== false) && (
           <Tab.Screen
             name="Remit"
-            options={{ tabBarIcon: ({ focused }) => <TabIcon icon="💵" label="Remit" focused={focused} /> }}
+            options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'cash' : 'cash-outline'} label="Remit" focused={focused} /> }}
             component={RemitScreen}
           />
         )}
@@ -64,14 +66,14 @@ export default function RiderNavigator({ appSettings }: Props) {
         {isLeader && (
           <Tab.Screen
             name="Team"
-            options={{ tabBarIcon: ({ focused }) => <TabIcon icon="👥" label="Team" focused={focused} /> }}
+            options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'people' : 'people-outline'} label="Team" focused={focused} /> }}
             component={TeamScreen}
           />
         )}
 
         <Tab.Screen
           name="News"
-          options={{ tabBarIcon: ({ focused }) => <TabIcon icon="📰" label="News" focused={focused} /> }}
+          options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'newspaper' : 'newspaper-outline'} label="News" focused={focused} /> }}
           component={NewsScreen}
         />
       </Tab.Navigator>
