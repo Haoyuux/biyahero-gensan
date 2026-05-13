@@ -25,8 +25,9 @@ export default function LoginScreen() {
           options: { redirectTo },
         });
       } else {
-        // Use HTTPS redirect URL already in Supabase allowed list (https://fetch-gensan.vercel.app/*)
-        const redirectTo = 'https://fetch-gensan.vercel.app/auth-callback';
+        // Local dev redirect — phone accesses the Metro dev server on the same WiFi.
+        // Update the IP when your network changes (check metro output: "exp://IP:8082").
+        const redirectTo = 'http://10.50.66.114:8082/auth';
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
