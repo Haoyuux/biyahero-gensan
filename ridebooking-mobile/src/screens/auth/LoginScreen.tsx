@@ -25,9 +25,8 @@ export default function LoginScreen() {
           options: { redirectTo },
         });
       } else {
-        // Use an HTTPS redirect URL — custom schemes (exp://, biyahero://) are
-        // rejected by Chrome Custom Tab on Android. HTTPS URLs are intercepted reliably.
-        const redirectTo = 'https://biyahero.online/auth-callback';
+        // Use HTTPS redirect URL already in Supabase allowed list (https://fetch-gensan.vercel.app/*)
+        const redirectTo = 'https://fetch-gensan.vercel.app/auth-callback';
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
