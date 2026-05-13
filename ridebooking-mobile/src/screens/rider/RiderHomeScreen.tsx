@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
 import { supabase, Profile } from '../../lib/supabase';
 import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
+import * as Notifications from 'expo-notifications';
 
 interface Props {
   profile: Profile;
@@ -54,6 +55,30 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const clearRiderRide = async () => {
     try { await AsyncStorage.removeItem(RIDER_RIDE_KEY); } catch { /* silent */ }
+  };
+
+  const registerPushToken = async () => {
+    try {
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      const finalStatus = existing === 'granted'
+        ? existing
+        : (await Notifications.requestPermissionsAsync()).status;
+      if (finalStatus !== 'granted') return;
+
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      await supabase.from('fcm_tokens').upsert(
+        { rider_id: profile.id, token: tokenData.data, platform: Platform.OS },
+        { onConflict: 'rider_id' },
+      );
+    } catch (e) {
+      console.warn('registerPushToken:', e);
+    }
+  };
+
+  const unregisterPushToken = async () => {
+    try {
+      await supabase.from('fcm_tokens').delete().eq('rider_id', profile.id);
+    } catch { /* silent */ }
   };
 
   // GPS
@@ -209,6 +234,9 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     if (!value) {
       setHasRequest(false);
       setRequestQueue([]);
+      await unregisterPushToken();
+    } else {
+      await registerPushToken();
     }
     await supabase.from('profiles').update({ is_online: value }).eq('id', profile.id);
   };
@@ -478,7 +506,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             </View>
           )}
 
-          <TouchableOpacity onPress={() => { clearRiderRide(); onSignOut(); }} style={styles.signOut}>
+          <TouchableOpacity onPress={() => { clearRiderRide(); unregisterPushToken(); onSignOut(); }} style={styles.signOut}>
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
