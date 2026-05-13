@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
+const GENDERS = ['Male', 'Female', 'Other'] as const;
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../contexts/AuthContext';
 
@@ -12,6 +13,7 @@ export default function OnboardingScreen() {
   const [lastName, setLastName] = useState(profile.last_name ?? '');
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [dob, setDob] = useState(profile.date_of_birth ?? '');
+  const [sex, setSex] = useState(profile.sex ?? '');
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
@@ -26,6 +28,7 @@ export default function OnboardingScreen() {
       full_name: `${firstName.trim()} ${lastName.trim()}`,
       phone: phone.trim() || null,
       date_of_birth: dob.trim() || null,
+      sex: sex.trim() || null,
       profile_completed: true,
       onboarded: true,
     }).eq('id', profile.id);
@@ -86,6 +89,19 @@ export default function OnboardingScreen() {
             placeholder="YYYY-MM-DD"
             placeholderTextColor="#9ca3af"
           />
+
+          <Text style={styles.fieldLabel}>GENDER</Text>
+          <View style={styles.genderRow}>
+            {GENDERS.map(g => (
+              <TouchableOpacity
+                key={g}
+                style={[styles.genderBtn, sex === g && styles.genderBtnActive]}
+                onPress={() => setSex(g)}
+              >
+                <Text style={[styles.genderText, sex === g && styles.genderTextActive]}>{g}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -122,4 +138,9 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: '#10b981', borderRadius: 16, paddingVertical: 17, alignItems: 'center' },
   btnDisabled: { opacity: 0.5 },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  genderRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  genderBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: '#222', backgroundColor: '#111', alignItems: 'center' },
+  genderBtnActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  genderText: { fontSize: 13, fontWeight: '600', color: '#4b5563' },
+  genderTextActive: { color: '#fff' },
 });

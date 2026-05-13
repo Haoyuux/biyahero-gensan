@@ -14,6 +14,7 @@ export default function ProfileScreen() {
   const [lastName, setLastName] = useState(profile.last_name ?? '');
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [dob, setDob] = useState(profile.date_of_birth ?? '');
+  const [sex, setSex] = useState(profile.sex ?? '');
   const [loading, setLoading] = useState(false);
   const [rides, setRides] = useState<any[]>([]);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '');
@@ -40,6 +41,7 @@ export default function ProfileScreen() {
       full_name: `${firstName.trim()} ${lastName.trim()}`,
       phone: phone.trim() || null,
       date_of_birth: dob.trim() || null,
+      sex: sex.trim() || null,
     }).eq('id', profile.id);
     setLoading(false);
     if (error) { Alert.alert('Error', error.message); return; }
@@ -130,6 +132,18 @@ export default function ProfileScreen() {
             <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholderTextColor="#9ca3af" />
             <Text style={styles.fieldLabel}>DATE OF BIRTH</Text>
             <TextInput style={styles.input} value={dob} onChangeText={setDob} placeholder="YYYY-MM-DD" placeholderTextColor="#9ca3af" />
+            <Text style={styles.fieldLabel}>GENDER</Text>
+            <View style={styles.genderRow}>
+              {['Male', 'Female', 'Other'].map(g => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.genderBtn, sex === g && styles.genderBtnActive]}
+                  onPress={() => setSex(g)}
+                >
+                  <Text style={[styles.genderBtnText, sex === g && styles.genderBtnTextActive]}>{g}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -141,6 +155,7 @@ export default function ProfileScreen() {
               ['Email', profile.email],
               ['Phone', profile.phone ?? '—'],
               ['Date of Birth', profile.date_of_birth ?? '—'],
+              ['Gender', profile.sex ?? '—'],
             ].map(([label, val]) => (
               <View key={label} style={styles.infoRow}>
                 <Text style={styles.infoLabel}>{label}</Text>
@@ -235,6 +250,11 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#f9fafb', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#030712', borderWidth: 1, borderColor: '#f3f4f6' },
   cancelBtn: { marginTop: 12, alignItems: 'center', padding: 12 },
   cancelBtnText: { fontSize: 13, color: '#9ca3af' },
+  genderRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  genderBtn: { flex: 1, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: '#f3f4f6', backgroundColor: '#f9fafb', alignItems: 'center' },
+  genderBtnActive: { backgroundColor: '#030712', borderColor: '#030712' },
+  genderBtnText: { fontSize: 13, fontWeight: '600', color: '#9ca3af' },
+  genderBtnTextActive: { color: '#fff' },
 
   infoGroup: { gap: 0 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
