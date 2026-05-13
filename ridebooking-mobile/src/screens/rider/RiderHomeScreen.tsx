@@ -10,6 +10,7 @@ import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
 import { supabase, Profile } from '../../lib/supabase';
 import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 interface Props {
   profile: Profile;
@@ -63,17 +64,30 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const registerPushToken = async () => {
     try {
+      if (Platform.OS === 'web') return; // Push not supported on web
+
       const { status: existing } = await Notifications.getPermissionsAsync();
       const finalStatus = existing === 'granted'
         ? existing
         : (await Notifications.requestPermissionsAsync()).status;
-      if (finalStatus !== 'granted') return;
+      if (finalStatus !== 'granted') {
+        console.warn('registerPushToken: permission not granted');
+        return;
+      }
 
-      const { data: tokenData } = await Notifications.getExpoPushTokenAsync();
-      await supabase
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId ??
+        '6a2352a2-9e24-401f-9273-41843f055a2b';
+
+      const { data: tokenData } = await Notifications.getExpoPushTokenAsync({ projectId });
+      console.log('[PUSH] token:', tokenData);
+
+      const { error } = await supabase
         .from('profiles')
         .update({ expo_push_token: tokenData })
         .eq('id', profile.id);
+      if (error) console.warn('registerPushToken save error:', error.message);
     } catch (e) {
       console.warn('registerPushToken:', e);
     }
