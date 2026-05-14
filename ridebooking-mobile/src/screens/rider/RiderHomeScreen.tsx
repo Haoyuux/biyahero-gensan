@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
-  useWindowDimensions, Image, BackHandler, Alert,
+  useWindowDimensions, Image, BackHandler, Alert, Vibration,
 } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,6 +35,8 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const ridesChannelRef = useRef<any>(null);
   const wasRestoredRef = useRef(false);
   const hasRestoredMapRef = useRef(false);
+  const alertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const alertNotifIdsRef = useRef<string[]>([]);
 
   const [isOnline, setIsOnline] = useState(profile.is_online ?? false);
   const [mapReady, setMapReady] = useState(false);
@@ -60,6 +62,18 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const chatScrollRef = useRef<ScrollView>(null);
+
+  const stopRideRequestAlert = () => {
+    if (alertIntervalRef.current) {
+      clearInterval(alertIntervalRef.current);
+      alertIntervalRef.current = null;
+    }
+    alertNotifIdsRef.current.forEach(id =>
+      Notifications.cancelScheduledNotificationAsync(id).catch(() => {})
+    );
+    alertNotifIdsRef.current = [];
+    Vibration.cancel();
+  };
 
   const saveRiderRide = async (request: any, accepted: boolean, status: 'going_to_pickup' | 'picked_up' = 'going_to_pickup') => {
     try {
@@ -93,16 +107,6 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       if (Constants.appOwnership === 'expo') {
         console.warn('[PUSH] Expo Go detected — push tokens not supported. Build an APK to test push.');
         return;
-      }
-
-      // Create Android notification channel (required for Android 8+)
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('ride-requests', {
-          name: 'Ride Requests',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-        });
       }
 
       const { status: existing } = await Notifications.getPermissionsAsync();
@@ -147,6 +151,20 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         .eq('id', profile.id);
     } catch { /* silent */ }
   };
+
+  // Always create the notification channel on mount so local notifications
+  // work even when push token registration is skipped (e.g. Expo Go)
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('ride-requests', {
+        name: 'Ride Requests',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 400, 200, 400, 200, 400],
+        sound: 'default',
+        enableVibrate: true,
+      });
+    }
+  }, []);
 
   // GPS
   useEffect(() => {
@@ -343,6 +361,32 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     }
   }, [requestQueue, hasRequest, requestAccepted]);
 
+  // Repeat alert sound + vibration every 10s while request modal is visible
+  useEffect(() => {
+    if (!hasRequest || !currentRequest) {
+      stopRideRequestAlert();
+      return;
+    }
+
+    const passengerName = [currentRequest.user?.first_name, currentRequest.user?.last_name]
+      .filter(Boolean).join(' ') || 'Passenger';
+    const title = 'New Ride Request';
+    const body = `₱${currentRequest.fare} · ${passengerName}`;
+
+    // Immediate vibration (sound already played by the first notification in the broadcast handler)
+    Vibration.vibrate([0, 400, 200, 400, 200, 400]);
+
+    alertIntervalRef.current = setInterval(() => {
+      Vibration.vibrate([0, 400, 200, 400, 200, 400]);
+      Notifications.scheduleNotificationAsync({
+        content: { title, body, sound: true, channelId: 'ride-requests' },
+        trigger: null,
+      }).then(id => alertNotifIdsRef.current.push(id)).catch(() => {});
+    }, 10000);
+
+    return () => stopRideRequestAlert();
+  }, [hasRequest, currentRequest]);
+
   // Chat subscription when active ride
   useEffect(() => {
     if (!acceptedRideIdRef.current) return;
@@ -377,6 +421,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   };
 
   const handleAccept = async () => {
+    stopRideRequestAlert();
     if (!currentRequest) return;
     const rideId = currentRequest.rideId;
     const { error } = await supabase.from('rides')
@@ -417,6 +462,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   };
 
   const handleDecline = () => {
+    stopRideRequestAlert();
     const declined = currentRequest;
     setHasRequest(false);
     setCurrentRequest(null);
