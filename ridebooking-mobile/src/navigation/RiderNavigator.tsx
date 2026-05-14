@@ -5,10 +5,21 @@ import { AppSettings } from '../lib/settingsService';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import RiderHomeScreen from '../screens/rider/RiderHomeScreen';
 import HistoryScreen from '../screens/rider/HistoryScreen';
+import RiderProfileScreen from '../screens/rider/RiderProfileScreen';
+import RiderMessagesScreen from '../screens/rider/RiderMessagesScreen';
 import RemitScreen from '../screens/rider/RemitScreen';
 import TeamScreen from '../screens/rider/TeamScreen';
 import NewsScreen from '../screens/rider/NewsScreen';
 import { useProfile } from '../contexts/AuthContext';
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const Tab = createBottomTabNavigator();
 
@@ -75,6 +86,18 @@ export default function RiderNavigator({ appSettings }: Props) {
           name="News"
           options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'newspaper' : 'newspaper-outline'} label="News" focused={focused} /> }}
           component={NewsScreen}
+        />
+
+        <Tab.Screen
+          name="Messages"
+          options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'chatbubbles' : 'chatbubbles-outline'} label="Messages" focused={focused} /> }}
+          component={RiderMessagesScreen}
+        />
+
+        <Tab.Screen
+          name="Profile"
+          options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'person' : 'person-outline'} label="Profile" focused={focused} /> }}
+          component={RiderProfileScreen}
         />
       </Tab.Navigator>
     </View>
