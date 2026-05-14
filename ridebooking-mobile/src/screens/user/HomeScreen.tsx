@@ -209,6 +209,11 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
         sound: 'default',
       });
     }
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      if (status !== 'granted') {
+        Notifications.requestPermissionsAsync();
+      }
+    });
     loadPricingConfigFromDB(supabase).then(setPricingConfig);
     AsyncStorage.getItem(FAVORITES_KEY).then(val => {
       if (val) setFavorites(JSON.parse(val));
