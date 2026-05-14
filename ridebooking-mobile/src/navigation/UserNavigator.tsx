@@ -1,9 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import * as Notifications from 'expo-notifications';
 import HomeScreen from '../screens/user/HomeScreen';
 import ProfileScreen from '../screens/user/ProfileScreen';
 import { useProfile } from '../contexts/AuthContext';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const Tab = createBottomTabNavigator();
 
