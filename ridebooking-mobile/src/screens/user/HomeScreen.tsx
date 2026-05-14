@@ -20,6 +20,7 @@ import {
 } from '../../lib/voucherService';
 import { fetchNewsPosts, NewsPost } from '../../lib/newsService';
 import ChatHistoryScreen from './ChatHistoryScreen';
+import * as Notifications from 'expo-notifications';
 
 type Step = 'home' | 'select' | 'searching' | 'matched' | 'review';
 type TierId = 'moto' | 'eco' | 'premium';
@@ -131,13 +132,14 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   // Drawer
   const [showDrawer, setShowDrawer] = useState(false);
 
-  // Rider confirm + reviews + vehicle photo
-  const [pendingRider, setPendingRider] = useState<Profile | null>(null);
+  // Rider reviews + vehicle photo
   const [riderReviews, setRiderReviews] = useState<{ rating: number; comment: string | null; user_name: string; completed_at: string | null }[]>([]);
   const [riderStats, setRiderStats] = useState<{ avgRating: number; rideCount: number } | null>(null);
   const [showVehiclePhoto, setShowVehiclePhoto] = useState(false);
   const [lastRiderCoords, setLastRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastRiderCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const wasRestoredRef = useRef(false);
+  const hasRestoredMapRef = useRef(false);
 
   // Review
   const [completedRider, setCompletedRider] = useState<Profile | null>(null);
@@ -152,6 +154,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       await AsyncStorage.setItem(USER_RIDE_KEY, JSON.stringify({
         currentRideId,
         step,
+        ridePhase,
         pickup: pickupLabel,
         pickupCoords,
         dropoff: destination,
@@ -198,6 +201,14 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
 
   // Init
   useEffect(() => {
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('ride-status', {
+        name: 'Ride Status',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: 'default',
+      });
+    }
     loadPricingConfigFromDB(supabase).then(setPricingConfig);
     AsyncStorage.getItem(FAVORITES_KEY).then(val => {
       if (val) setFavorites(JSON.parse(val));
@@ -224,6 +235,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
         if (saved.activeRider) setActiveRider(saved.activeRider);
         if (saved.selectedVoucherUv) setSelectedVoucherUv(saved.selectedVoucherUv);
         if (saved.voucherDiscount) setVoucherDiscount(saved.voucherDiscount);
+        if (saved.ridePhase) { ridePhaseRef.current = saved.ridePhase; setRidePhase(saved.ridePhase); }
+        wasRestoredRef.current = true;
       } catch {
         await AsyncStorage.removeItem(USER_RIDE_KEY);
       }
@@ -256,8 +269,41 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   useEffect(() => {
     if (!mapReady || !pickupCoords) return;
     mapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
-    mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
+    if (step !== 'matched') mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
   }, [mapReady, pickupCoords]);
+
+  // Restore map markers + route after app restart mid-ride
+  useEffect(() => {
+    if (!mapReady || !wasRestoredRef.current || hasRestoredMapRef.current) return;
+    if (step !== 'matched' || !activeRider) return;
+    hasRestoredMapRef.current = true;
+
+    if (pickupCoords) mapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
+
+    if (ridePhase === 'going_to_pickup') {
+      if (pickupCoords) {
+        mapRef.current?.setDestination(pickupCoords.lat, pickupCoords.lng, '📍 Pickup: ' + pickupLabel);
+      }
+    } else if (ridePhase === 'arrived' && destinationCoords) {
+      mapRef.current?.setDestination(destinationCoords.lat, destinationCoords.lng, '🏁 ' + (destination || 'Destination'));
+    }
+
+    const rLat = activeRider.last_lat;
+    const rLng = activeRider.last_lng;
+    if (rLat && rLng) {
+      mapRef.current?.setRiderLocation(rLat, rLng);
+      setLastRiderCoords({ lat: rLat, lng: rLng });
+      lastRiderCoordsRef.current = { lat: rLat, lng: rLng };
+      mapRef.current?.flyTo(rLat, rLng, 15);
+      if (ridePhase === 'going_to_pickup' && pickupCoords) {
+        drawRiderToPickupRoute(rLat, rLng);
+      } else if (ridePhase === 'arrived' && destinationCoords) {
+        drawRiderToDropoffRoute(rLat, rLng);
+      }
+    } else if (destinationCoords) {
+      mapRef.current?.flyTo(destinationCoords.lat, destinationCoords.lng, 14);
+    }
+  }, [mapReady, step, activeRider]);
 
   // Fallback: force mapReady if WebView never fires the event (edge case on some devices)
   useEffect(() => {
@@ -366,20 +412,44 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     ch.on('broadcast', { event: 'RIDE_ACCEPTED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
       stopBroadcasting();
-      setPendingRider(payload.rider as Profile);
-      showToast('Rider found! Confirming...', 'success');
+      const rider = payload.rider as Profile;
+      setActiveRider(rider);
+      const bd = calculateFare(selectedTier, routeDistance, routeDuration, pricingConfig);
+      setFareBreakdown(bd);
+      setStep('matched');
+      saveRideState({ step: 'matched', activeRider: rider });
+      if (rider.last_lat && rider.last_lng) {
+        mapRef.current?.setRiderLocation(rider.last_lat, rider.last_lng);
+        setLastRiderCoords({ lat: rider.last_lat, lng: rider.last_lng });
+        lastRiderCoordsRef.current = { lat: rider.last_lat, lng: rider.last_lng };
+        mapRef.current?.flyTo(rider.last_lat, rider.last_lng, 15);
+        drawRiderToPickupRoute(rider.last_lat, rider.last_lng);
+      }
+      showToast('Rider found! On the way...', 'success');
+      const riderName = [rider.first_name, rider.last_name].filter(Boolean).join(' ') || 'Your rider';
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Rider Found!',
+          body: `${riderName} is on the way`,
+          sound: true,
+          channelId: 'ride-status',
+        },
+        trigger: null,
+      });
     });
     ch.on('broadcast', { event: 'RIDER_LOCATION' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
       mapRef.current?.setRiderLocation(payload.lat, payload.lng);
       lastRiderCoordsRef.current = { lat: payload.lat, lng: payload.lng };
       setLastRiderCoords({ lat: payload.lat, lng: payload.lng });
-      // Live route: once rider has picked up passenger, redraw rider → dropoff every 5 updates
-      if (ridePhaseRef.current === 'arrived') {
-        userRouteTickRef.current++;
-        if (userRouteTickRef.current >= 5) {
-          userRouteTickRef.current = 0;
+      // Redraw route every 3 location updates (~9s) for both phases
+      userRouteTickRef.current++;
+      if (userRouteTickRef.current >= 3) {
+        userRouteTickRef.current = 0;
+        if (ridePhaseRef.current === 'arrived') {
           drawRiderToDropoffRoute(payload.lat, payload.lng);
+        } else {
+          drawRiderToPickupRoute(payload.lat, payload.lng);
         }
       }
     });
@@ -388,6 +458,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       ridePhaseRef.current = 'arrived';
       userRouteTickRef.current = 0;
       setRidePhase('arrived');
+      saveRideState({ ridePhase: 'arrived', step: 'matched' });
       showToast('Your rider has arrived! 🏍️', 'success');
       // Remove pickup marker; keep/re-set destination; draw rider → dropoff route
       mapRef.current?.clearPickup();
@@ -410,6 +481,13 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       ridePhaseRef.current = 'going_to_pickup';
       setRidePhase('going_to_pickup');
       setStep('searching');
+      // Reset map to pre-matched state
+      mapRef.current?.clearRider();
+      mapRef.current?.clearRoute();
+      mapRef.current?.clearDestination();
+      if (pickupCoords) mapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
+      if (destinationCoords) mapRef.current?.setDestination(destinationCoords.lat, destinationCoords.lng, destination || 'Destination');
+      if (pickupCoords) mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 14);
       supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', currentRideId);
       stopBroadcasting();
       broadcastIntervalRef.current = setInterval(() => {
@@ -592,9 +670,10 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     setDestination(''); setDestinationCoords(null); setDropoffQuery('');
     setVoucherDiscount(0); setAppliedVoucher(null); setVoucherCode(''); setVoucherMsg('');
     setSelectedVoucherUv(null); setUserVouchers([]);
-    setPendingRider(null); setRiderReviews([]); setRiderStats(null); setShowVehiclePhoto(false);
+    setRiderReviews([]); setRiderStats(null); setShowVehiclePhoto(false);
     setLastRiderCoords(null); lastRiderCoordsRef.current = null;
     mapRef.current?.clearRider(); mapRef.current?.clearRoute(); mapRef.current?.clearDestination(); mapRef.current?.clearPickup();
+    if (pickupCoords) mapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
     clearRideState();
   };
 
@@ -667,146 +746,153 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       const showExpanded = isExpanded || hasSuggestions;
       return (
         <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          {/* Handle */}
-          <TouchableOpacity style={styles.handleWrap} onPress={() => { setIsExpanded(e => !e); setSuggestions([]); }} activeOpacity={1}>
-            <View style={styles.handle} />
-          </TouchableOpacity>
-
-          {/* Header */}
-          <View style={styles.homeHeaderRow}>
-            <View>
-              <Text style={styles.heading}>Where to?</Text>
-              <Text style={styles.hint}>📍 Service available in Mindanao only</Text>
-            </View>
-            <TouchableOpacity onPress={() => { setIsExpanded(e => !e); setSuggestions([]); }} style={styles.chevronBtn}>
-              <Text style={styles.chevronText}>{showExpanded ? '∧' : '∨'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Expanded: suggestions / favorites / quick places */}
-          {showExpanded && (
-            <ScrollView style={styles.expandedArea} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {hasSuggestions ? (
-                <View style={styles.suggestionBox}>
-                  {searchLoading && <Text style={styles.searchingText}>Searching...</Text>}
-                  {suggestions.map((place, i) => (
-                    <View key={i} style={[styles.suggRow, i < suggestions.length - 1 && styles.suggBorder]}>
-                      <TouchableOpacity style={styles.suggLeft} onPress={() => handleSelectPlace(place)}>
-                        <Text style={styles.suggPin}>📍</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.suggName} numberOfLines={1}>{place.name || place.display_name.split(',')[0]}</Text>
-                          <Text style={styles.suggSub} numberOfLines={1}>{place.display_name}</Text>
-                        </View>
-                      </TouchableOpacity>
-                      {activeField === 'dropoff' && (
-                        <TouchableOpacity onPress={() => saveFavorite(place)} style={styles.starBtn}>
-                          <Text style={[styles.starIcon, favorites.some(f => f.label === place.display_name) && styles.starIconFilled]}>
-                            {favorites.some(f => f.label === place.display_name) ? '★' : '☆'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              ) : activeQuery.length >= 3 && !searchLoading ? (
-                <Text style={styles.noResults}>No locations found in Mindanao for "{activeQuery}"</Text>
-              ) : activeField === 'pickup' ? (
-                <TouchableOpacity style={styles.quickItem} onPress={() => { setPickupLabel('Current Location'); setActiveField('dropoff'); setIsExpanded(false); }}>
-                  <View style={styles.quickIcon}><Text>📍</Text></View>
-                  <View><Text style={styles.quickName}>Current Location</Text><Text style={styles.quickSub}>Use GPS location</Text></View>
-                </TouchableOpacity>
-              ) : (
-                <>
-                  {favorites.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLbl}>SAVED PLACES</Text>
-                      {favorites.map(fav => (
-                        <View key={fav.id} style={styles.quickItem}>
-                          <TouchableOpacity style={styles.quickItemLeft} onPress={() => {
-                            setDestination(fav.name); setDestinationCoords({ lat: fav.coords[0], lng: fav.coords[1] });
-                            setActiveField(null);
-                            mapRef.current?.setDestination(fav.coords[0], fav.coords[1], fav.name);
-                            mapRef.current?.flyTo(fav.coords[0], fav.coords[1], 14);
-                            if (pickupCoords) fetchRoute(pickupCoords, { lat: fav.coords[0], lng: fav.coords[1] });
-                            setIsExpanded(false);
-                          }}>
-                            <View style={[styles.quickIcon, { backgroundColor: '#fef3c7' }]}><Text>⭐</Text></View>
-                            <View style={{ flex: 1 }}><Text style={styles.quickName}>{fav.name}</Text><Text style={styles.quickSub} numberOfLines={1}>{fav.label.split(',').slice(0, 2).join(',')}</Text></View>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => removeFavorite(fav.id)} style={styles.removeBtn}>
-                            <Text style={styles.removeBtnText}>✕</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                      <View style={styles.divider} />
-                    </>
-                  )}
-                  <Text style={styles.sectionLbl}>QUICK DESTINATIONS</Text>
-                  {QUICK_PLACES.map(place => (
-                    <TouchableOpacity key={place.name} style={styles.quickItem} onPress={() => selectQuickPlace(place)}>
-                      <View style={styles.quickIcon}><Text>{place.emoji}</Text></View>
-                      <View><Text style={styles.quickName}>{place.name}</Text><Text style={styles.quickSub}>{place.subtitle}</Text></View>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-            </ScrollView>
-          )}
-
-          {/* Dual input */}
-          <View style={styles.inputBox}>
-            <TouchableOpacity
-              style={[styles.inputRow, activeField === 'pickup' ? styles.inputRowActive : styles.inputRowInactive]}
-              onPress={() => { setActiveField('pickup'); setIsExpanded(true); setSuggestions([]); }}
-              activeOpacity={1}
-            >
-              <View style={styles.dotBlack} />
-              {activeField === 'pickup' ? (
-                <TextInput style={styles.inputField} placeholder="Search pickup..." placeholderTextColor="#9ca3af" value={pickupQuery} onChangeText={setPickupQuery} autoFocus />
-              ) : (
-                <Text style={[styles.inputStaticText, { color: '#111827' }]} numberOfLines={1}>{pickupLabel}</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.connector}>
-              <View style={styles.connDot} />
-              <View style={styles.connDot} />
-              <View style={styles.connLine} />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.inputRow, activeField === 'dropoff' ? styles.inputRowActive : styles.inputRowInactive]}
-              onPress={() => { setActiveField('dropoff'); setIsExpanded(true); setSuggestions([]); }}
-              activeOpacity={1}
-            >
-              <View style={styles.dotGreen} />
-              {activeField === 'dropoff' ? (
-                <TextInput style={styles.inputField} placeholder="Where to?" placeholderTextColor="#9ca3af" value={dropoffQuery} onChangeText={setDropoffQuery} autoFocus />
-              ) : (
-                <Text style={[styles.inputStaticText, !destination && { color: '#9ca3af' }]} numberOfLines={1}>
-                  {destination || 'Choose destination'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, !destinationCoords && styles.primaryBtnInactive]}
-            onPress={() => {
-              if (!destinationCoords) { setActiveField('dropoff'); setIsExpanded(true); return; }
-              if (!profile.first_name || !profile.last_name || !profile.phone) {
-                Alert.alert('Complete your profile', 'Please add your first name, last name, and phone number before booking.');
-                return;
-              }
-              setStep('select');
-              fetchUserVouchers(profile.id).then(setUserVouchers);
-            }}
-            activeOpacity={0.85}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            contentContainerStyle={{ paddingBottom: 8 }}
           >
-            <Text style={[styles.primaryBtnText, !destinationCoords && styles.primaryBtnTextInactive]}>
-              {destinationCoords ? 'Find a Rider' : 'Where are you going?'}
-            </Text>
-          </TouchableOpacity>
+            {/* Handle */}
+            <TouchableOpacity style={styles.handleWrap} onPress={() => { setIsExpanded(e => !e); setSuggestions([]); }} activeOpacity={1}>
+              <View style={styles.handle} />
+            </TouchableOpacity>
+
+            {/* Header */}
+            <View style={styles.homeHeaderRow}>
+              <View>
+                <Text style={styles.heading}>Where to?</Text>
+                <Text style={styles.hint}>📍 Service available in Mindanao only</Text>
+              </View>
+              <TouchableOpacity onPress={() => { setIsExpanded(e => !e); setSuggestions([]); }} style={styles.chevronBtn}>
+                <Text style={styles.chevronText}>{showExpanded ? '∧' : '∨'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Expanded: suggestions / favorites / quick places */}
+            {showExpanded && (
+              <View style={styles.expandedArea}>
+                {hasSuggestions ? (
+                  <View style={styles.suggestionBox}>
+                    {searchLoading && <Text style={styles.searchingText}>Searching...</Text>}
+                    {suggestions.map((place, i) => (
+                      <View key={i} style={[styles.suggRow, i < suggestions.length - 1 && styles.suggBorder]}>
+                        <TouchableOpacity style={styles.suggLeft} onPress={() => handleSelectPlace(place)}>
+                          <Text style={styles.suggPin}>📍</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.suggName} numberOfLines={1}>{place.name || place.display_name.split(',')[0]}</Text>
+                            <Text style={styles.suggSub} numberOfLines={1}>{place.display_name}</Text>
+                          </View>
+                        </TouchableOpacity>
+                        {activeField === 'dropoff' && (
+                          <TouchableOpacity onPress={() => saveFavorite(place)} style={styles.starBtn}>
+                            <Text style={[styles.starIcon, favorites.some(f => f.label === place.display_name) && styles.starIconFilled]}>
+                              {favorites.some(f => f.label === place.display_name) ? '★' : '☆'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ) : activeQuery.length >= 3 && !searchLoading ? (
+                  <Text style={styles.noResults}>No locations found in Mindanao for "{activeQuery}"</Text>
+                ) : activeField === 'pickup' ? (
+                  <TouchableOpacity style={styles.quickItem} onPress={() => { setPickupLabel('Current Location'); setActiveField('dropoff'); setIsExpanded(false); }}>
+                    <View style={styles.quickIcon}><Text>📍</Text></View>
+                    <View><Text style={styles.quickName}>Current Location</Text><Text style={styles.quickSub}>Use GPS location</Text></View>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    {favorites.length > 0 && (
+                      <>
+                        <Text style={styles.sectionLbl}>SAVED PLACES</Text>
+                        {favorites.map(fav => (
+                          <View key={fav.id} style={styles.quickItem}>
+                            <TouchableOpacity style={styles.quickItemLeft} onPress={() => {
+                              setDestination(fav.name); setDestinationCoords({ lat: fav.coords[0], lng: fav.coords[1] });
+                              setActiveField(null);
+                              mapRef.current?.setDestination(fav.coords[0], fav.coords[1], fav.name);
+                              mapRef.current?.flyTo(fav.coords[0], fav.coords[1], 14);
+                              if (pickupCoords) fetchRoute(pickupCoords, { lat: fav.coords[0], lng: fav.coords[1] });
+                              setIsExpanded(false);
+                            }}>
+                              <View style={[styles.quickIcon, { backgroundColor: '#fef3c7' }]}><Text>⭐</Text></View>
+                              <View style={{ flex: 1 }}><Text style={styles.quickName}>{fav.name}</Text><Text style={styles.quickSub} numberOfLines={1}>{fav.label.split(',').slice(0, 2).join(',')}</Text></View>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => removeFavorite(fav.id)} style={styles.removeBtn}>
+                              <Text style={styles.removeBtnText}>✕</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                        <View style={styles.divider} />
+                      </>
+                    )}
+                    <Text style={styles.sectionLbl}>QUICK DESTINATIONS</Text>
+                    {QUICK_PLACES.map(place => (
+                      <TouchableOpacity key={place.name} style={styles.quickItem} onPress={() => selectQuickPlace(place)}>
+                        <View style={styles.quickIcon}><Text>{place.emoji}</Text></View>
+                        <View><Text style={styles.quickName}>{place.name}</Text><Text style={styles.quickSub}>{place.subtitle}</Text></View>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+
+            {/* Dual input */}
+            <View style={styles.inputBox}>
+              <TouchableOpacity
+                style={[styles.inputRow, activeField === 'pickup' ? styles.inputRowActive : styles.inputRowInactive]}
+                onPress={() => { setActiveField('pickup'); setIsExpanded(true); setSuggestions([]); }}
+                activeOpacity={1}
+              >
+                <View style={styles.dotBlack} />
+                {activeField === 'pickup' ? (
+                  <TextInput style={styles.inputField} placeholder="Search pickup..." placeholderTextColor="#9ca3af" value={pickupQuery} onChangeText={setPickupQuery} autoFocus />
+                ) : (
+                  <Text style={[styles.inputStaticText, { color: '#111827' }]} numberOfLines={1}>{pickupLabel}</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.connector}>
+                <View style={styles.connDot} />
+                <View style={styles.connDot} />
+                <View style={styles.connLine} />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.inputRow, activeField === 'dropoff' ? styles.inputRowActive : styles.inputRowInactive]}
+                onPress={() => { setActiveField('dropoff'); setIsExpanded(true); setSuggestions([]); }}
+                activeOpacity={1}
+              >
+                <View style={styles.dotGreen} />
+                {activeField === 'dropoff' ? (
+                  <TextInput style={styles.inputField} placeholder="Where to?" placeholderTextColor="#9ca3af" value={dropoffQuery} onChangeText={setDropoffQuery} autoFocus />
+                ) : (
+                  <Text style={[styles.inputStaticText, !destination && { color: '#9ca3af' }]} numberOfLines={1}>
+                    {destination || 'Choose destination'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, !destinationCoords && styles.primaryBtnInactive]}
+              onPress={() => {
+                if (!destinationCoords) { setActiveField('dropoff'); setIsExpanded(true); return; }
+                if (!profile.first_name || !profile.last_name || !profile.phone) {
+                  Alert.alert('Complete your profile', 'Please add your first name, last name, and phone number before booking.');
+                  return;
+                }
+                setStep('select');
+                fetchUserVouchers(profile.id).then(setUserVouchers);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.primaryBtnText, !destinationCoords && styles.primaryBtnTextInactive]}>
+                {destinationCoords ? 'Find a Rider' : 'Where are you going?'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </KeyboardAvoidingView>
       );
     }
@@ -1313,94 +1399,6 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
         </View>
       </Modal>
 
-      {/* Rider confirm modal */}
-      <Modal visible={!!pendingRider} transparent animationType="slide" onRequestClose={() => {}}>
-        <View style={styles.confirmOverlay}>
-          <View style={styles.confirmSheet}>
-            <View style={styles.handle} />
-            <Text style={styles.confirmLabel}>DRIVER FOUND</Text>
-
-            <View style={styles.confirmRiderRow}>
-              <View style={styles.confirmAvatar}>
-                {pendingRider?.avatar_url
-                  ? <Image source={{ uri: pendingRider.avatar_url }} style={styles.confirmAvatarImg} />
-                  : <Text style={styles.confirmAvatarText}>{(pendingRider?.first_name?.[0] ?? 'R').toUpperCase()}</Text>
-                }
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.confirmName}>{pendingRider?.first_name} {pendingRider?.last_name}</Text>
-                <View style={styles.confirmBadgeRow}>
-                  {pendingRider?.sex && <View style={styles.confirmBadge}><Text style={styles.confirmBadgeText}>{pendingRider.sex}</Text></View>}
-                </View>
-              </View>
-            </View>
-
-            {(pendingRider?.vehicle_make || pendingRider?.vehicle_plate) && (
-              <View style={styles.confirmVehicleCard}>
-                {pendingRider?.vehicle_type && (
-                  <View style={styles.confirmVehicleRow}>
-                    <Text style={styles.confirmVehicleLabel}>Type</Text>
-                    <Text style={styles.confirmVehicleVal}>{pendingRider.vehicle_type}</Text>
-                  </View>
-                )}
-                {(pendingRider?.vehicle_make || pendingRider?.vehicle_model) && (
-                  <View style={styles.confirmVehicleRow}>
-                    <Text style={styles.confirmVehicleLabel}>Vehicle</Text>
-                    <Text style={styles.confirmVehicleVal}>{[pendingRider?.vehicle_make, pendingRider?.vehicle_model].filter(Boolean).join(' ')}</Text>
-                  </View>
-                )}
-                {pendingRider?.vehicle_color && (
-                  <View style={styles.confirmVehicleRow}>
-                    <Text style={styles.confirmVehicleLabel}>Color</Text>
-                    <Text style={styles.confirmVehicleVal}>{pendingRider.vehicle_color}</Text>
-                  </View>
-                )}
-                {pendingRider?.vehicle_plate && (
-                  <View style={styles.confirmVehicleRow}>
-                    <Text style={styles.confirmVehicleLabel}>Plate</Text>
-                    <Text style={[styles.confirmVehicleVal, { fontFamily: 'monospace', letterSpacing: 2 }]}>{pendingRider.vehicle_plate}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <View style={styles.confirmActions}>
-              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => {
-                if (currentRideId) {
-                  supabase.channel('rides').send({ type: 'broadcast', event: 'CANCEL_RIDE', payload: { rideId: currentRideId } });
-                  supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
-                }
-                setPendingRider(null);
-                resetToHome();
-              }}>
-                <Text style={styles.confirmCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmAcceptBtn} onPress={() => {
-                if (!pendingRider) return;
-                const rider = pendingRider;
-                setActiveRider(rider);
-                setPendingRider(null);
-                const bd = calculateFare(selectedTier, routeDistance, routeDuration, pricingConfig);
-                setFareBreakdown(bd);
-                setStep('matched');
-                saveRideState({ step: 'matched', activeRider: rider });
-                if (rider.last_lat && rider.last_lng) {
-                  mapRef.current?.setRiderLocation(rider.last_lat, rider.last_lng);
-                  setLastRiderCoords({ lat: rider.last_lat, lng: rider.last_lng });
-                  mapRef.current?.flyTo(rider.last_lat, rider.last_lng, 15);
-                  drawRiderToPickupRoute(rider.last_lat, rider.last_lng);
-                }
-                if (currentRideId) {
-                  supabase.channel('rides').send({ type: 'broadcast', event: 'USER_CONFIRMED_RIDER', payload: { rideId: currentRideId } });
-                }
-              }}>
-                <Text style={styles.confirmAcceptText}>Accept Rider</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       {/* Vehicle photo modal */}
       <Modal visible={showVehiclePhoto} transparent animationType="fade" onRequestClose={() => setShowVehiclePhoto(false)}>
         <TouchableOpacity style={styles.vehiclePhotoOverlay} activeOpacity={1} onPress={() => setShowVehiclePhoto(false)}>
@@ -1610,7 +1608,7 @@ const styles = StyleSheet.create({
   chevronText: { fontSize: 18, color: '#9ca3af', lineHeight: 24 },
 
   // Expanded area
-  expandedArea: { maxHeight: 240, marginBottom: 8 },
+  expandedArea: { marginBottom: 8 },
   suggestionBox: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#f3f4f6', overflow: 'hidden', marginBottom: 4 },
   suggRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   suggBorder: { borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
