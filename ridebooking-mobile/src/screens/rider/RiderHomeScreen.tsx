@@ -152,16 +152,21 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     } catch { /* silent */ }
   };
 
-  // Always create the notification channel on mount so local notifications
-  // work even when push token registration is skipped (e.g. Expo Go)
+  // Always (re)create the notification channel on mount.
+  // Android caches channel settings after first creation, so we delete
+  // and recreate to ensure vibration pattern + sound are applied.
   useEffect(() => {
     if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('ride-requests', {
-        name: 'Ride Requests',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 400, 200, 400, 200, 400],
-        sound: 'default',
-        enableVibrate: true,
+      Notifications.deleteNotificationChannelAsync('ride-requests').catch(() => {}).finally(() => {
+        Notifications.setNotificationChannelAsync('ride-requests', {
+          name: 'Ride Requests',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 500, 200, 500, 200, 500],
+          sound: 'default',
+          enableVibrate: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
+        });
       });
     }
   }, []);
