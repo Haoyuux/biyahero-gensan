@@ -138,6 +138,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [showVehiclePhoto, setShowVehiclePhoto] = useState(false);
   const [lastRiderCoords, setLastRiderCoords] = useState<{ lat: number; lng: number } | null>(null);
   const lastRiderCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const activeRiderRef = useRef<Profile | null>(null);
   const wasRestoredRef = useRef(false);
   const hasRestoredMapRef = useRef(false);
 
@@ -198,6 +199,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
         .filter(Boolean).join(', ') || d.display_name?.split(',')[0] || 'Selected location';
     } catch { return 'Selected location'; }
   };
+
+  useEffect(() => { activeRiderRef.current = activeRider; }, [activeRider]);
 
   // Init
   useEffect(() => {
@@ -296,7 +299,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     const rLat = activeRider.last_lat;
     const rLng = activeRider.last_lng;
     if (rLat && rLng) {
-      mapRef.current?.setRiderLocation(rLat, rLng);
+      mapRef.current?.setRiderLocation(rLat, rLng, activeRider.avatar_url ?? '');
       setLastRiderCoords({ lat: rLat, lng: rLng });
       lastRiderCoordsRef.current = { lat: rLat, lng: rLng };
       mapRef.current?.flyTo(rLat, rLng, 15);
@@ -424,7 +427,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       setStep('matched');
       saveRideState({ step: 'matched', activeRider: rider });
       if (rider.last_lat && rider.last_lng) {
-        mapRef.current?.setRiderLocation(rider.last_lat, rider.last_lng);
+        mapRef.current?.setRiderLocation(rider.last_lat, rider.last_lng, rider.avatar_url ?? '');
         setLastRiderCoords({ lat: rider.last_lat, lng: rider.last_lng });
         lastRiderCoordsRef.current = { lat: rider.last_lat, lng: rider.last_lng };
         mapRef.current?.flyTo(rider.last_lat, rider.last_lng, 15);
@@ -444,7 +447,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     });
     ch.on('broadcast', { event: 'RIDER_LOCATION' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
-      mapRef.current?.setRiderLocation(payload.lat, payload.lng);
+      mapRef.current?.setRiderLocation(payload.lat, payload.lng, activeRiderRef.current?.avatar_url ?? '');
       lastRiderCoordsRef.current = { lat: payload.lat, lng: payload.lng };
       setLastRiderCoords({ lat: payload.lat, lng: payload.lng });
       // Redraw route every 3 location updates (~9s) for both phases

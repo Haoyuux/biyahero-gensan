@@ -184,7 +184,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
           const { latitude, longitude } = loc.coords;
           riderCurrentLocRef.current = { lat: latitude, lng: longitude };
           if (mapReady) {
-            mapRef.current?.setMyLocation(latitude, longitude);
+            mapRef.current?.setMyLocation(latitude, longitude, profile.avatar_url ?? '');
             // Auto-rotate map to face direction of travel during active ride
             if (acceptedRideIdRef.current && loc.coords.heading != null && loc.coords.heading >= 0) {
               mapRef.current?.rotateTo(loc.coords.heading);
@@ -216,7 +216,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (mapReady) {
-        mapRef.current?.setMyLocation(loc.coords.latitude, loc.coords.longitude);
+        mapRef.current?.setMyLocation(loc.coords.latitude, loc.coords.longitude, profile.avatar_url ?? '');
         mapRef.current?.flyTo(loc.coords.latitude, loc.coords.longitude, 15);
       }
     })();

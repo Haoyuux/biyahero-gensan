@@ -1,4 +1,6 @@
 android/.gradle
 android/build
 android/app/build
-ios/build
+android/app/.cxx
+.git
+dist

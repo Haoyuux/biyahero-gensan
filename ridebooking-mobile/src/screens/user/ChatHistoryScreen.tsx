@@ -5,59 +5,66 @@ import {
 } from 'react-native';
 import {
   ConversationSummary, ChatMessage,
-  fetchUserConversations, fetchMessages,
+  fetchUserConversations, fetchRiderConversations, fetchMessages,
 } from '../../lib/chatService';
 
 interface Props {
   visible: boolean;
   userId: string;
+  role?: 'user' | 'rider';
   onClose: () => void;
+  asTab?: boolean;
 }
 
-export default function ChatHistoryScreen({ visible, userId, onClose }: Props) {
+export default function ChatHistoryScreen({ visible, userId, role = 'user', onClose, asTab = false }: Props) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
+  const [selectedConv, setSelectedConv] = useState<ConversationSummary | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [msgLoading, setMsgLoading] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
-    fetchUserConversations(userId)
+    const fetch = role === 'rider' ? fetchRiderConversations : fetchUserConversations;
+    fetch(userId)
       .then(setConversations)
       .finally(() => setLoading(false));
-  }, [visible, userId]);
+  }, [visible, userId, role]);
 
-  const openConversation = async (rideId: string) => {
-    setSelectedRideId(rideId);
+  const openConversation = async (conv: ConversationSummary) => {
+    setSelectedRideId(conv.ride_id);
+    setSelectedConv(conv);
     setMsgLoading(true);
-    const msgs = await fetchMessages(rideId);
+    const msgs = await fetchMessages(conv.ride_id);
     setMessages(msgs);
     setMsgLoading(false);
   };
 
   const closeConversation = () => {
     setSelectedRideId(null);
+    setSelectedConv(null);
     setMessages([]);
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+  const content = (
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, asTab && styles.headerTab]}>
           {selectedRideId ? (
             <TouchableOpacity onPress={closeConversation} style={styles.backBtn}>
               <Text style={styles.backText}>←</Text>
             </TouchableOpacity>
+          ) : asTab ? (
+            <View style={{ width: 36 }} />
           ) : (
             <TouchableOpacity onPress={onClose} style={styles.backBtn}>
               <Text style={styles.backText}>✕</Text>
             </TouchableOpacity>
           )}
           <Text style={styles.headerTitle}>
-            {selectedRideId ? 'Conversation' : 'Messages'}
+            {selectedRideId ? (selectedConv?.other_name ?? 'Conversation') : 'Messages'}
           </Text>
           <View style={{ width: 36 }} />
         </View>
@@ -80,7 +87,7 @@ export default function ChatHistoryScreen({ visible, userId, onClose }: Props) {
                 <TouchableOpacity
                   key={conv.ride_id}
                   style={styles.convRow}
-                  onPress={() => openConversation(conv.ride_id)}
+                  onPress={() => openConversation(conv)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.convAvatar}>
@@ -118,7 +125,7 @@ export default function ChatHistoryScreen({ visible, userId, onClose }: Props) {
                 <Text style={styles.emptySub}>No messages in this conversation.</Text>
               )}
               {messages.map(m => {
-                const isMe = m.sender_role === 'user';
+                const isMe = m.sender_role === role;
                 return (
                   <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowThem]}>
                     <View style={[styles.msgBubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
@@ -133,6 +140,12 @@ export default function ChatHistoryScreen({ visible, userId, onClose }: Props) {
           )
         )}
       </View>
+  );
+
+  if (asTab) return content;
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      {content}
     </Modal>
   );
 }
@@ -145,6 +158,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
     backgroundColor: '#fff', paddingTop: 52,
   },
+  headerTab: { paddingTop: 16 },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 20, color: '#030712' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#030712' },

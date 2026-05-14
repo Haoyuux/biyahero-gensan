@@ -84,6 +84,8 @@ export interface Profile {
   vehicle_type: string | null;
   vehicle_image_url: string | null;
   sex: string | null;
-  birthday: string | null;
   expo_push_token: string | null;
+  or_url: string | null;
+  cr_url: string | null;
+  license_url: string | null;
 }
