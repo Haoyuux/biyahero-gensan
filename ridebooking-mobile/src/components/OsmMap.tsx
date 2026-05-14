@@ -41,7 +41,7 @@ const buildHtml = () => `
     html, body, #map { width: 100%; height: 100%; }
     #compass-btn {
       position: absolute;
-      top: 80px; right: 10px;
+      top: 116px; right: 14px;
       z-index: 1000;
       width: 38px; height: 38px;
       background: #fff;
