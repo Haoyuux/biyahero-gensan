@@ -37,6 +37,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const hasRestoredMapRef = useRef(false);
   const alertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const alertNotifIdsRef = useRef<string[]>([]);
+  const notifiedRideIdsRef = useRef<Set<string>>(new Set());
 
   const [isOnline, setIsOnline] = useState(profile.is_online ?? false);
   const [mapReady, setMapReady] = useState(false);
@@ -313,16 +314,20 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         if (prev.some((r: any) => r.rideId === payload.rideId)) return prev;
         return [...prev, payload];
       });
-      const passengerName = [payload.user?.first_name, payload.user?.last_name].filter(Boolean).join(' ') || 'Passenger';
-      Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'New Ride Request',
-          body: `₱${payload.fare} · ${passengerName}`,
-          sound: true,
-          channelId: 'ride-requests',
-        },
-        trigger: null,
-      });
+      // Only notify once per rideId — passenger broadcasts every 4s so we'd spam otherwise
+      if (!notifiedRideIdsRef.current.has(payload.rideId)) {
+        notifiedRideIdsRef.current.add(payload.rideId);
+        const passengerName = [payload.user?.first_name, payload.user?.last_name].filter(Boolean).join(' ') || 'Passenger';
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'New Ride Request',
+            body: `₱${payload.fare} · ${passengerName}`,
+            sound: true,
+            channelId: 'ride-requests',
+          },
+          trigger: null,
+        });
+      }
     });
 
     ch.on('broadcast', { event: 'CANCEL_RIDE' }, ({ payload }) => {
@@ -427,6 +432,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const handleAccept = async () => {
     stopRideRequestAlert();
+    notifiedRideIdsRef.current.clear();
     if (!currentRequest) return;
     const rideId = currentRequest.rideId;
     const { error } = await supabase.from('rides')
@@ -468,6 +474,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const handleDecline = () => {
     stopRideRequestAlert();
+    notifiedRideIdsRef.current.clear();
     const declined = currentRequest;
     setHasRequest(false);
     setCurrentRequest(null);
