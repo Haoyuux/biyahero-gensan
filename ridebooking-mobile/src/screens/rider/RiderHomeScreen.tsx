@@ -30,6 +30,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const routeTickRef = useRef(0);
   const isOnlineRef = useRef(profile.is_online ?? false);
   const acceptedRideIdRef = useRef<string | null>(null);
+  const declinedRidesRef = useRef<Map<string, number>>(new Map());
+  const currentRequestRef = useRef<any>(null);
+  const ridesChannelRef = useRef<any>(null);
+  const wasRestoredRef = useRef(false);
+  const hasRestoredMapRef = useRef(false);
 
   const [isOnline, setIsOnline] = useState(profile.is_online ?? false);
   const [mapReady, setMapReady] = useState(false);
@@ -47,6 +52,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   // Active ride
   const [activeRide, setActiveRide] = useState<any>(null);
   const [rideStatus, setRideStatus] = useState<'going_to_pickup' | 'picked_up'>('going_to_pickup');
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Chat
   const [showChat, setShowChat] = useState(false);
@@ -55,9 +61,9 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const [unreadCount, setUnreadCount] = useState(0);
   const chatScrollRef = useRef<ScrollView>(null);
 
-  const saveRiderRide = async (request: any, accepted: boolean) => {
+  const saveRiderRide = async (request: any, accepted: boolean, status: 'going_to_pickup' | 'picked_up' = 'going_to_pickup') => {
     try {
-      await AsyncStorage.setItem(RIDER_RIDE_KEY, JSON.stringify({ currentRequest: request, requestAccepted: accepted }));
+      await AsyncStorage.setItem(RIDER_RIDE_KEY, JSON.stringify({ currentRequest: request, requestAccepted: accepted, rideStatus: status }));
     } catch { /* silent */ }
   };
 
@@ -153,20 +159,28 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         async (loc) => {
           const { latitude, longitude } = loc.coords;
           riderCurrentLocRef.current = { lat: latitude, lng: longitude };
-          if (mapReady) mapRef.current?.setRiderLocation(latitude, longitude);
+          if (mapReady) {
+            mapRef.current?.setMyLocation(latitude, longitude);
+            // Auto-rotate map to face direction of travel during active ride
+            if (acceptedRideIdRef.current && loc.coords.heading != null && loc.coords.heading >= 0) {
+              mapRef.current?.rotateTo(loc.coords.heading);
+            }
+          }
           if (isOnlineRef.current) {
-            await supabase.from('profiles')
+            // Fire-and-forget — don't block GPS callback on DB round-trip
+            supabase.from('profiles')
               .update({ last_lat: latitude, last_lng: longitude })
               .eq('id', profile.id);
             if (acceptedRideIdRef.current) {
-              supabase.channel('rides').send({
+              const ch = ridesChannelRef.current ?? supabase.channel('rides');
+              ch.send({
                 type: 'broadcast', event: 'RIDER_LOCATION',
                 payload: { rideId: acceptedRideIdRef.current, lat: latitude, lng: longitude },
               });
-              // Update route every 5 GPS ticks (~15s) while on a trip
+              // Redraw route every 3 GPS ticks (~9s) toward current target
               if (riderTargetRef.current) {
                 routeTickRef.current++;
-                if (routeTickRef.current >= 5) {
+                if (routeTickRef.current >= 3) {
                   routeTickRef.current = 0;
                   fetchRiderRoute({ lat: latitude, lng: longitude }, riderTargetRef.current);
                 }
@@ -178,12 +192,39 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (mapReady) {
-        mapRef.current?.setRiderLocation(loc.coords.latitude, loc.coords.longitude);
+        mapRef.current?.setMyLocation(loc.coords.latitude, loc.coords.longitude);
         mapRef.current?.flyTo(loc.coords.latitude, loc.coords.longitude, 15);
       }
     })();
     return () => { try { locationSub.current?.remove(); } catch { /* web compat */ } };
   }, [mapReady]);
+
+  // Restore map markers + route after app restart mid-ride
+  useEffect(() => {
+    if (!mapReady || !wasRestoredRef.current || hasRestoredMapRef.current) return;
+    if (!requestAccepted || !activeRide) return;
+    hasRestoredMapRef.current = true;
+
+    const target = rideStatus === 'going_to_pickup'
+      ? activeRide.pickup?.coords
+      : activeRide.dropoff?.coords;
+    const label = rideStatus === 'going_to_pickup'
+      ? '📍 Pickup: ' + (activeRide.pickup?.label ?? 'Passenger Pickup')
+      : '🏁 Dropoff: ' + (activeRide.dropoff?.label ?? 'Destination');
+
+    if (target) {
+      riderTargetRef.current = target;
+      mapRef.current?.setDestination(target.lat, target.lng, label);
+      mapRef.current?.setDestDraggable(false);
+      mapRef.current?.flyTo(target.lat, target.lng, 15);
+      if (riderCurrentLocRef.current) {
+        fetchRiderRoute(riderCurrentLocRef.current, target);
+      } else {
+        // GPS not ready yet — draw route on next tick
+        routeTickRef.current = 4;
+      }
+    }
+  }, [mapReady, requestAccepted, activeRide, rideStatus]);
 
   // Today stats
   const fetchTodayStats = async () => {
@@ -227,21 +268,37 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         setRequestAccepted(saved.requestAccepted ?? false);
         setActiveRide(saved.currentRequest);
         acceptedRideIdRef.current = saved.currentRequest.rideId;
+        if (saved.rideStatus) setRideStatus(saved.rideStatus);
+        wasRestoredRef.current = true;
       } catch {
         await AsyncStorage.removeItem(RIDER_RIDE_KEY);
       }
     })();
   }, []);
 
-  // Rides channel
+  useEffect(() => { currentRequestRef.current = currentRequest; }, [currentRequest]);
+
+  // Rides channel — dep is only isOnline; use refs inside handlers to avoid channel churn
   useEffect(() => {
     if (!isOnline) return;
     const ch = supabase.channel('rides');
 
     ch.on('broadcast', { event: 'REQUEST_RIDE' }, ({ payload }) => {
+      const declinedAt = declinedRidesRef.current.get(payload.rideId);
+      if (declinedAt && Date.now() - declinedAt < 60000) return;
       setRequestQueue(prev => {
-        if (prev.some(r => r.rideId === payload.rideId)) return prev;
+        if (prev.some((r: any) => r.rideId === payload.rideId)) return prev;
         return [...prev, payload];
+      });
+      const passengerName = [payload.user?.first_name, payload.user?.last_name].filter(Boolean).join(' ') || 'Passenger';
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'New Ride Request',
+          body: `₱${payload.fare} · ${passengerName}`,
+          sound: true,
+          channelId: 'ride-requests',
+        },
+        trigger: null,
       });
     });
 
@@ -260,7 +317,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         setRideStatus('going_to_pickup');
         mapRef.current?.clearDestination();
         mapRef.current?.clearRoute();
-      } else if (currentRequest?.rideId === rideId) {
+      } else if (currentRequestRef.current?.rideId === rideId) {
         setHasRequest(false);
         setCurrentRequest(null);
       }
@@ -272,16 +329,10 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       }
     });
 
-    ch.on('broadcast', { event: 'USER_CONFIRMED_RIDER' }, ({ payload }) => {
-      if (acceptedRideIdRef.current === payload.rideId) {
-        setActiveRide(currentRequest);
-        setRequestAccepted(true);
-      }
-    });
-
     ch.subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [isOnline, currentRequest]);
+    ridesChannelRef.current = ch;
+    return () => { ridesChannelRef.current = null; supabase.removeChannel(ch); };
+  }, [isOnline]);
 
   // Pop from queue
   useEffect(() => {
@@ -351,36 +402,41 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       riderTargetRef.current = pickupCoords;
       routeTickRef.current = 0;
       mapRef.current?.setDestination(pickupCoords.lat, pickupCoords.lng, '📍 Pickup: ' + (currentRequest.pickup?.label ?? 'Passenger Pickup'));
+      mapRef.current?.setDestDraggable(false);
       mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
       if (riderCurrentLocRef.current) {
         fetchRiderRoute(riderCurrentLocRef.current, pickupCoords);
       }
     }
 
-    supabase.channel('rides').send({
+    const ch = ridesChannelRef.current ?? supabase.channel('rides');
+    ch.send({
       type: 'broadcast', event: 'RIDE_ACCEPTED',
       payload: { rideId, rider: profile },
     });
   };
 
   const handleDecline = () => {
+    const declined = currentRequest;
     setHasRequest(false);
     setCurrentRequest(null);
+    if (declined?.rideId) {
+      declinedRidesRef.current.set(declined.rideId, Date.now());
+      setTimeout(() => {
+        declinedRidesRef.current.delete(declined.rideId);
+      }, 60000);
+    }
   };
 
-  const handleCancelRide = async () => {
+  const handleCancelRide = () => {
     if (!acceptedRideIdRef.current) return;
     const rideId = acceptedRideIdRef.current;
-    supabase.channel('rides').send({
-      type: 'broadcast', event: 'RIDE_CANCELLED',
-      payload: { rideId, riderId: profile.id },
-    });
-    await supabase.from('rides')
-      .update({ status: 'pending', rider_id: null })
-      .eq('id', rideId);
+
+    // Reset UI immediately — don't block on network
     acceptedRideIdRef.current = null;
     riderTargetRef.current = null;
     clearRiderRide();
+    setShowCancelConfirm(false);
     setRequestAccepted(false);
     setActiveRide(null);
     setCurrentRequest(null);
@@ -388,15 +444,22 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setRideStatus('going_to_pickup');
     mapRef.current?.clearDestination();
     mapRef.current?.clearRoute();
+
+    // Fire-and-forget network sync
+    const ch = ridesChannelRef.current ?? supabase.channel('rides');
+    ch.send({ type: 'broadcast', event: 'RIDE_CANCELLED', payload: { rideId, riderId: profile.id } });
+    supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', rideId);
   };
 
   const handleArrivedAtPickup = () => {
     if (!acceptedRideIdRef.current) return;
-    supabase.channel('rides').send({
+    const ch = ridesChannelRef.current ?? supabase.channel('rides');
+    ch.send({
       type: 'broadcast', event: 'RIDER_ARRIVED',
       payload: { rideId: acceptedRideIdRef.current },
     });
     setRideStatus('picked_up');
+    saveRiderRide(activeRide, true, 'picked_up');
 
     // Switch map to show dropoff + draw initial route + enable live route updates
     const dropoffCoords = activeRide?.dropoff?.coords;
@@ -405,6 +468,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       routeTickRef.current = 0;
       mapRef.current?.clearDestination();
       mapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, '🏁 Dropoff: ' + (activeRide?.dropoff?.label ?? 'Destination'));
+      mapRef.current?.setDestDraggable(false);
       mapRef.current?.flyTo(dropoffCoords.lat, dropoffCoords.lng, 15);
       if (riderCurrentLocRef.current) {
         fetchRiderRoute(riderCurrentLocRef.current, dropoffCoords);
@@ -412,16 +476,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     }
   };
 
-  const handleCompleteRide = async () => {
+  const handleCompleteRide = () => {
     if (!acceptedRideIdRef.current) return;
     const rideId = acceptedRideIdRef.current;
-    supabase.channel('rides').send({
-      type: 'broadcast', event: 'RIDE_COMPLETED',
-      payload: { rideId, rider: profile },
-    });
-    await supabase.from('rides')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', rideId);
+
+    // Reset UI immediately
     acceptedRideIdRef.current = null;
     clearRiderRide();
     setRequestAccepted(false);
@@ -429,6 +488,13 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setCurrentRequest(null);
     setMessages([]);
     setRideStatus('going_to_pickup');
+    mapRef.current?.clearDestination();
+    mapRef.current?.clearRoute();
+
+    // Fire-and-forget network sync
+    const ch = ridesChannelRef.current ?? supabase.channel('rides');
+    ch.send({ type: 'broadcast', event: 'RIDE_COMPLETED', payload: { rideId, rider: profile } });
+    supabase.from('rides').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', rideId);
     fetchTodayStats();
   };
 
@@ -520,55 +586,59 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
       {/* Active ride sheet */}
       {requestAccepted && activeRide ? (
-        <ScrollView style={styles.sheet} showsVerticalScrollIndicator={false}>
+        <View style={styles.activeSheet}>
           <View style={styles.handle} />
           <Text style={styles.sectionLabel}>ACTIVE RIDE</Text>
 
-          {/* Passenger */}
-          <View style={styles.passengerCard}>
-            <View style={styles.driverAvatar}>
-              <Text style={styles.driverAvatarText}>
-                {(activeRide.user?.first_name?.[0] ?? 'U').toUpperCase()}
-              </Text>
+          {/* Scrollable ride details */}
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            {/* Passenger */}
+            <View style={styles.passengerCard}>
+              <View style={styles.driverAvatar}>
+                <Text style={styles.driverAvatarText}>
+                  {(activeRide.user?.first_name?.[0] ?? 'U').toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.driverName}>
+                  {activeRide.user?.first_name} {activeRide.user?.last_name}
+                </Text>
+                <Text style={styles.fareText}>₱{activeRide.fare}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => { setShowChat(true); setUnreadCount(0); }}
+              >
+                <Text style={styles.actionBtnIcon}>💬</Text>
+                {unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.driverName}>
-                {activeRide.user?.first_name} {activeRide.user?.last_name}
-              </Text>
-              <Text style={styles.fareText}>₱{activeRide.fare}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => { setShowChat(true); setUnreadCount(0); }}
-            >
-              <Text style={styles.actionBtnIcon}>💬</Text>
-              {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount}</Text>
+
+            {/* Route info */}
+            <View style={styles.routeCard}>
+              <View style={styles.routeRow}>
+                <View style={styles.dotBlack} />
+                <View>
+                  <Text style={styles.routeLabel}>PICKUP</Text>
+                  <Text style={styles.routeValue}>{activeRide.pickup?.label ?? 'Current Location'}</Text>
                 </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Route info */}
-          <View style={styles.routeCard}>
-            <View style={styles.routeRow}>
-              <View style={styles.dotBlack} />
-              <View>
-                <Text style={styles.routeLabel}>PICKUP</Text>
-                <Text style={styles.routeValue}>{activeRide.pickup?.label ?? 'Current Location'}</Text>
+              </View>
+              <View style={styles.routeDivider} />
+              <View style={styles.routeRow}>
+                <View style={styles.dotGreen} />
+                <View>
+                  <Text style={styles.routeLabel}>DROPOFF</Text>
+                  <Text style={styles.routeValue}>{activeRide.dropoff?.label ?? activeRide.dropoff_label}</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.routeDivider} />
-            <View style={styles.routeRow}>
-              <View style={styles.dotGreen} />
-              <View>
-                <Text style={styles.routeLabel}>DROPOFF</Text>
-                <Text style={styles.routeValue}>{activeRide.dropoff?.label ?? activeRide.dropoff_label}</Text>
-              </View>
-            </View>
-          </View>
+          </ScrollView>
 
+          {/* Actions — always visible at bottom */}
           {rideStatus === 'going_to_pickup' ? (
             <TouchableOpacity style={styles.primaryBtn} onPress={handleArrivedAtPickup}>
               <Text style={styles.primaryBtnText}>I Arrived at Pickup</Text>
@@ -579,23 +649,21 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={styles.cancelRideBtn}
-            onPress={() =>
-              Alert.alert(
-                'Cancel ride?',
-                'The passenger will be notified and the ride will go back to searching.',
-                [
-                  { text: 'Keep Ride', style: 'cancel' },
-                  { text: 'Yes, Cancel', style: 'destructive', onPress: handleCancelRide },
-                ],
-              )
-            }
-          >
-            <Text style={styles.cancelRideBtnText}>Cancel Booking</Text>
-          </TouchableOpacity>
-          <View style={{ height: 32 }} />
-        </ScrollView>
+          {showCancelConfirm ? (
+            <View style={styles.cancelConfirmRow}>
+              <TouchableOpacity style={styles.keepBtn} onPress={() => setShowCancelConfirm(false)}>
+                <Text style={styles.keepBtnText}>Keep Ride</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.yesCancelBtn} onPress={handleCancelRide}>
+                <Text style={styles.yesCancelText}>Yes, Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.cancelRideBtn} onPress={() => setShowCancelConfirm(true)}>
+              <Text style={styles.cancelRideBtnText}>Cancel Booking</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       ) : (
         /* Default rider sheet */
         <View style={styles.sheet}>
@@ -781,6 +849,14 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20,
     shadowOffset: { width: 0, height: -1 }, elevation: 16,
   },
+  activeSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36,
+    height: '58%',
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20,
+    shadowOffset: { width: 0, height: -1 }, elevation: 16,
+  },
   handle: { width: 40, height: 5, backgroundColor: '#e5e7eb', borderRadius: 99, alignSelf: 'center', marginBottom: 16 },
   sectionLabel: { fontSize: 9, fontWeight: '700', color: '#9ca3af', letterSpacing: 1.5, marginBottom: 12 },
 
@@ -857,6 +933,11 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: '#030712', borderRadius: 16, paddingVertical: 17, alignItems: 'center', marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
   primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   cancelRideBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
+  cancelConfirmRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  keepBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', alignItems: 'center' },
+  keepBtnText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  yesCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#fef2f2', alignItems: 'center' },
+  yesCancelText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
   cancelRideBtnText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
 
   // Modal
