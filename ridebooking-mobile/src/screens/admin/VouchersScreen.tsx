@@ -97,6 +97,7 @@ export default function VouchersScreen() {
   const [viewingVoucher, setViewingVoucher] = useState<VoucherWithUsage | null>(null);
   const [claimRows, setClaimRows] = useState<UserVoucherRow[]>([]);
   const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claimsError, setClaimsError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data: voucherData } = await supabase
@@ -143,6 +144,8 @@ export default function VouchersScreen() {
   const openView = async (v: VoucherWithUsage) => {
     setViewingVoucher(v);
     setClaimsLoading(true);
+    setClaimsError(null);
+    setClaimRows([]);
     try {
       const { uvRows, rideRows, profiles } = await fetchVoucherClaims(v.id);
 
@@ -195,7 +198,9 @@ export default function VouchersScreen() {
         }));
 
       setClaimRows([...claimedRows, ...extraRideRows]);
-    } catch (e: any) { Alert.alert('Error loading claims', e.message); }
+    } catch (e: any) {
+      setClaimsError(e.message ?? 'Failed to load claims');
+    }
     finally { setClaimsLoading(false); }
   };
 
@@ -394,6 +399,19 @@ export default function VouchersScreen() {
 
             {claimsLoading
               ? <ActivityIndicator style={{ flex: 1 }} color="#10b981" />
+              : claimsError
+              ? (
+                <ScrollView contentContainerStyle={s.claimsList}>
+                  <View style={s.errorBox}>
+                    <Text style={s.errorTitle}>Failed to load claims</Text>
+                    <Text style={s.errorMsg}>{claimsError}</Text>
+                    <Text style={s.errorHint}>Make sure the Edge Function is deployed:{'\n'}supabase functions deploy admin-fetch-voucher-claims</Text>
+                    <TouchableOpacity style={s.retryBtn} onPress={() => viewingVoucher && openView(viewingVoucher)}>
+                      <Text style={s.retryBtnText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              )
               : (
                 <ScrollView contentContainerStyle={s.claimsList}>
                   <Text style={s.sectionLabel}>
@@ -566,6 +584,12 @@ const s = StyleSheet.create({
   summaryNum: { fontSize: 22, fontWeight: '800', color: '#030712' },
   summaryLabel: { fontSize: 10, color: '#9ca3af', marginTop: 2 },
   claimsList: { padding: 16, paddingBottom: 40 },
+  errorBox: { backgroundColor: '#fef2f2', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#fecaca', marginTop: 8 },
+  errorTitle: { fontSize: 14, fontWeight: '700', color: '#ef4444', marginBottom: 6 },
+  errorMsg: { fontSize: 13, color: '#7f1d1d', marginBottom: 8 },
+  errorHint: { fontSize: 11, color: '#9ca3af', marginBottom: 12, fontFamily: 'monospace' },
+  retryBtn: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#ef4444' },
+  retryBtnText: { fontSize: 13, fontWeight: '700', color: '#ef4444' },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: '#9ca3af', letterSpacing: 1, marginBottom: 12 },
   claimCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
   claimHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
