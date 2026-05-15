@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity,
-  SafeAreaView, RefreshControl, Modal, ScrollView, Alert, TextInput, Switch,
+  SafeAreaView, RefreshControl, Modal, ScrollView, Alert, TextInput, Switch, Image,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Voucher } from '../../lib/voucherService';
@@ -9,6 +9,24 @@ import { useProfile } from '../../contexts/AuthContext';
 
 interface VoucherWithUsage extends Voucher {
   usage_count: number;
+}
+
+interface UserVoucherRow {
+  id: string;
+  user_id: string;
+  voucher_id: string;
+  status: 'available' | 'used' | 'expired';
+  added_at: string;
+  used_at: string | null;
+  ride_id: string | null;
+  // joined
+  user_name: string | null;
+  user_avatar: string | null;
+  ride_fare: number | null;
+  ride_discount: number | null;
+  ride_date: string | null;
+  ride_pickup: string | null;
+  voucher_discount_paid: boolean | null;
 }
 
 interface VoucherForm {
@@ -34,6 +52,8 @@ const EMPTY_FORM: VoucherForm = {
   starts_at: '', expires_at: '', is_active: true,
 };
 
+const STATUS_COLOR = { available: '#10b981', used: '#6b7280', expired: '#ef4444' };
+
 function normalizeCode(code: string) {
   return code.trim().toUpperCase().replace(/\s+/g, '');
 }
@@ -47,6 +67,11 @@ export default function VouchersScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // View (detail) state
+  const [viewingVoucher, setViewingVoucher] = useState<VoucherWithUsage | null>(null);
+  const [claimRows, setClaimRows] = useState<UserVoucherRow[]>([]);
+  const [claimsLoading, setClaimsLoading] = useState(false);
 
   const load = useCallback(async () => {
     const { data: voucherData } = await supabase
@@ -78,6 +103,98 @@ export default function VouchersScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load user claims for a voucher
+  const openView = async (v: VoucherWithUsage) => {
+    setViewingVoucher(v);
+    setClaimsLoading(true);
+    try {
+      const { data: uvRows } = await supabase
+        .from('user_vouchers')
+        .select('id, user_id, voucher_id, status, added_at, used_at, ride_id')
+        .eq('voucher_id', v.id)
+        .order('added_at', { ascending: false });
+
+      if (!uvRows?.length) { setClaimRows([]); setClaimsLoading(false); return; }
+
+      // Fetch user profiles
+      const userIds = [...new Set(uvRows.map((r: any) => r.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+      const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
+      (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
+
+      // Fetch rides for used vouchers
+      const rideIds = uvRows.map((r: any) => r.ride_id).filter(Boolean);
+      const rideMap: Record<string, any> = {};
+      if (rideIds.length) {
+        const { data: rides } = await supabase
+          .from('rides')
+          .select('id, fare, voucher_discount, created_at, pickup, voucher_discount_paid')
+          .in('id', rideIds);
+        (rides ?? []).forEach((r: any) => { rideMap[r.id] = r; });
+      }
+
+      setClaimRows(uvRows.map((r: any) => {
+        const ride = r.ride_id ? rideMap[r.ride_id] : null;
+        const user = profileMap[r.user_id];
+        return {
+          id: r.id,
+          user_id: r.user_id,
+          voucher_id: r.voucher_id,
+          status: r.status,
+          added_at: r.added_at,
+          used_at: r.used_at,
+          ride_id: r.ride_id,
+          user_name: user?.full_name ?? null,
+          user_avatar: user?.avatar_url ?? null,
+          ride_fare: ride?.fare ?? null,
+          ride_discount: ride?.voucher_discount ?? null,
+          ride_date: ride?.created_at ?? null,
+          ride_pickup: ride?.pickup ?? null,
+          voucher_discount_paid: ride?.voucher_discount_paid ?? null,
+        };
+      }));
+    } catch (e: any) { Alert.alert('Error loading claims', e.message); }
+    finally { setClaimsLoading(false); }
+  };
+
+  const handleRemoveClaim = async (row: UserVoucherRow) => {
+    Alert.alert('Remove Voucher', `Remove this voucher from ${row.user_name ?? 'user'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive', onPress: async () => {
+          try {
+            await supabase.from('user_vouchers').delete().eq('id', row.id);
+            // Refresh claims
+            if (viewingVoucher) await openView(viewingVoucher);
+            await load();
+          } catch (e: any) { Alert.alert('Error', e.message); }
+        },
+      },
+    ]);
+  };
+
+  const handleMarkPaid = async (row: UserVoucherRow) => {
+    if (!row.ride_id) return;
+    Alert.alert('Mark Paid', 'Mark this voucher discount as settled?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Mark Paid', onPress: async () => {
+          try {
+            await supabase.from('rides').update({
+              voucher_discount_paid: true,
+              voucher_discount_paid_at: new Date().toISOString(),
+              voucher_discount_paid_by: profile.id,
+            }).eq('id', row.ride_id!);
+            if (viewingVoucher) await openView(viewingVoucher);
+          } catch (e: any) { Alert.alert('Error', e.message); }
+        },
+      },
+    ]);
+  };
 
   const openCreate = () => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true); };
 
@@ -168,9 +285,7 @@ export default function VouchersScreen() {
             <View style={s.cardHeader}>
               <Text style={s.code}>{item.code}</Text>
               <View style={s.headerRight}>
-                <Text style={s.usageText}>
-                  {item.usage_count} / {item.usage_limit ?? '∞'} used
-                </Text>
+                <Text style={s.usageText}>{item.usage_count} / {item.usage_limit ?? '∞'} used</Text>
                 <Switch
                   value={item.is_active}
                   onValueChange={() => toggleActive(item)}
@@ -192,6 +307,9 @@ export default function VouchersScreen() {
               {item.expires_at && <Text style={s.metaItem}>Expires: {new Date(item.expires_at).toLocaleDateString()}</Text>}
             </View>
             <View style={s.cardFooter}>
+              <TouchableOpacity style={s.viewBtn} onPress={() => openView(item)}>
+                <Text style={s.viewBtnText}>View Claims</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={s.editBtn} onPress={() => openEdit(item)}><Text style={s.editBtnText}>Edit</Text></TouchableOpacity>
               <TouchableOpacity style={s.deleteBtn} onPress={() => deleteVoucher(item)}><Text style={s.deleteBtnText}>Delete</Text></TouchableOpacity>
             </View>
@@ -201,23 +319,102 @@ export default function VouchersScreen() {
         contentContainerStyle={s.list}
       />
 
+      {/* ── View / Claims Modal ── */}
+      <Modal visible={!!viewingVoucher} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setViewingVoucher(null)}>
+        {viewingVoucher && (
+          <SafeAreaView style={s.safe}>
+            <View style={s.modalHeader}>
+              <View>
+                <Text style={s.modalTitle}>{viewingVoucher.code}</Text>
+                <Text style={s.modalSub}>{viewingVoucher.title}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setViewingVoucher(null)}><Text style={s.closeBtn}>✕</Text></TouchableOpacity>
+            </View>
+
+            {/* Voucher summary */}
+            <View style={s.summaryRow}>
+              <View style={s.summaryItem}>
+                <Text style={s.summaryNum}>{viewingVoucher.usage_count}</Text>
+                <Text style={s.summaryLabel}>Claims</Text>
+              </View>
+              <View style={s.summaryItem}>
+                <Text style={s.summaryNum}>{viewingVoucher.usage_limit ?? '∞'}</Text>
+                <Text style={s.summaryLabel}>Limit</Text>
+              </View>
+              <View style={s.summaryItem}>
+                <Text style={[s.summaryNum, { color: viewingVoucher.is_active ? '#10b981' : '#ef4444' }]}>
+                  {viewingVoucher.is_active ? 'Active' : 'Inactive'}
+                </Text>
+                <Text style={s.summaryLabel}>Status</Text>
+              </View>
+            </View>
+
+            {claimsLoading
+              ? <ActivityIndicator style={{ flex: 1 }} color="#10b981" />
+              : (
+                <ScrollView contentContainerStyle={s.claimsList}>
+                  <Text style={s.sectionLabel}>USAGE HISTORY ({claimRows.length})</Text>
+                  {claimRows.length === 0 && (
+                    <Text style={s.empty}>No one has claimed this voucher yet.</Text>
+                  )}
+                  {claimRows.map(row => (
+                    <View key={row.id} style={s.claimCard}>
+                      <View style={s.claimHeader}>
+                        <View style={s.claimUser}>
+                          {row.user_avatar
+                            ? <Image source={{ uri: row.user_avatar }} style={s.claimAvatar} />
+                            : <View style={s.claimAvatarPH}><Text style={s.claimAvatarInit}>{(row.user_name ?? '?')[0].toUpperCase()}</Text></View>
+                          }
+                          <View>
+                            <Text style={s.claimName}>{row.user_name ?? 'Unknown User'}</Text>
+                            <Text style={s.claimDate}>{new Date(row.added_at).toLocaleDateString()}</Text>
+                          </View>
+                        </View>
+                        <View style={[s.statusBadge, { backgroundColor: STATUS_COLOR[row.status] + '20' }]}>
+                          <Text style={[s.statusText, { color: STATUS_COLOR[row.status] }]}>{row.status}</Text>
+                        </View>
+                      </View>
+
+                      {row.status === 'used' && row.ride_fare != null && (
+                        <View style={s.rideInfo}>
+                          <Text style={s.rideInfoText}>
+                            Fare: ₱{row.ride_fare.toFixed(2)} · Discount: ₱{(row.ride_discount ?? 0).toFixed(2)}
+                          </Text>
+                          {row.ride_pickup && <Text style={s.rideInfoText} numberOfLines={1}>{row.ride_pickup}</Text>}
+                          {row.ride_date && <Text style={s.rideInfoDate}>{new Date(row.ride_date).toLocaleString()}</Text>}
+                          {row.voucher_discount_paid
+                            ? <View style={s.paidBadge}><Text style={s.paidBadgeText}>Discount Settled ✓</Text></View>
+                            : (
+                              <TouchableOpacity style={s.markPaidBtn} onPress={() => handleMarkPaid(row)}>
+                                <Text style={s.markPaidBtnText}>Mark Discount as Settled</Text>
+                              </TouchableOpacity>
+                            )
+                          }
+                        </View>
+                      )}
+
+                      <TouchableOpacity style={s.removeClaimBtn} onPress={() => handleRemoveClaim(row)}>
+                        <Text style={s.removeClaimBtnText}>Remove from user</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )
+            }
+          </SafeAreaView>
+        )}
+      </Modal>
+
+      {/* ── Create / Edit Modal ── */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
         <SafeAreaView style={s.safe}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>{editingId ? 'Edit Voucher' : 'New Voucher'}</Text>
             <TouchableOpacity onPress={() => setShowForm(false)}><Text style={s.closeBtn}>✕</Text></TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={s.modalContent}>
-
+          <ScrollView contentContainerStyle={s.formContent}>
             <Field label="Code *">
-              <TextInput
-                style={s.input}
-                value={form.code}
-                onChangeText={v => setForm(f => ({ ...f, code: normalizeCode(v) }))}
-                placeholder="SUMMER20"
-                placeholderTextColor="#9ca3af"
-                autoCapitalize="characters"
-              />
+              <TextInput style={s.input} value={form.code} onChangeText={v => setForm(f => ({ ...f, code: normalizeCode(v) }))} placeholder="SUMMER20" placeholderTextColor="#9ca3af" autoCapitalize="characters" />
             </Field>
             <Field label="Title *">
               <TextInput style={s.input} value={form.title} onChangeText={v => setForm(f => ({ ...f, title: v }))} placeholder="Summer Promo" placeholderTextColor="#9ca3af" />
@@ -237,36 +434,30 @@ export default function VouchersScreen() {
             </Field>
 
             <Field label={`Discount Value (${form.discount_type === 'fixed' ? '₱' : '%'})`}>
-              <TextInput style={s.input} value={form.discount_value} onChangeText={v => setForm(f => ({ ...f, discount_value: v }))} keyboardType="decimal-pad" placeholderTextColor="#9ca3af" />
+              <TextInput style={s.input} value={form.discount_value} onChangeText={v => setForm(f => ({ ...f, discount_value: v }))} keyboardType="decimal-pad" />
             </Field>
 
             {form.discount_type === 'percentage' && (
-              <Field label="Max Discount Amount (₱, optional cap)">
+              <Field label="Max Discount Amount (₱ cap, optional)">
                 <TextInput style={s.input} value={form.max_discount_amount} onChangeText={v => setForm(f => ({ ...f, max_discount_amount: v }))} keyboardType="decimal-pad" placeholder="—" placeholderTextColor="#9ca3af" />
               </Field>
             )}
 
-            <Field label="Minimum Fare (₱)">
-              <TextInput style={s.input} value={form.minimum_fare} onChangeText={v => setForm(f => ({ ...f, minimum_fare: v }))} keyboardType="decimal-pad" placeholderTextColor="#9ca3af" />
-            </Field>
+            {([
+              { key: 'minimum_fare', label: 'Minimum Fare (₱)' },
+              { key: 'minimum_distance_km', label: 'Minimum Distance (km)' },
+              { key: 'usage_limit', label: 'Total Usage Limit (blank = unlimited)' },
+              { key: 'per_user_limit', label: 'Per User Limit' },
+            ] as { key: keyof VoucherForm; label: string }[]).map(field => (
+              <Field key={field.key} label={field.label}>
+                <TextInput style={s.input} value={form[field.key] as string} onChangeText={v => setForm(f => ({ ...f, [field.key]: v }))} keyboardType="decimal-pad" placeholderTextColor="#9ca3af" />
+              </Field>
+            ))}
 
-            <Field label="Minimum Distance (km)">
-              <TextInput style={s.input} value={form.minimum_distance_km} onChangeText={v => setForm(f => ({ ...f, minimum_distance_km: v }))} keyboardType="decimal-pad" placeholderTextColor="#9ca3af" />
-            </Field>
-
-            <Field label="Total Usage Limit (blank = unlimited)">
-              <TextInput style={s.input} value={form.usage_limit} onChangeText={v => setForm(f => ({ ...f, usage_limit: v }))} keyboardType="number-pad" placeholder="∞" placeholderTextColor="#9ca3af" />
-            </Field>
-
-            <Field label="Per User Limit">
-              <TextInput style={s.input} value={form.per_user_limit} onChangeText={v => setForm(f => ({ ...f, per_user_limit: v }))} keyboardType="number-pad" placeholderTextColor="#9ca3af" />
-            </Field>
-
-            <Field label="Starts At (ISO format, optional)">
+            <Field label="Starts At (ISO datetime, optional)">
               <TextInput style={s.input} value={form.starts_at} onChangeText={v => setForm(f => ({ ...f, starts_at: v }))} placeholder="2025-06-01T00:00:00" placeholderTextColor="#9ca3af" autoCapitalize="none" />
             </Field>
-
-            <Field label="Expires At (ISO format, optional)">
+            <Field label="Expires At (ISO datetime, optional)">
               <TextInput style={s.input} value={form.expires_at} onChangeText={v => setForm(f => ({ ...f, expires_at: v }))} placeholder="2025-12-31T23:59:59" placeholderTextColor="#9ca3af" autoCapitalize="none" />
             </Field>
 
@@ -312,15 +503,47 @@ const s = StyleSheet.create({
   metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   metaItem: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f9fafb', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   cardFooter: { flexDirection: 'row', gap: 8 },
-  editBtn: { backgroundColor: '#eff6ff', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  viewBtn: { backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#bbf7d0' },
+  viewBtnText: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
+  editBtn: { backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
   editBtnText: { fontSize: 12, fontWeight: '600', color: '#3b82f6' },
-  deleteBtn: { backgroundColor: '#fef2f2', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  deleteBtn: { backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
   deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#ef4444' },
   empty: { textAlign: 'center', color: '#9ca3af', fontSize: 14, marginTop: 40 },
-  modalContent: { padding: 20, paddingBottom: 40 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#030712' },
+
+  // View modal
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#030712', letterSpacing: 0.5 },
+  modalSub: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   closeBtn: { fontSize: 20, color: '#9ca3af', paddingHorizontal: 8 },
+  summaryRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  summaryItem: { flex: 1, alignItems: 'center', paddingVertical: 14 },
+  summaryNum: { fontSize: 22, fontWeight: '800', color: '#030712' },
+  summaryLabel: { fontSize: 10, color: '#9ca3af', marginTop: 2 },
+  claimsList: { padding: 16, paddingBottom: 40 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: '#9ca3af', letterSpacing: 1, marginBottom: 12 },
+  claimCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  claimHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  claimUser: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  claimAvatar: { width: 36, height: 36, borderRadius: 18 },
+  claimAvatarPH: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
+  claimAvatarInit: { fontSize: 14, fontWeight: '700', color: '#6b7280' },
+  claimName: { fontSize: 14, fontWeight: '600', color: '#030712' },
+  claimDate: { fontSize: 11, color: '#9ca3af' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  statusText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  rideInfo: { backgroundColor: '#f9fafb', borderRadius: 8, padding: 10, marginBottom: 10 },
+  rideInfoText: { fontSize: 13, color: '#374151', marginBottom: 2 },
+  rideInfoDate: { fontSize: 11, color: '#9ca3af', marginBottom: 8 },
+  paidBadge: { backgroundColor: '#ecfdf5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: 'flex-start' },
+  paidBadgeText: { fontSize: 12, fontWeight: '600', color: '#059669' },
+  markPaidBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, alignSelf: 'flex-start' },
+  markPaidBtnText: { fontSize: 12, fontWeight: '600', color: '#10b981' },
+  removeClaimBtn: { alignSelf: 'flex-start' },
+  removeClaimBtnText: { fontSize: 12, color: '#ef4444', fontWeight: '600' },
+
+  // Form
+  formContent: { padding: 20, paddingBottom: 40 },
   fieldWrap: { marginTop: 12 },
   fieldLabel: { fontSize: 12, fontWeight: '600', color: '#374151', marginBottom: 7 },
   input: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, borderWidth: 1, borderColor: '#e5e7eb', color: '#030712' },
