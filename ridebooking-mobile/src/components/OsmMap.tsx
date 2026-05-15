@@ -73,6 +73,7 @@ const buildHtml = () => `
       rotate: true,
       touchRotate: true,
       rotateControl: false,
+      preferCanvas: true,
     }).setView([DEFAULT_LAT, DEFAULT_LNG], 14);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -189,14 +190,20 @@ const buildHtml = () => `
     window.clearRider = () => {
       if (riderMarker) { map.removeLayer(riderMarker); riderMarker = null; riderMarkerAvatar = null; }
     };
+    const myLocationIcon = L.divIcon({
+      html: '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+          + '<div style="background:#1d4ed8;border-radius:5px;padding:2px 6px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.35)">You</div>'
+          + '<div style="background:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #1d4ed8, 0 2px 6px rgba(0,0,0,0.3);font-size:14px;line-height:1">🏍️</div>'
+          + '</div>',
+      iconSize: [38, 46],
+      iconAnchor: [19, 46],
+      className: '',
+    });
     window.setMyLocation = (lat, lng, avatarUrl) => {
-      const icon = buildAvatarIcon(avatarUrl || '', '#030712');
       if (myMarker) {
         myMarker.setLatLng([lat, lng]);
-        if (avatarUrl !== myMarkerAvatar) { myMarker.setIcon(icon); myMarkerAvatar = avatarUrl; }
       } else {
-        myMarkerAvatar = avatarUrl;
-        myMarker = L.marker([lat, lng], { icon }).addTo(map);
+        myMarker = L.marker([lat, lng], { icon: myLocationIcon }).addTo(map);
       }
     };
     window.clearMyLocation = () => {

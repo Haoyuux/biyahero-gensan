@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, ActivityIndicator, ScrollView, Animated,
-  KeyboardAvoidingView, Platform, Modal, Image, Linking,
+  Alert, ActivityIndicator, ScrollView, Animated, PanResponder,
+  KeyboardAvoidingView, Platform, Modal, Image, Linking, useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,6 +67,30 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dotAnims = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
   const ringAnims = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+
+  // Draggable bottom sheet (matched step)
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const sheetY = useRef(new Animated.Value(0)).current;
+  const sheetSnapRef = useRef(0);
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onPanResponderMove: (_, gs) => {
+        sheetY.setValue(Math.max(0, Math.min(sheetSnapRef.current, gs.dy)));
+      },
+      onPanResponderRelease: (_, gs) => {
+        const snap = sheetSnapRef.current;
+        const shouldCollapse = gs.dy > snap * 0.35 || gs.vy > 0.5;
+        Animated.spring(sheetY, {
+          toValue: shouldCollapse ? snap : 0,
+          useNativeDriver: true,
+          tension: 120,
+          friction: 14,
+        }).start();
+      },
+    })
+  ).current;
 
   // Map
   const [mapReady, setMapReady] = useState(false);
@@ -187,11 +211,16 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     }
   };
 
+  const nominatimHeaders = {
+    'Accept-Language': 'en',
+    'User-Agent': 'BiyaheroApp/1.0 (com.biyahero.app)',
+  };
+
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
     try {
       const r = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`,
-        { headers: { 'Accept-Language': 'en' } },
+        { headers: nominatimHeaders },
       );
       const d = await r.json();
       const a = d.address ?? {};
@@ -262,7 +291,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       try {
         const r = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } },
+          { headers: nominatimHeaders },
         );
         const d = await r.json();
         const a = d.address ?? {};
@@ -279,6 +308,9 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     mapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
     if (step !== 'matched') mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
   }, [mapReady, pickupCoords]);
+
+  // Reset sheet to expanded whenever step changes
+  useEffect(() => { sheetY.setValue(0); }, [step]);
 
   // Restore map markers + route after app restart mid-ride
   useEffect(() => {
@@ -329,7 +361,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(activeQuery)}&limit=5&countrycodes=ph&viewbox=118.3,10.2,127.5,4.5&bounded=1`,
-          { headers: { 'Accept-Language': 'en' } },
+          { headers: nominatimHeaders },
         );
         setSuggestions(await res.json());
       } catch { /* ignore */ }
@@ -484,25 +516,19 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     });
     ch.on('broadcast', { event: 'RIDE_CANCELLED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
-      showToast('Rider cancelled. Finding a new rider...', 'warn');
+      stopBroadcasting();
       setActiveRider(null);
       ridePhaseRef.current = 'going_to_pickup';
       setRidePhase('going_to_pickup');
-      setStep('searching');
-      // Reset map to pre-matched state
+      setStep('select');
       mapRef.current?.clearRider();
       mapRef.current?.clearRoute();
       mapRef.current?.clearDestination();
       if (pickupCoords) mapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
       if (destinationCoords) mapRef.current?.setDestination(destinationCoords.lat, destinationCoords.lng, destination || 'Destination');
       if (pickupCoords) mapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 14);
-      supabase.from('rides').update({ status: 'pending', rider_id: null }).eq('id', currentRideId);
-      stopBroadcasting();
-      broadcastIntervalRef.current = setInterval(() => {
-        if (broadcastPayloadRef.current) {
-          supabase.channel('rides').send({ type: 'broadcast', event: 'REQUEST_RIDE', payload: broadcastPayloadRef.current });
-        }
-      }, 4000);
+      supabase.from('rides').update({ status: 'cancelled' }).eq('id', currentRideId);
+      showToast('Rider cancelled your booking.', 'warn');
     });
     ch.on('broadcast', { event: 'RIDE_COMPLETED' }, ({ payload }) => {
       if (payload.rideId !== currentRideId) return;
@@ -1047,22 +1073,25 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       const etaMin = routeDuration ? Math.max(1, Math.round(routeDuration / 60)) : null;
       const distKm = routeDistance ? (routeDistance / 1000).toFixed(1) : null;
       const finalFare = fareBreakdown ? Math.max(0, fareBreakdown.totalFare - voucherDiscount) : 0;
+      sheetSnapRef.current = SCREEN_HEIGHT * 0.65 - 150;
       return (
-        <View style={styles.matchedSheet}>
-          <View style={styles.matchedHandle} />
-          <View style={styles.matchedHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.matchedStatusLbl, ridePhase === 'arrived' && { color: '#10b981' }]}>
-                {ridePhase === 'arrived' ? 'RIDER ARRIVED' : 'ON THE WAY'}
-              </Text>
-              <Text style={styles.matchedEta}>
-                {ridePhase === 'arrived'
-                  ? 'Your rider has arrived!'
-                  : etaMin ? `Arriving in ${etaMin} min` : 'On the way to pickup'}
-              </Text>
-              {(distKm || destination) && <Text style={styles.matchedSub}>{[distKm && `${distKm} km`, destination].filter(Boolean).join(' · ')}</Text>}
+        <Animated.View style={[styles.matchedSheet, { height: SCREEN_HEIGHT * 0.65, transform: [{ translateY: sheetY }] }]}>
+          <View {...sheetPanResponder.panHandlers}>
+            <View style={styles.matchedHandle} />
+            <View style={styles.matchedHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.matchedStatusLbl, ridePhase === 'arrived' && { color: '#10b981' }]}>
+                  {ridePhase === 'arrived' ? 'RIDER ARRIVED' : 'ON THE WAY'}
+                </Text>
+                <Text style={styles.matchedEta}>
+                  {ridePhase === 'arrived'
+                    ? 'Your rider has arrived!'
+                    : etaMin ? `Arriving in ${etaMin} min` : 'On the way to pickup'}
+                </Text>
+                {(distKm || destination) && <Text style={styles.matchedSub}>{[distKm && `${distKm} km`, destination].filter(Boolean).join(' · ')}</Text>}
+              </View>
+              <View style={styles.farePill}><Text style={styles.farePillText}>₱{finalFare}</Text></View>
             </View>
-            <View style={styles.farePill}><Text style={styles.farePillText}>₱{finalFare}</Text></View>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
@@ -1189,7 +1218,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
               </TouchableOpacity>
             )}
           </ScrollView>
-        </View>
+        </Animated.View>
       );
     }
 
@@ -1852,7 +1881,7 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
     shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 24, shadowOffset: { width: 0, height: -2 }, elevation: 20,
-    maxHeight: '68%',
+    overflow: 'hidden',
   },
   matchedHandle: { width: 40, height: 5, backgroundColor: '#e5e7eb', borderRadius: 99, alignSelf: 'center', marginTop: 12 },
   matchedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },

@@ -7,6 +7,7 @@ import RiderVerificationScreen from '../screens/admin/RiderVerificationScreen';
 import AdminRemittancesScreen from '../screens/admin/AdminRemittancesScreen';
 import UserBlockingScreen from '../screens/admin/UserBlockingScreen';
 import AdminProfileScreen from '../screens/admin/AdminProfileScreen';
+import AdminMoreNavigator from './AdminMoreNavigator';
 
 const Tab = createBottomTabNavigator();
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -40,6 +41,11 @@ export default function AdminNavigator() {
         name="AdminBlocking"
         component={UserBlockingScreen}
         options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'ban' : 'ban-outline'} label="Blocking" focused={focused} /> }}
+      />
+      <Tab.Screen
+        name="AdminMore"
+        component={AdminMoreNavigator}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'grid' : 'grid-outline'} label="More" focused={focused} /> }}
       />
       <Tab.Screen
         name="AdminProfile"

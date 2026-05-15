@@ -3,7 +3,9 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
   useWindowDimensions, Image, BackHandler, Alert, Vibration,
+  Animated, PanResponder,
 } from 'react-native';
+import * as KeepAwake from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
@@ -20,7 +22,30 @@ interface Props {
 const RIDER_RIDE_KEY = 'biyahero_rider_ride';
 
 export default function RiderHomeScreen({ profile, onSignOut }: Props) {
-  const { width } = useWindowDimensions();
+  const { width, height: SCREEN_HEIGHT } = useWindowDimensions();
+
+  // Draggable bottom sheet
+  const riderSheetY = useRef(new Animated.Value(0)).current;
+  const riderSheetSnapRef = useRef(0);
+  const riderSheetPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onPanResponderMove: (_, gs) => {
+        riderSheetY.setValue(Math.max(0, Math.min(riderSheetSnapRef.current, gs.dy)));
+      },
+      onPanResponderRelease: (_, gs) => {
+        const snap = riderSheetSnapRef.current;
+        const shouldCollapse = gs.dy > snap * 0.35 || gs.vy > 0.5;
+        Animated.spring(riderSheetY, {
+          toValue: shouldCollapse ? snap : 0,
+          useNativeDriver: true,
+          tension: 120,
+          friction: 14,
+        }).start();
+      },
+    })
+  ).current;
   const fs = (base: number) => Math.round(base * (width / 390)); // responsive font scale
   const mapRef = useRef<OsmMapHandle>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -28,7 +53,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const riderCurrentLocRef = useRef<{ lat: number; lng: number } | null>(null);
   const riderTargetRef = useRef<{ lat: number; lng: number } | null>(null);
   const routeTickRef = useRef(0);
-  const isOnlineRef = useRef(profile.is_online ?? false);
+  const isOnlineRef = useRef(false);
   const acceptedRideIdRef = useRef<string | null>(null);
   const declinedRidesRef = useRef<Map<string, number>>(new Map());
   const currentRequestRef = useRef<any>(null);
@@ -39,7 +64,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const alertNotifIdsRef = useRef<string[]>([]);
   const notifiedRideIdsRef = useRef<Set<string>>(new Set());
 
-  const [isOnline, setIsOnline] = useState(profile.is_online ?? false);
+  const [isOnline, setIsOnline] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
   // Today stats
@@ -153,23 +178,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     } catch { /* silent */ }
   };
 
-  // Always (re)create the notification channel on mount.
-  // Android caches channel settings after first creation, so we delete
-  // and recreate to ensure vibration pattern + sound are applied.
+
+  // Force offline on every app open so stale DB state doesn't auto-online the rider
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      Notifications.deleteNotificationChannelAsync('ride-requests').catch(() => {}).finally(() => {
-        Notifications.setNotificationChannelAsync('ride-requests', {
-          name: 'Ride Requests',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 500, 200, 500, 200, 500],
-          sound: 'default',
-          enableVibrate: true,
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-          bypassDnd: true,
-        });
-      });
-    }
+    supabase.from('profiles').update({ is_online: false }).eq('id', profile.id);
+    unregisterPushToken();
   }, []);
 
   // GPS
@@ -184,7 +197,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
           const { latitude, longitude } = loc.coords;
           riderCurrentLocRef.current = { lat: latitude, lng: longitude };
           if (mapReady) {
-            mapRef.current?.setMyLocation(latitude, longitude, profile.avatar_url ?? '');
+            mapRef.current?.setMyLocation(latitude, longitude);
             // Auto-rotate map to face direction of travel during active ride
             if (acceptedRideIdRef.current && loc.coords.heading != null && loc.coords.heading >= 0) {
               mapRef.current?.rotateTo(loc.coords.heading);
@@ -216,7 +229,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (mapReady) {
-        mapRef.current?.setMyLocation(loc.coords.latitude, loc.coords.longitude, profile.avatar_url ?? '');
+        mapRef.current?.setMyLocation(loc.coords.latitude, loc.coords.longitude);
         mapRef.current?.flyTo(loc.coords.latitude, loc.coords.longitude, 15);
       }
     })();
@@ -266,6 +279,19 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   };
 
   useEffect(() => { fetchTodayStats(); }, []);
+
+  // Keep screen awake during active booking so rider can navigate
+  useEffect(() => {
+    if (requestAccepted) {
+      KeepAwake.activateKeepAwakeAsync('rider-active-ride');
+    } else {
+      KeepAwake.deactivateKeepAwake('rider-active-ride');
+    }
+    return () => { KeepAwake.deactivateKeepAwake('rider-active-ride'); };
+  }, [requestAccepted]);
+
+  // Reset sheet to expanded when active ride state changes
+  useEffect(() => { riderSheetY.setValue(0); }, [requestAccepted]);
 
   // Prevent Android back button from exiting app during active ride
   useEffect(() => {
@@ -638,14 +664,18 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     );
   }
 
+  riderSheetSnapRef.current = (requestAccepted ? SCREEN_HEIGHT * 0.58 : SCREEN_HEIGHT * 0.52) - 130;
+
   return (
     <View style={styles.container}>
       <OsmMap ref={mapRef} style={styles.map} onMapReady={() => setMapReady(true)} />
 
       {/* Active ride sheet */}
       {requestAccepted && activeRide ? (
-        <View style={styles.activeSheet}>
-          <View style={styles.handle} />
+        <Animated.View style={[styles.activeSheet, { height: SCREEN_HEIGHT * 0.58, transform: [{ translateY: riderSheetY }] }]}>
+          <View {...riderSheetPan.panHandlers}>
+            <View style={styles.handle} />
+          </View>
           <Text style={styles.sectionLabel}>ACTIVE RIDE</Text>
 
           {/* Scrollable ride details */}
@@ -721,11 +751,13 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
               <Text style={styles.cancelRideBtnText}>Cancel Booking</Text>
             </TouchableOpacity>
           )}
-        </View>
+        </Animated.View>
       ) : (
         /* Default rider sheet */
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <Animated.View style={[styles.sheet, { height: SCREEN_HEIGHT * 0.52, transform: [{ translateY: riderSheetY }] }]}>
+          <View {...riderSheetPan.panHandlers}>
+            <View style={styles.handle} />
+          </View>
           <View style={styles.riderRow}>
             <View style={styles.driverAvatarPro}>
               {profile.avatar_url ? (
@@ -785,7 +817,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             </View>
           )}
 
-        </View>
+        </Animated.View>
       )}
 
       {/* Profile button — top right */}
@@ -902,16 +934,14 @@ const styles = StyleSheet.create({
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36,
-    maxHeight: '55%',
+    paddingHorizontal: 20, paddingBottom: 36, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20,
     shadowOffset: { width: 0, height: -1 }, elevation: 16,
   },
   activeSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36,
-    height: '58%',
+    paddingHorizontal: 20, paddingBottom: 36, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20,
     shadowOffset: { width: 0, height: -1 }, elevation: 16,
   },

@@ -85,6 +85,18 @@ export default function RiderProfileScreen() {
     setEditingVehicle(false);
   };
 
+  const uploadToStorage = async (uri: string, mimeType: string, bucket: string, path: string) => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return supabase.storage.from(bucket).upload(path, blob, { contentType: mimeType, upsert: true });
+  };
+
+  const resolveExt = (asset: { mimeType?: string; uri: string }) => {
+    if (asset.mimeType) return asset.mimeType.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg';
+    const fromUri = asset.uri.split('.').pop() ?? '';
+    return /^(jpg|jpeg|png|gif|webp|heic)$/i.test(fromUri) ? fromUri.toLowerCase() : 'jpg';
+  };
+
   const pickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed'); return; }
@@ -94,18 +106,22 @@ export default function RiderProfileScreen() {
     });
     if (result.canceled || !result.assets[0]) return;
     setLoadingPersonal(true);
-    const asset = result.assets[0];
-    const ext = asset.uri.split('.').pop() ?? 'jpg';
-    const path = `avatars/${profile.id}.${ext}`;
-    const formData = new FormData();
-    formData.append('file', { uri: asset.uri, name: `avatar.${ext}`, type: `image/${ext}` } as any);
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, formData, { upsert: true });
-    if (upErr) { setLoadingPersonal(false); Alert.alert('Upload failed', upErr.message); return; }
-    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', profile.id);
-    setAvatarUrl(urlData.publicUrl);
-    refetchProfile();
-    setLoadingPersonal(false);
+    try {
+      const asset = result.assets[0];
+      const ext = resolveExt(asset);
+      const mimeType = asset.mimeType ?? `image/${ext}`;
+      const path = `avatars/${profile.id}.${ext}`;
+      const { error: upErr } = await uploadToStorage(asset.uri, mimeType, 'avatars', path);
+      if (upErr) { Alert.alert('Upload failed', upErr.message); return; }
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+      await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', profile.id);
+      setAvatarUrl(urlData.publicUrl);
+      refetchProfile();
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message ?? 'Unknown error');
+    } finally {
+      setLoadingPersonal(false);
+    }
   };
 
   const pickVehiclePhoto = async () => {
@@ -117,18 +133,22 @@ export default function RiderProfileScreen() {
     });
     if (result.canceled || !result.assets[0]) return;
     setLoadingVehicle(true);
-    const asset = result.assets[0];
-    const ext = asset.uri.split('.').pop() ?? 'jpg';
-    const path = `vehicles/${profile.id}.${ext}`;
-    const formData = new FormData();
-    formData.append('file', { uri: asset.uri, name: `vehicle.${ext}`, type: `image/${ext}` } as any);
-    const { error: upErr } = await supabase.storage.from('vehicles').upload(path, formData, { upsert: true });
-    if (upErr) { setLoadingVehicle(false); Alert.alert('Upload failed', upErr.message); return; }
-    const { data: urlData } = supabase.storage.from('vehicles').getPublicUrl(path);
-    await supabase.from('profiles').update({ vehicle_image_url: urlData.publicUrl }).eq('id', profile.id);
-    setVehicleImageUrl(urlData.publicUrl);
-    refetchProfile();
-    setLoadingVehicle(false);
+    try {
+      const asset = result.assets[0];
+      const ext = resolveExt(asset);
+      const mimeType = asset.mimeType ?? `image/${ext}`;
+      const path = `vehicles/${profile.id}.${ext}`;
+      const { error: upErr } = await uploadToStorage(asset.uri, mimeType, 'documents', path);
+      if (upErr) { Alert.alert('Upload failed', upErr.message); return; }
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+      await supabase.from('profiles').update({ vehicle_image_url: urlData.publicUrl }).eq('id', profile.id);
+      setVehicleImageUrl(urlData.publicUrl);
+      refetchProfile();
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message ?? 'Unknown error');
+    } finally {
+      setLoadingVehicle(false);
+    }
   };
 
   const pickDocument = async (docType: 'or' | 'cr' | 'license') => {
@@ -140,22 +160,26 @@ export default function RiderProfileScreen() {
     });
     if (result.canceled || !result.assets[0]) return;
     setLoadingDoc(docType);
-    const asset = result.assets[0];
-    const ext = asset.uri.split('.').pop() ?? 'jpg';
-    const path = `documents/${profile.id}/${docType}.${ext}`;
-    const formData = new FormData();
-    formData.append('file', { uri: asset.uri, name: `${docType}.${ext}`, type: `image/${ext}` } as any);
-    const { error: upErr } = await supabase.storage.from('documents').upload(path, formData, { upsert: true });
-    if (upErr) { setLoadingDoc(null); Alert.alert('Upload failed', upErr.message); return; }
-    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
-    const url = urlData.publicUrl;
-    const field = docType === 'or' ? 'or_url' : docType === 'cr' ? 'cr_url' : 'license_url';
-    await supabase.from('profiles').update({ [field]: url }).eq('id', profile.id);
-    if (docType === 'or') setOrUrl(url);
-    if (docType === 'cr') setCrUrl(url);
-    if (docType === 'license') setLicenseUrl(url);
-    refetchProfile();
-    setLoadingDoc(null);
+    try {
+      const asset = result.assets[0];
+      const ext = resolveExt(asset);
+      const mimeType = asset.mimeType ?? `image/${ext}`;
+      const path = `documents/${profile.id}/${docType}.${ext}`;
+      const { error: upErr } = await uploadToStorage(asset.uri, mimeType, 'documents', path);
+      if (upErr) { Alert.alert('Upload failed', upErr.message); return; }
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+      const url = urlData.publicUrl;
+      const field = docType === 'or' ? 'or_url' : docType === 'cr' ? 'cr_url' : 'license_url';
+      await supabase.from('profiles').update({ [field]: url }).eq('id', profile.id);
+      if (docType === 'or') setOrUrl(url);
+      if (docType === 'cr') setCrUrl(url);
+      if (docType === 'license') setLicenseUrl(url);
+      refetchProfile();
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message ?? 'Unknown error');
+    } finally {
+      setLoadingDoc(null);
+    }
   };
 
   const completed = rides.filter(r => r.status === 'completed');
