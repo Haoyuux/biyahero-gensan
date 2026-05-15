@@ -9,20 +9,29 @@ import { useProfile } from '../../contexts/AuthContext';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 
-async function fetchVoucherClaims(voucherId: string): Promise<{ uvRows: any[]; rideRows: any[]; profiles: any[] }> {
+async function callAdminFn(name: string, body: object): Promise<any> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-fetch-voucher-claims`, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ voucherId }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error ?? 'Failed to fetch claims');
+    throw new Error(err.error ?? `${name} failed`);
   }
   return res.json();
 }
+
+const fetchVoucherClaims = (voucherId: string) =>
+  callAdminFn('admin-fetch-voucher-claims', { voucherId });
+
+const removeUserVoucher = (userVoucherId: string) =>
+  callAdminFn('admin-voucher-action', { action: 'removeUserVoucher', userVoucherId });
+
+const markDiscountPaid = (rideId: string) =>
+  callAdminFn('admin-voucher-action', { action: 'markDiscountPaid', rideId });
 
 interface VoucherWithUsage extends Voucher {
   usage_count: number;
@@ -204,44 +213,49 @@ export default function VouchersScreen() {
     finally { setClaimsLoading(false); }
   };
 
-  const handleRemoveClaim = async (row: UserVoucherRow) => {
-    // Ride-sourced rows (extraRideRows) use the ride id as row.id — can't delete from user_vouchers
-    // Only user_vouchers rows (claimed/not yet used) can be removed
+  const handleRemoveClaim = (row: UserVoucherRow) => {
     if (row.used_at !== null) {
-      Alert.alert('Cannot Remove', 'This voucher was already used in a ride. Remove it from the ride record instead.');
+      Alert.alert('Cannot Remove', 'This voucher was already used in a ride.');
       return;
     }
-    Alert.alert('Remove Voucher', `Remove this saved voucher from ${row.user_name ?? 'user'}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive', onPress: async () => {
-          try {
-            await supabase.from('user_vouchers').delete().eq('id', row.id);
-            if (viewingVoucher) await openView(viewingVoucher);
-            await load();
-          } catch (e: any) { Alert.alert('Error', e.message); }
+    Alert.alert(
+      'Remove Voucher',
+      `Remove this saved voucher from ${row.user_name ?? 'user'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeUserVoucher(row.id);
+              if (viewingVoucher) await openView(viewingVoucher);
+              await load();
+            } catch (e: any) { Alert.alert('Error', e.message); }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
-  const handleMarkPaid = async (row: UserVoucherRow) => {
+  const handleMarkPaid = (row: UserVoucherRow) => {
     if (!row.ride_id) return;
-    Alert.alert('Mark Paid', 'Mark this voucher discount as settled?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Mark Paid', onPress: async () => {
-          try {
-            await supabase.from('rides').update({
-              voucher_discount_paid: true,
-              voucher_discount_paid_at: new Date().toISOString(),
-              voucher_discount_paid_by: profile.id,
-            }).eq('id', row.ride_id!);
-            if (viewingVoucher) await openView(viewingVoucher);
-          } catch (e: any) { Alert.alert('Error', e.message); }
+    Alert.alert(
+      'Mark Discount Settled',
+      `Mark the ₱${(row.ride_discount ?? 0).toFixed(2)} discount as settled?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Settled',
+          onPress: async () => {
+            try {
+              await markDiscountPaid(row.ride_id!);
+              if (viewingVoucher) await openView(viewingVoucher);
+            } catch (e: any) { Alert.alert('Error', e.message); }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const openCreate = () => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true); };
