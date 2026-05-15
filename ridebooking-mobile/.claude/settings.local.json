@@ -5,7 +5,13 @@
       "Bash(git commit *)",
       "Bash(npx tsc *)",
       "Bash(npx react-native *)",
-      "Bash(npx expo *)"
+      "Bash(npx expo *)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; $env:PATH = \"$env:JAVA_HOME\\\\bin;$env:PATH\"; Set-Location \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-mobile\\\\android\"; .\\\\gradlew assembleDebug 2>&1 | Select-Object -Last 5)",
+      "WebFetch(domain:assets.mixkit.co)",
+      "WebSearch",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; $env:PATH = \"$env:JAVA_HOME\\\\bin;$env:PATH\"; Set-Location \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-mobile\\\\android\"; .\\\\gradlew assembleDebug 2>&1)",
+      "PowerShell(cmd /c \"dir D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-mobile\\\\android\\\\app\\\\src\\\\main\\\\res\\\\mipmap-xxhdpi\\\\ic_launcher.webp 2>&1\")",
+      "Skill(superpowers:executing-plans)"
     ]
   }
 }
