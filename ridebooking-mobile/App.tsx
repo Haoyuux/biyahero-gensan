@@ -1,6 +1,8 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Linking, Platform } from 'react-native';
+import { useFonts } from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 
 // Web relay: when Supabase redirects to the Metro dev server via IP (http://10.x.x.x:8082/auth?code=xxx),
 // relay to the native app via exp:// deep link.
@@ -22,9 +24,11 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import OnboardingScreen from './src/screens/onboarding/OnboardingScreen';
 import UserNavigator from './src/navigation/UserNavigator';
 import RiderNavigator from './src/navigation/RiderNavigator';
+import AdminNavigator from './src/navigation/AdminNavigator';
 import { supabase } from './src/lib/supabase';
 
 export default function App() {
+  const [fontsLoaded] = useFonts({ ...Ionicons.font });
   const { session, profile, loading, signOut, refetchProfile } = useAuth();
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
 
@@ -72,7 +76,7 @@ export default function App() {
     );
   }
 
-  if (loading) {
+  if (loading || !fontsLoaded) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#10b981" />
@@ -93,11 +97,16 @@ export default function App() {
   }
 
   const isRider = profile.role === 'rider' || profile.role === 'team_leader';
+  const isAdmin = profile.role === 'admin' || profile.role === 'super_admin';
 
   return (
     <AuthProvider value={{ profile, signOut, refetchProfile }}>
       <NavigationContainer>
-        {isRider ? <RiderNavigator appSettings={appSettings} /> : <UserNavigator />}
+        {isAdmin
+          ? <AdminNavigator />
+          : isRider
+          ? <RiderNavigator appSettings={appSettings} />
+          : <UserNavigator />}
       </NavigationContainer>
     </AuthProvider>
   );
