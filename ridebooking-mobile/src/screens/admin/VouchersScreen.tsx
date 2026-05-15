@@ -87,13 +87,15 @@ export default function VouchersScreen() {
     }
 
     const ids = voucherData.map((v: any) => v.id);
-    const { data: usageData } = await supabase
-      .from('user_vouchers')
+    // Count from rides (authoritative) — user_vouchers may be empty if voucher applied at booking without prior save
+    const { data: rideUsageData } = await supabase
+      .from('rides')
       .select('voucher_id')
-      .in('voucher_id', ids);
+      .in('voucher_id', ids)
+      .not('voucher_discount', 'is', null);
 
     const usageMap: Record<string, number> = {};
-    (usageData ?? []).forEach((u: any) => {
+    (rideUsageData ?? []).forEach((u: any) => {
       usageMap[u.voucher_id] = (usageMap[u.voucher_id] ?? 0) + 1;
     });
 
@@ -104,71 +106,95 @@ export default function VouchersScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load user claims for a voucher
+  // Load claims for a voucher — rides is the authoritative source
   const openView = async (v: VoucherWithUsage) => {
     setViewingVoucher(v);
     setClaimsLoading(true);
     try {
-      const { data: uvRows } = await supabase
-        .from('user_vouchers')
-        .select('id, user_id, voucher_id, status, added_at, used_at, ride_id')
+      // Primary: rides where this voucher was actually applied
+      const { data: rides } = await supabase
+        .from('rides')
+        .select('id, user_id, fare, voucher_discount, created_at, pickup, voucher_discount_paid, status')
         .eq('voucher_id', v.id)
-        .order('added_at', { ascending: false });
+        .not('voucher_discount', 'is', null)
+        .order('created_at', { ascending: false });
 
-      if (!uvRows?.length) { setClaimRows([]); setClaimsLoading(false); return; }
+      // Supplementary: user_vouchers rows with status='available' (saved but not yet used)
+      const { data: savedRows } = await supabase
+        .from('user_vouchers')
+        .select('id, user_id, added_at, ride_id')
+        .eq('voucher_id', v.id)
+        .eq('status', 'available');
 
-      // Fetch user profiles
-      const userIds = [...new Set(uvRows.map((r: any) => r.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
+      const rideUserIds = [...new Set((rides ?? []).map((r: any) => r.user_id))];
+      const savedUserIds = [...new Set((savedRows ?? []).map((r: any) => r.user_id))];
+      const allUserIds = [...new Set([...rideUserIds, ...savedUserIds])];
+
       const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
-      (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
-
-      // Fetch rides for used vouchers
-      const rideIds = uvRows.map((r: any) => r.ride_id).filter(Boolean);
-      const rideMap: Record<string, any> = {};
-      if (rideIds.length) {
-        const { data: rides } = await supabase
-          .from('rides')
-          .select('id, fare, voucher_discount, created_at, pickup, voucher_discount_paid')
-          .in('id', rideIds);
-        (rides ?? []).forEach((r: any) => { rideMap[r.id] = r; });
+      if (allUserIds.length) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', allUserIds);
+        (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
       }
 
-      setClaimRows(uvRows.map((r: any) => {
-        const ride = r.ride_id ? rideMap[r.ride_id] : null;
-        const user = profileMap[r.user_id];
-        return {
+      // Build unified rows: ride usage rows first, then saved-unused
+      const rideRows: UserVoucherRow[] = (rides ?? []).map((r: any) => ({
+        id: r.id,
+        user_id: r.user_id,
+        voucher_id: v.id,
+        status: 'used' as const,
+        added_at: r.created_at,
+        used_at: r.created_at,
+        ride_id: r.id,
+        user_name: profileMap[r.user_id]?.full_name ?? null,
+        user_avatar: profileMap[r.user_id]?.avatar_url ?? null,
+        ride_fare: r.fare,
+        ride_discount: r.voucher_discount,
+        ride_date: r.created_at,
+        ride_pickup: r.pickup,
+        voucher_discount_paid: r.voucher_discount_paid ?? null,
+      }));
+
+      // Saved rows that don't have a corresponding ride entry
+      const usedUserIds = new Set(rideRows.map(r => r.user_id));
+      const savedUnusedRows: UserVoucherRow[] = (savedRows ?? [])
+        .filter((r: any) => !usedUserIds.has(r.user_id))
+        .map((r: any) => ({
           id: r.id,
           user_id: r.user_id,
-          voucher_id: r.voucher_id,
-          status: r.status,
+          voucher_id: v.id,
+          status: 'available' as const,
           added_at: r.added_at,
-          used_at: r.used_at,
-          ride_id: r.ride_id,
-          user_name: user?.full_name ?? null,
-          user_avatar: user?.avatar_url ?? null,
-          ride_fare: ride?.fare ?? null,
-          ride_discount: ride?.voucher_discount ?? null,
-          ride_date: ride?.created_at ?? null,
-          ride_pickup: ride?.pickup ?? null,
-          voucher_discount_paid: ride?.voucher_discount_paid ?? null,
-        };
-      }));
+          used_at: null,
+          ride_id: null,
+          user_name: profileMap[r.user_id]?.full_name ?? null,
+          user_avatar: profileMap[r.user_id]?.avatar_url ?? null,
+          ride_fare: null,
+          ride_discount: null,
+          ride_date: null,
+          ride_pickup: null,
+          voucher_discount_paid: null,
+        }));
+
+      setClaimRows([...rideRows, ...savedUnusedRows]);
     } catch (e: any) { Alert.alert('Error loading claims', e.message); }
     finally { setClaimsLoading(false); }
   };
 
   const handleRemoveClaim = async (row: UserVoucherRow) => {
-    Alert.alert('Remove Voucher', `Remove this voucher from ${row.user_name ?? 'user'}?`, [
+    // Only user_vouchers rows (saved/unused) can be removed; ride-sourced rows cannot be deleted
+    if (row.status !== 'available') {
+      Alert.alert('Cannot Remove', 'This voucher was used in a completed ride. Remove it from the ride record instead.');
+      return;
+    }
+    Alert.alert('Remove Voucher', `Remove this saved voucher from ${row.user_name ?? 'user'}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive', onPress: async () => {
           try {
             await supabase.from('user_vouchers').delete().eq('id', row.id);
-            // Refresh claims
             if (viewingVoucher) await openView(viewingVoucher);
             await load();
           } catch (e: any) { Alert.alert('Error', e.message); }
@@ -335,7 +361,7 @@ export default function VouchersScreen() {
             <View style={s.summaryRow}>
               <View style={s.summaryItem}>
                 <Text style={s.summaryNum}>{viewingVoucher.usage_count}</Text>
-                <Text style={s.summaryLabel}>Claims</Text>
+                <Text style={s.summaryLabel}>Rides Used</Text>
               </View>
               <View style={s.summaryItem}>
                 <Text style={s.summaryNum}>{viewingVoucher.usage_limit ?? '∞'}</Text>
@@ -353,9 +379,11 @@ export default function VouchersScreen() {
               ? <ActivityIndicator style={{ flex: 1 }} color="#10b981" />
               : (
                 <ScrollView contentContainerStyle={s.claimsList}>
-                  <Text style={s.sectionLabel}>USAGE HISTORY ({claimRows.length})</Text>
+                  <Text style={s.sectionLabel}>
+                    USAGE HISTORY ({claimRows.filter(r => r.status === 'used').length} used · {claimRows.filter(r => r.status === 'available').length} saved)
+                  </Text>
                   {claimRows.length === 0 && (
-                    <Text style={s.empty}>No one has claimed this voucher yet.</Text>
+                    <Text style={s.empty}>No rides or saved claims for this voucher yet.</Text>
                   )}
                   {claimRows.map(row => (
                     <View key={row.id} style={s.claimCard}>
