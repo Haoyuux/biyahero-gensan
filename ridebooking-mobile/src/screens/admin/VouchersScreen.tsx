@@ -7,6 +7,23 @@ import { supabase } from '../../lib/supabase';
 import { Voucher } from '../../lib/voucherService';
 import { useProfile } from '../../contexts/AuthContext';
 
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+
+async function fetchVoucherClaims(voucherId: string): Promise<{ uvRows: any[]; rideRows: any[]; profiles: any[] }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-fetch-voucher-claims`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ voucherId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(err.error ?? 'Failed to fetch claims');
+  }
+  return res.json();
+}
+
 interface VoucherWithUsage extends Voucher {
   usage_count: number;
 }
@@ -122,55 +139,27 @@ export default function VouchersScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load claims for a voucher
+  // Load claims via Edge Function (uses service role — bypasses RLS)
   const openView = async (v: VoucherWithUsage) => {
     setViewingVoucher(v);
     setClaimsLoading(true);
     try {
-      // user_vouchers is the primary source — fetch ALL statuses (claimed/available/used/expired)
-      // Do NOT filter by status='available' because the DB may store 'claimed' or other values
-      const { data: uvRows } = await supabase
-        .from('user_vouchers')
-        .select('id, user_id, voucher_id, status, added_at, used_at, ride_id')
-        .eq('voucher_id', v.id)
-        .order('added_at', { ascending: false });
-
-      // Also fetch rides that used this voucher (any voucher_discount value, even 0)
-      const { data: rideRows } = await supabase
-        .from('rides')
-        .select('id, user_id, fare, voucher_discount, created_at, pickup, voucher_discount_paid, status')
-        .eq('voucher_id', v.id)
-        .order('created_at', { ascending: false });
-
-      // Collect all user IDs to fetch names in one query
-      const uvUserIds = (uvRows ?? []).map((r: any) => r.user_id);
-      const rideUserIds = (rideRows ?? []).map((r: any) => r.user_id);
-      const allUserIds = [...new Set([...uvUserIds, ...rideUserIds])];
+      const { uvRows, rideRows, profiles } = await fetchVoucherClaims(v.id);
 
       const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
-      if (allUserIds.length) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', allUserIds);
-        (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
-      }
+      profiles.forEach((p: any) => { profileMap[p.id] = p; });
 
-      // Build ride map for cross-referencing
       const rideMap: Record<string, any> = {};
-      (rideRows ?? []).forEach((r: any) => {
-        rideMap[r.id] = r;
-        // Also index by user_id so we can link uv rows to their ride
-      });
+      rideRows.forEach((r: any) => { rideMap[r.id] = r; });
 
-      // Build rows from user_vouchers (claimed/saved entries)
-      const claimedRows: UserVoucherRow[] = (uvRows ?? []).map((uv: any) => {
+      // user_vouchers rows (claimed/saved/used)
+      const claimedRows: UserVoucherRow[] = uvRows.map((uv: any) => {
         const ride = uv.ride_id ? rideMap[uv.ride_id] : null;
         return {
           id: uv.id,
           user_id: uv.user_id,
           voucher_id: uv.voucher_id,
-          status: uv.status,           // use raw DB status value
+          status: uv.status,
           added_at: uv.added_at,
           used_at: uv.used_at,
           ride_id: uv.ride_id,
@@ -184,15 +173,15 @@ export default function VouchersScreen() {
         };
       });
 
-      // Add rides that don't have a matching user_vouchers row (voucher applied directly at booking)
-      const uvRideIds = new Set((uvRows ?? []).map((r: any) => r.ride_id).filter(Boolean));
-      const extraRideRows: UserVoucherRow[] = (rideRows ?? [])
+      // Rides that used the voucher without a user_vouchers row (applied directly at booking)
+      const uvRideIds = new Set(uvRows.map((r: any) => r.ride_id).filter(Boolean));
+      const extraRideRows: UserVoucherRow[] = rideRows
         .filter((r: any) => !uvRideIds.has(r.id))
         .map((r: any) => ({
           id: r.id,
           user_id: r.user_id,
           voucher_id: v.id,
-          status: 'used' as const,
+          status: 'used',
           added_at: r.created_at,
           used_at: r.created_at,
           ride_id: r.id,
