@@ -7,11 +7,10 @@ import { supabase } from '../../lib/supabase';
 interface RideRow {
   id: string;
   fare: number;
-  booking_fee: number;
   voucher_discount: number;
-  created_at: string;
-  pickup: string;
-  dropoff: string;
+  completed_at: string;
+  pickup_label: string;
+  dropoff_label: string;
   ride_type: string;
 }
 
@@ -42,9 +41,9 @@ export default function RevenueDashboardScreen() {
 
     const { data } = await supabase
       .from('rides')
-      .select('id, fare, booking_fee, voucher_discount, created_at, pickup, dropoff, ride_type')
+      .select('id, fare, voucher_discount, completed_at, pickup_label, dropoff_label, ride_type')
       .eq('status', 'completed')
-      .order('created_at', { ascending: false })
+      .order('completed_at', { ascending: false })
       .limit(100);
 
     const rideList = (data ?? []) as RideRow[];
@@ -53,9 +52,11 @@ export default function RevenueDashboardScreen() {
     rideList.forEach(r => {
       const net = (r.fare ?? 0) - (r.voucher_discount ?? 0);
       grossTotal += net;
-      const d = new Date(r.created_at);
-      if (d >= startOfWeek) grossThisWeek += net;
-      else if (d >= startOfLastWeek) grossLastWeek += net;
+      if (r.completed_at) {
+        const d = new Date(r.completed_at);
+        if (d >= startOfWeek) grossThisWeek += net;
+        else if (d >= startOfLastWeek) grossLastWeek += net;
+      }
     });
 
     setStats({ grossTotal, grossThisWeek, grossLastWeek });
@@ -100,15 +101,15 @@ export default function RevenueDashboardScreen() {
         renderItem={({ item }) => (
           <View style={s.rideCard}>
             <View style={s.rideHeader}>
-              <Text style={s.rideDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+              <Text style={s.rideDate}>{new Date(item.completed_at).toLocaleDateString()}</Text>
               <View style={[s.typeBadge, { backgroundColor: (RIDE_TYPE_COLOR[item.ride_type] ?? '#6b7280') + '20' }]}>
                 <Text style={[s.typeBadgeText, { color: RIDE_TYPE_COLOR[item.ride_type] ?? '#6b7280' }]}>{item.ride_type}</Text>
               </View>
               <Text style={s.fare}>₱{item.fare?.toFixed(2) ?? '0.00'}</Text>
             </View>
-            <Text style={s.route} numberOfLines={1}>{item.pickup}</Text>
+            <Text style={s.route} numberOfLines={1}>{item.pickup_label}</Text>
             <Text style={s.rideArrow}>→</Text>
-            <Text style={s.route} numberOfLines={1}>{item.dropoff}</Text>
+            <Text style={s.route} numberOfLines={1}>{item.dropoff_label}</Text>
             {(item.voucher_discount > 0) && (
               <Text style={s.discount}>Discount: −₱{item.voucher_discount.toFixed(2)}</Text>
             )}

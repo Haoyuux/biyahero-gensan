@@ -8,11 +8,11 @@ interface Review {
   id: string;
   rating: number;
   comment: string | null;
-  created_at: string;
+  completed_at: string;
   rider_id: string | null;
   user_id: string;
-  pickup: string;
-  dropoff: string;
+  pickup_label: string;
+  dropoff_label: string;
 }
 
 interface ReviewWithNames extends Review {
@@ -38,9 +38,9 @@ export default function RideReviewsScreen() {
   const load = useCallback(async () => {
     const { data: rides } = await supabase
       .from('rides')
-      .select('id, rating, comment, created_at, rider_id, user_id, pickup, dropoff')
+      .select('id, rating, comment, completed_at, rider_id, user_id, pickup_label, dropoff_label')
       .not('rating', 'is', null)
-      .order('created_at', { ascending: false })
+      .order('completed_at', { ascending: false })
       .limit(50);
 
     if (!rides?.length) { setReviews([]); setLoading(false); setRefreshing(false); return; }
@@ -82,7 +82,7 @@ export default function RideReviewsScreen() {
           <View style={s.card}>
             <View style={s.cardHeader}>
               <Stars rating={item.rating ?? 0} />
-              <Text style={s.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
+              <Text style={s.date}>{new Date(item.completed_at).toLocaleDateString()}</Text>
             </View>
             {item.comment ? (
               <Text style={s.comment}>"{item.comment}"</Text>
@@ -99,7 +99,7 @@ export default function RideReviewsScreen() {
                 <Text style={s.nameValue}>{item.passengerName}</Text>
               </View>
             </View>
-            <Text style={s.route} numberOfLines={1}>{item.pickup} → {item.dropoff}</Text>
+            <Text style={s.route} numberOfLines={1}>{item.pickup_label} → {item.dropoff_label}</Text>
           </View>
         )}
         ListEmptyComponent={<Text style={s.empty}>No reviews yet</Text>}

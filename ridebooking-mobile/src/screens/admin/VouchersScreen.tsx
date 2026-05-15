@@ -170,8 +170,8 @@ export default function VouchersScreen() {
           user_avatar: profileMap[uv.user_id]?.avatar_url ?? null,
           ride_fare: ride?.fare ?? null,
           ride_discount: ride?.voucher_discount ?? null,
-          ride_date: ride?.created_at ?? null,
-          ride_pickup: ride?.pickup ?? null,
+          ride_date: ride?.completed_at ?? null,
+          ride_pickup: ride?.pickup_label ?? null,
           voucher_discount_paid: ride?.voucher_discount_paid ?? null,
         };
       });
@@ -192,8 +192,8 @@ export default function VouchersScreen() {
           user_avatar: profileMap[r.user_id]?.avatar_url ?? null,
           ride_fare: r.fare,
           ride_discount: r.voucher_discount,
-          ride_date: r.created_at,
-          ride_pickup: r.pickup,
+          ride_date: r.completed_at,
+          ride_pickup: r.pickup_label,
           voucher_discount_paid: r.voucher_discount_paid ?? null,
         }));
 

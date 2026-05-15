@@ -14,8 +14,8 @@ interface LiveStats {
 interface OngoingRide {
   id: string;
   status: string;
-  pickup: string;
-  dropoff: string;
+  pickup_label: string;
+  dropoff_label: string;
   user_id: string;
   rider_id: string | null;
 }
@@ -44,7 +44,7 @@ export default function AdminLiveScreen() {
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'user'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'rider').eq('rider_status', 'approved'),
       supabase.from('profiles').select('*').eq('is_online', true).in('role', ['rider', 'team_leader']),
-      supabase.from('rides').select('id,status,pickup,dropoff,user_id,rider_id').not('status', 'in', '(completed,cancelled)').order('created_at', { ascending: false }).limit(30),
+      supabase.from('rides').select('id,status,pickup_label,dropoff_label,user_id,rider_id').not('status', 'in', '(completed,cancelled)').order('completed_at', { ascending: false }).limit(30),
     ]);
 
     setStats({
@@ -124,9 +124,9 @@ export default function AdminLiveScreen() {
                 </Text>
               </View>
             </View>
-            <Text style={s.rideRoute} numberOfLines={1}>{item.pickup}</Text>
+            <Text style={s.rideRoute} numberOfLines={1}>{item.pickup_label}</Text>
             <Text style={s.rideArrow}>→</Text>
-            <Text style={s.rideRoute} numberOfLines={1}>{item.dropoff}</Text>
+            <Text style={s.rideRoute} numberOfLines={1}>{item.dropoff_label}</Text>
           </View>
         )}
         contentContainerStyle={s.list}

@@ -31,9 +31,9 @@ export default function BookingAnalyticsScreen() {
     const [{ data: recentRides }, { count: allTime }] = await Promise.all([
       supabase
         .from('rides')
-        .select('created_at')
+        .select('completed_at')
         .eq('status', 'completed')
-        .gte('created_at', twoWeeksAgo),
+        .gte('completed_at', twoWeeksAgo),
       supabase
         .from('rides')
         .select('*', { count: 'exact', head: true })
@@ -45,7 +45,7 @@ export default function BookingAnalyticsScreen() {
     let totalLastWeek = 0;
 
     (recentRides ?? []).forEach((ride: any) => {
-      const rideDate = new Date(ride.created_at);
+      const rideDate = new Date(ride.completed_at);
       if (rideDate >= startOfWeek) {
         dayCounts[rideDate.getDay()]++;
         totalThisWeek++;

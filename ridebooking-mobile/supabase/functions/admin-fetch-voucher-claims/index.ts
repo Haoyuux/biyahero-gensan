@@ -53,9 +53,9 @@ Deno.serve(async (req) => {
     // Fetch all rides that used this voucher
     const { data: rideRows, error: rideError } = await admin
       .from('rides')
-      .select('id, user_id, fare, voucher_discount, created_at, pickup, voucher_discount_paid, status')
+      .select('id, user_id, fare, voucher_discount, completed_at, pickup_label, voucher_discount_paid, status')
       .eq('voucher_id', voucherId)
-      .order('created_at', { ascending: false })
+      .order('completed_at', { ascending: false })
 
     if (rideError) throw rideError
 
