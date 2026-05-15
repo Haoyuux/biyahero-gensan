@@ -66,6 +66,7 @@ export interface Profile {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
+  cover_photo_url: string | null;
   role: UserRole;
   onboarded: boolean;
   profile_completed: boolean;
@@ -73,19 +74,31 @@ export interface Profile {
   last_name: string | null;
   phone: string | null;
   birthday: string | null;
+  sex: string | null;
   rider_status: RiderStatus | null;
   is_online: boolean;
   last_lat: number | null;
   last_lng: number | null;
+  last_seen_at: string | null;
   vehicle_make: string | null;
   vehicle_model: string | null;
   vehicle_plate: string | null;
   vehicle_color: string | null;
   vehicle_type: string | null;
   vehicle_image_url: string | null;
-  sex: string | null;
-  expo_push_token: string | null;
   or_url: string | null;
   cr_url: string | null;
   license_url: string | null;
+  expo_push_token: string | null;
+  // Admin
+  admin_role_ids: string[];
+  // Blocking
+  is_blocked: boolean;
+  block_reason: string | null;
+  blocked_by: string | null;
+  blocked_at: string | null;
+  // Rider verification
+  reviewed_by: string | null;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
 }
