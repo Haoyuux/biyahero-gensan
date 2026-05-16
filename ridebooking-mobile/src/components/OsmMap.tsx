@@ -94,18 +94,13 @@ const buildHtml = () => `
       iconSize: [130, 44], iconAnchor: [65, 44], className: '',
     });
     function buildAvatarIcon(avatarUrl, borderColor) {
-      const circleStyle = 'width:48px;height:48px;border-radius:50%;border:3px solid ' + borderColor + ';overflow:hidden;background:#f3f4f6;'
-        + (avatarUrl
-          ? 'background-image:url("' + avatarUrl + '");background-size:cover;background-position:center'
-          : 'display:flex;align-items:center;justify-content:center');
-      const inner = avatarUrl ? '' : '<span style="font-size:22px;line-height:48px;display:block;text-align:center">🏍️</span>';
       return L.divIcon({
-        html: '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.4))">'
-          + '<div style="width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-bottom:22px solid ' + borderColor + '"></div>'
-          + '<div style="' + circleStyle + '">' + inner + '</div>'
+        html: '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3))">'
+          + '<div style="background:' + borderColor + ';border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;letter-spacing:0.3px">Rider</div>'
+          + '<div style="background:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2.5px solid ' + borderColor + ';font-size:16px;line-height:1">🏍️</div>'
           + '</div>',
-        iconSize: [54, 79],
-        iconAnchor: [27, 79],
+        iconSize: [44, 48],
+        iconAnchor: [22, 48],
         className: '',
       });
     }

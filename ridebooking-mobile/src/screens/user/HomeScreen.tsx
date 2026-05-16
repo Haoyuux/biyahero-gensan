@@ -20,6 +20,7 @@ import {
 } from '../../lib/voucherService';
 import { fetchNewsPosts, NewsPost } from '../../lib/newsService';
 import ChatHistoryScreen from './ChatHistoryScreen';
+import ErrandScreen from './ErrandScreen';
 import * as Notifications from 'expo-notifications';
 
 type Step = 'home' | 'select' | 'searching' | 'matched' | 'review';
@@ -116,6 +117,9 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   // Route
   const [routeDistance, setRouteDistance] = useState(0);
   const [routeDuration, setRouteDuration] = useState(0);
+
+  // Errand screen
+  const [showErrand, setShowErrand] = useState(false);
 
   // Booking flow
   const [step, setStep] = useState<Step>('home');
@@ -927,6 +931,12 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
                 {destinationCoords ? 'Find a Rider' : 'Where are you going?'}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.errandBtn} onPress={() => setShowErrand(true)} activeOpacity={0.85}>
+              <Text style={styles.errandBtnEmoji}>📦</Text>
+              <Text style={styles.errandBtnText}>Sugo / Errand</Text>
+              <Text style={styles.errandBtnDesc}>Send a rider on an errand</Text>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       );
@@ -1614,6 +1624,11 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
         userId={profile.id}
         onClose={() => setShowChatHistory(false)}
       />
+
+      {/* Errand Screen Modal */}
+      <Modal visible={showErrand} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowErrand(false)}>
+        <ErrandScreen onClose={() => setShowErrand(false)} />
+      </Modal>
     </View>
   );
 }
@@ -1622,6 +1637,11 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f3f4f6' },
   map: { flex: 1 },
+
+  errandBtn: { backgroundColor: '#fff', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, marginTop: 10, borderWidth: 1, borderColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center', gap: 12 },
+  errandBtnEmoji: { fontSize: 26 },
+  errandBtnText: { fontSize: 15, fontWeight: '700', color: '#030712' },
+  errandBtnDesc: { fontSize: 11, color: '#9ca3af', position: 'absolute', right: 16 },
 
   // Sheet base
   sheet: {

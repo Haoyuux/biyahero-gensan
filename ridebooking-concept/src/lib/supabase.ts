@@ -171,7 +171,7 @@ export async function getRiderProfiles(): Promise<Profile[]> {
   const { data } = await supabase
     .from('profiles')
     .select('*')
-    .eq('role', 'rider')
+    .in('role', ['rider', 'team_leader'])
     .order('created_at', { ascending: false });
   return (data as Profile[]) || [];
 }

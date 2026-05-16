@@ -65,6 +65,7 @@ export default function RiderProfileScreen() {
 
   // Stats + history
   const [rides, setRides] = useState<any[]>([]);
+  const [errandHistory, setErrandHistory] = useState<any[]>([]);
 
   const loadVehicles = useCallback(async () => {
     const { data } = await supabase
@@ -85,6 +86,14 @@ export default function RiderProfileScreen() {
       .order('created_at', { ascending: false })
       .limit(30)
       .then(({ data }) => setRides(data ?? []));
+    supabase
+      .from('errands')
+      .select('id, errand_type, pickup_label, dropoff_label, description, fare, status, created_at, completed_at, user_name, recipient_name')
+      .eq('rider_id', profile.id)
+      .in('status', ['completed', 'cancelled'])
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => setErrandHistory(data ?? []));
   }, []);
 
   const handleSavePersonal = async () => {
@@ -662,6 +671,29 @@ export default function RiderProfileScreen() {
           {previewVehicleDoc?.url ? <Image source={{ uri: previewVehicleDoc.url }} style={styles.previewImage} resizeMode="contain" /> : null}
         </View>
       </Modal>
+
+      {/* Errand History */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Errand History (Sugo)</Text>
+        {errandHistory.length === 0 ? (
+          <Text style={styles.emptyText}>No errands yet.</Text>
+        ) : errandHistory.map(e => (
+          <View key={e.id} style={styles.rideItem}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rideRoute} numberOfLines={1}>
+                {e.errand_type === 'buy' ? '🛍️' : e.errand_type === 'pickup_deliver' ? '📦' : '📋'} {e.description ?? '—'}
+              </Text>
+              <Text style={styles.rideDate} numberOfLines={1}>{e.pickup_label} → {e.dropoff_label}</Text>
+              {e.user_name ? <Text style={styles.rideDate}>From: {e.user_name}</Text> : null}
+              <Text style={styles.rideDate}>{new Date(e.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={styles.rideFare}>₱{e.fare}</Text>
+              <View style={[styles.statusDot, { backgroundColor: e.status === 'completed' ? '#10b981' : '#ef4444' }]} />
+            </View>
+          </View>
+        ))}
+      </View>
 
       {/* Sign out */}
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>

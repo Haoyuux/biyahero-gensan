@@ -15,11 +15,34 @@ export interface TierPricing {
   disabled: boolean;              // when true, tier is hidden from users
 }
 
+export interface ErrandVehiclePricing {
+  baseFare: number;
+  perKmRate: number;
+  maintenanceCostPerKm: number;
+  convenienceFee: number;
+  disabled: boolean;
+}
+
+export interface ErrandPricing {
+  moto: ErrandVehiclePricing;
+  tricycle: ErrandVehiclePricing;
+  disabled: boolean;
+}
+
+export interface ErrandFareBreakdown {
+  baseFare: number;
+  distanceFee: number;
+  convenienceFee: number;
+  total: number;
+  distanceKm: number;
+}
+
 export interface PricingConfig {
   moto: TierPricing;
   tricycle: TierPricing;
   eco: TierPricing;
   premium: TierPricing;
+  errand: ErrandPricing;
   teamBookingFeeDiscount: number; // percentage 0-100, applied at remittance time
 }
 
@@ -71,7 +94,7 @@ export const DEFAULT_PRICING: PricingConfig = {
   },
   premium: {
     baseFare: 100,
-    perKmRate: 30,        // ₱25 revenue + ₱5 maintenance
+    perKmRate: 30,
     perMinuteRate: 5,
     bookingFee: 12,
     bookingFeeType: 'static',
@@ -79,6 +102,11 @@ export const DEFAULT_PRICING: PricingConfig = {
     perKmThresholdEnabled: false,
     perKmThreshold: 0,
     disabled: false,
+  },
+  errand: {
+    disabled: false,
+    moto: { baseFare: 35, perKmRate: 10, maintenanceCostPerKm: 2, convenienceFee: 15, disabled: false },
+    tricycle: { baseFare: 45, perKmRate: 12, maintenanceCostPerKm: 2, convenienceFee: 15, disabled: false },
   },
 };
 
@@ -121,6 +149,20 @@ export function calculateFare(
   };
 }
 
+export function calculateErrandFare(
+  errandType: 'buy' | 'pickup_deliver' | 'other',
+  vehicleType: 'moto' | 'tricycle',
+  distanceM: number,
+  config: PricingConfig = DEFAULT_PRICING,
+): ErrandFareBreakdown {
+  const p = config.errand[vehicleType];
+  const distanceKm = distanceM / 1000;
+  const distanceFee = Math.round(distanceKm * p.perKmRate * 10) / 10;
+  const convenienceFee = errandType === 'pickup_deliver' ? 0 : p.convenienceFee;
+  const total = Math.round(p.baseFare + distanceFee + convenienceFee);
+  return { baseFare: p.baseFare, distanceFee, convenienceFee, total, distanceKm };
+}
+
 /** Load saved config from localStorage, merged with defaults for missing keys. */
 export function loadPricingConfig(): PricingConfig {
   try {
@@ -133,6 +175,7 @@ export function loadPricingConfig(): PricingConfig {
         tricycle: { ...DEFAULT_PRICING.tricycle, ...parsed.tricycle },
         eco:      { ...DEFAULT_PRICING.eco,      ...parsed.eco },
         premium:  { ...DEFAULT_PRICING.premium,  ...parsed.premium },
+        errand:   parsed.errand ? { disabled: parsed.errand.disabled ?? false, moto: { ...DEFAULT_PRICING.errand.moto, ...parsed.errand.moto }, tricycle: { ...DEFAULT_PRICING.errand.tricycle, ...parsed.errand.tricycle } } : DEFAULT_PRICING.errand,
       };
     }
   } catch { /* ignore */ }
@@ -161,6 +204,7 @@ export async function loadPricingConfigFromDB(): Promise<PricingConfig> {
       tricycle: { ...DEFAULT_PRICING.tricycle, ...saved.tricycle },
       eco:      { ...DEFAULT_PRICING.eco,      ...saved.eco },
       premium:  { ...DEFAULT_PRICING.premium,  ...saved.premium },
+      errand:   saved.errand ? { disabled: saved.errand.disabled ?? false, moto: { ...DEFAULT_PRICING.errand.moto, ...saved.errand.moto }, tricycle: { ...DEFAULT_PRICING.errand.tricycle, ...saved.errand.tricycle } } : DEFAULT_PRICING.errand,
     };
     // Cache locally so offline/fallback reads get the latest
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));

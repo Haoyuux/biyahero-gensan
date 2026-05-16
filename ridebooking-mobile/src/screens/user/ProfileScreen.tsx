@@ -19,6 +19,7 @@ export default function ProfileScreen() {
   const [sex, setSex] = useState(profile.sex ?? '');
   const [loading, setLoading] = useState(false);
   const [rides, setRides] = useState<any[]>([]);
+  const [errands, setErrands] = useState<any[]>([]);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url ?? '');
 
   useEffect(() => {
@@ -29,6 +30,14 @@ export default function ProfileScreen() {
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => setRides(data ?? []));
+    supabase
+      .from('errands')
+      .select('id, errand_type, pickup_label, dropoff_label, description, fare, status, created_at, completed_at')
+      .eq('user_id', profile.id)
+      .in('status', ['completed', 'cancelled'])
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => setErrands(data ?? []));
   }, []);
 
   const handleSave = async () => {
@@ -215,6 +224,28 @@ export default function ProfileScreen() {
             </View>
           ))
         )}
+      </View>
+
+      {/* Errand History */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Errand History (Sugo)</Text>
+        {errands.length === 0 ? (
+          <Text style={styles.emptyText}>No errands yet.</Text>
+        ) : errands.map(e => (
+          <View key={e.id} style={styles.rideItem}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rideRoute} numberOfLines={1}>
+                {e.errand_type === 'buy' ? '🛍️' : e.errand_type === 'pickup_deliver' ? '📦' : '📋'} {e.description ?? '—'}
+              </Text>
+              <Text style={styles.rideDate} numberOfLines={1}>{e.pickup_label} → {e.dropoff_label}</Text>
+              <Text style={styles.rideDate}>{new Date(e.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={styles.rideFare}>₱{e.fare}</Text>
+              <View style={[styles.statusDot, { backgroundColor: e.status === 'completed' ? '#10b981' : '#ef4444' }]} />
+            </View>
+          </View>
+        ))}
       </View>
 
       {/* Sign out */}
