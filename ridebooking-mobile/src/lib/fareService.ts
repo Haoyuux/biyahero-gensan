@@ -10,11 +10,34 @@ export interface TierPricing {
   disabled: boolean;
 }
 
+export interface ErrandVehiclePricing {
+  baseFare: number;
+  perKmRate: number;
+  maintenanceCostPerKm: number;
+  convenienceFee: number;
+  disabled: boolean;
+}
+
+export interface ErrandPricing {
+  moto: ErrandVehiclePricing;
+  tricycle: ErrandVehiclePricing;
+  disabled: boolean;
+}
+
+export interface ErrandFareBreakdown {
+  baseFare: number;
+  distanceFee: number;
+  convenienceFee: number;
+  total: number;
+  distanceKm: number;
+}
+
 export interface PricingConfig {
   moto: TierPricing;
   tricycle: TierPricing;
   eco: TierPricing;
   premium: TierPricing;
+  errand: ErrandPricing;
   teamBookingFeeDiscount: number;
 }
 
@@ -49,6 +72,11 @@ export const DEFAULT_PRICING: PricingConfig = {
     bookingFeeType: 'static', maintenanceCostPerKm: 5,
     perKmThresholdEnabled: false, perKmThreshold: 0, disabled: false,
   },
+  errand: {
+    disabled: false,
+    moto: { baseFare: 35, perKmRate: 10, maintenanceCostPerKm: 2, convenienceFee: 15, disabled: false },
+    tricycle: { baseFare: 45, perKmRate: 12, maintenanceCostPerKm: 2, convenienceFee: 15, disabled: false },
+  },
 };
 
 export function calculateFare(
@@ -72,6 +100,20 @@ export function calculateFare(
   return { baseFare: p.baseFare, distanceFee, timeFee, bookingFee, totalFare, distanceKm };
 }
 
+export function calculateErrandFare(
+  errandType: 'buy' | 'pickup_deliver' | 'other',
+  vehicleType: 'moto' | 'tricycle',
+  distanceM: number,
+  config: PricingConfig = DEFAULT_PRICING,
+): ErrandFareBreakdown {
+  const p = config.errand[vehicleType];
+  const distanceKm = distanceM / 1000;
+  const distanceFee = Math.round(distanceKm * p.perKmRate * 10) / 10;
+  const convenienceFee = errandType === 'pickup_deliver' ? 0 : p.convenienceFee;
+  const total = Math.round(p.baseFare + distanceFee + convenienceFee);
+  return { baseFare: p.baseFare, distanceFee, convenienceFee, total, distanceKm };
+}
+
 export async function loadPricingConfigFromDB(supabase: any): Promise<PricingConfig> {
   try {
     const { data, error } = await supabase
@@ -87,6 +129,11 @@ export async function loadPricingConfigFromDB(supabase: any): Promise<PricingCon
       tricycle: { ...DEFAULT_PRICING.tricycle, ...saved.tricycle },
       eco: { ...DEFAULT_PRICING.eco, ...saved.eco },
       premium: { ...DEFAULT_PRICING.premium, ...saved.premium },
+      errand: saved.errand ? {
+        disabled: saved.errand.disabled ?? false,
+        moto: { ...DEFAULT_PRICING.errand.moto, ...saved.errand.moto },
+        tricycle: { ...DEFAULT_PRICING.errand.tricycle, ...saved.errand.tricycle },
+      } : DEFAULT_PRICING.errand,
     };
   } catch {
     return DEFAULT_PRICING;

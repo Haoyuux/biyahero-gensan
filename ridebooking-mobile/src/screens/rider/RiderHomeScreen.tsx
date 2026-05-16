@@ -20,6 +20,7 @@ interface Props {
 }
 
 const RIDER_RIDE_KEY = 'biyahero_rider_ride';
+const RIDER_ERRAND_KEY = 'biyahero_rider_errand';
 
 export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const { width, height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -87,6 +88,16 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const [activeRide, setActiveRide] = useState<any>(null);
   const [rideStatus, setRideStatus] = useState<'going_to_pickup' | 'picked_up'>('going_to_pickup');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Errand requests
+  const [currentErrand, setCurrentErrand] = useState<any>(null);
+  const [hasErrand, setHasErrand] = useState(false);
+  const [activeErrand, setActiveErrand] = useState<any>(null);
+  const activeErrandRef = useRef<any>(null);
+  const [errandStatus, setErrandStatus] = useState<'going_to_pickup' | 'picked_up' | 'going_to_dropoff'>('going_to_pickup');
+  const errandChannelRef = useRef<any>(null);
+  const [errandCanceling, setErrandCanceling] = useState(false);
+  const [showErrandCancelConfirm, setShowErrandCancelConfirm] = useState(false);
 
   // Chat
   const [showChat, setShowChat] = useState(false);
@@ -189,6 +200,22 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   useEffect(() => {
     supabase.from('profiles').update({ is_online: false }).eq('id', profile.id);
     unregisterPushToken();
+    // Restore active errand from previous session
+    AsyncStorage.getItem(RIDER_ERRAND_KEY).then(async raw => {
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        if (!saved.errandId) return;
+        const { data } = await supabase.from('errands').select('status, rider_id').eq('id', saved.errandId).single();
+        if (!data || data.rider_id !== profile.id || !['accepted', 'picked_up'].includes(data.status)) {
+          AsyncStorage.removeItem(RIDER_ERRAND_KEY);
+          return;
+        }
+        setActiveErrand(saved);
+        activeErrandRef.current = saved;
+        setErrandStatus(data.status === 'picked_up' ? 'going_to_dropoff' : 'going_to_pickup');
+      } catch { AsyncStorage.removeItem(RIDER_ERRAND_KEY); }
+    });
   }, []);
 
   // Load approved vehicles
@@ -239,6 +266,13 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
                   fetchRiderRoute({ lat: latitude, lng: longitude }, riderTargetRef.current);
                 }
               }
+            }
+            if (activeErrandRef.current) {
+              const ch = errandChannelRef.current ?? supabase.channel('errands');
+              ch.send({
+                type: 'broadcast', event: 'ERRAND_RIDER_LOCATION',
+                payload: { errandId: activeErrandRef.current.errandId, lat: latitude, lng: longitude },
+              });
             }
           }
         },
@@ -405,6 +439,34 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     return () => { ridesChannelRef.current = null; supabase.removeChannel(ch); };
   }, [isOnline]);
 
+  // Errands channel
+  useEffect(() => {
+    if (!isOnline) return;
+    const errandCh = supabase.channel('errands');
+    errandCh.on('broadcast', { event: 'REQUEST_ERRAND' }, ({ payload }) => {
+      if (hasErrand || activeErrand) return;
+      setCurrentErrand(payload);
+      setHasErrand(true);
+      Notifications.scheduleNotificationAsync({
+        content: { title: '📦 New Errand Request', body: `₱${payload.fare} · ${payload.description?.slice(0, 40)}`, sound: true, channelId: 'ride-requests' },
+        trigger: null,
+      });
+    });
+    errandCh.on('broadcast', { event: 'CANCEL_ERRAND' }, ({ payload }) => {
+      if (currentErrand?.errandId === payload.errandId) { setHasErrand(false); setCurrentErrand(null); }
+      if (activeErrandRef.current?.errandId === payload.errandId) {
+        setActiveErrand(null); activeErrandRef.current = null; setErrandStatus('going_to_pickup');
+        AsyncStorage.removeItem(RIDER_ERRAND_KEY);
+        mapRef.current?.clearDestination(); mapRef.current?.clearRoute();
+        riderTargetRef.current = null;
+        Alert.alert('Errand Cancelled', 'The user cancelled the errand.');
+      }
+    });
+    errandCh.subscribe();
+    errandChannelRef.current = errandCh;
+    return () => { errandChannelRef.current = null; supabase.removeChannel(errandCh); };
+  }, [isOnline, hasErrand, activeErrand]);
+
   // Pop from queue
   useEffect(() => {
     if (requestQueue.length > 0 && !hasRequest && !requestAccepted) {
@@ -560,6 +622,133 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     }
   };
 
+  const handleAcceptErrand = async () => {
+    if (!currentErrand) return;
+    const errandId = currentErrand.errandId;
+    const riderName = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
+    const { data: accepted, error } = await supabase.rpc('accept_errand', {
+      p_errand_id: errandId,
+      p_rider_name: riderName,
+      p_rider_avatar: profile.avatar_url,
+    });
+    if (error || accepted !== true) {
+      setHasErrand(false);
+      setCurrentErrand(null);
+      Alert.alert('Errand unavailable', 'This errand is no longer available.');
+      return;
+    }
+    setHasErrand(false);
+    setActiveErrand(currentErrand);
+    activeErrandRef.current = currentErrand;
+    setCurrentErrand(null);
+    setErrandStatus('going_to_pickup');
+    AsyncStorage.setItem(RIDER_ERRAND_KEY, JSON.stringify(currentErrand));
+    const ch = errandChannelRef.current ?? supabase.channel('errands');
+    ch.send({ type: 'broadcast', event: 'ERRAND_ACCEPTED', payload: { errandId, rider: profile } });
+    // Navigate to pickup on map + draw route
+    if (currentErrand.pickup?.coords) {
+      riderTargetRef.current = currentErrand.pickup.coords;
+      mapRef.current?.setDestination(currentErrand.pickup.coords.lat, currentErrand.pickup.coords.lng, '📍 ' + currentErrand.pickup.label);
+      mapRef.current?.setDestDraggable(false);
+      mapRef.current?.setPickupDraggable(false);
+      mapRef.current?.flyTo(currentErrand.pickup.coords.lat, currentErrand.pickup.coords.lng, 15);
+      if (riderCurrentLocRef.current) {
+        fetchRiderRoute(riderCurrentLocRef.current, currentErrand.pickup.coords);
+      }
+    }
+  };
+
+  const handleDeclineErrand = () => {
+    setHasErrand(false);
+    setCurrentErrand(null);
+  };
+
+  const handleErrandPickedUp = async () => {
+    if (!activeErrand) return;
+    await supabase.from('errands').update({ status: 'picked_up' }).eq('id', activeErrand.errandId);
+    setErrandStatus('going_to_dropoff');
+    const ch = errandChannelRef.current ?? supabase.channel('errands');
+    ch.send({ type: 'broadcast', event: 'ERRAND_PICKED_UP', payload: { errandId: activeErrand.errandId } });
+    if (activeErrand.dropoff?.coords) {
+      riderTargetRef.current = activeErrand.dropoff.coords;
+      mapRef.current?.setDestination(activeErrand.dropoff.coords.lat, activeErrand.dropoff.coords.lng, '🏁 ' + activeErrand.dropoff.label);
+      mapRef.current?.setDestDraggable(false);
+      mapRef.current?.setPickupDraggable(false);
+      mapRef.current?.flyTo(activeErrand.dropoff.coords.lat, activeErrand.dropoff.coords.lng, 15);
+      if (riderCurrentLocRef.current) {
+        fetchRiderRoute(riderCurrentLocRef.current, activeErrand.dropoff.coords);
+      }
+    }
+  };
+
+  const handleErrandCompleted = async () => {
+    if (!activeErrand) return;
+    await supabase.from('errands').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', activeErrand.errandId);
+    const ch = errandChannelRef.current ?? supabase.channel('errands');
+    ch.send({ type: 'broadcast', event: 'ERRAND_COMPLETED', payload: { errandId: activeErrand.errandId } });
+    mapRef.current?.clearDestination();
+    mapRef.current?.clearRoute();
+    setActiveErrand(null);
+    activeErrandRef.current = null;
+    setErrandStatus('going_to_pickup');
+    AsyncStorage.removeItem(RIDER_ERRAND_KEY);
+  };
+
+  const clearActiveErrand = async () => {
+    mapRef.current?.clearDestination();
+    mapRef.current?.clearRoute();
+    riderTargetRef.current = null;
+    setActiveErrand(null);
+    activeErrandRef.current = null;
+    setErrandStatus('going_to_pickup');
+    await AsyncStorage.removeItem(RIDER_ERRAND_KEY);
+  };
+
+  const cancelErrandInSupabase = async (errandId: string) => {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('cancel_errand', { p_errand_id: errandId });
+    if (!rpcError && rpcData !== false) return;
+
+    const { error: functionError } = await supabase.functions.invoke('errand-cancel', {
+      body: { errand_id: errandId },
+    });
+    if (!functionError) return;
+
+    const { data: updated, error: updateError } = await supabase
+      .from('errands')
+      .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+      .eq('id', errandId)
+      .eq('rider_id', profile.id)
+      .select('id, status')
+      .maybeSingle();
+
+    if (updateError || !updated) {
+      throw new Error(updateError?.message || functionError.message || rpcError?.message || 'Unable to cancel errand.');
+    }
+  };
+
+  const handleCancelErrand = async () => {
+    const errandId = activeErrandRef.current?.errandId ?? activeErrand?.errandId;
+    if (!errandId || errandCanceling) return;
+
+    setShowErrandCancelConfirm(false);
+    setErrandCanceling(true);
+    try {
+      await cancelErrandInSupabase(errandId);
+      const ch = errandChannelRef.current ?? supabase.channel('errands');
+      await ch.send({ type: 'broadcast', event: 'CANCEL_ERRAND', payload: { errandId } }).catch(() => {});
+      await clearActiveErrand();
+    } catch (e: any) {
+      Alert.alert('Cancel Failed', e?.message ?? 'Unable to cancel errand. Please try again.');
+    } finally {
+      setErrandCanceling(false);
+    }
+  };
+
+  const confirmCancelErrand = () => {
+    if (errandCanceling) return;
+    setShowErrandCancelConfirm(true);
+  };
+
   const handleCancelRide = () => {
     if (!acceptedRideIdRef.current) return;
     const rideId = acceptedRideIdRef.current;
@@ -712,7 +901,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     );
   }
 
-  riderSheetSnapRef.current = (requestAccepted ? SCREEN_HEIGHT * 0.58 : SCREEN_HEIGHT * 0.52) - 130;
+  riderSheetSnapRef.current = requestAccepted ? SCREEN_HEIGHT * 0.45 : 180;
 
   return (
     <View style={styles.container}>
@@ -802,10 +991,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
         </Animated.View>
       ) : (
         /* Default rider sheet */
-        <Animated.View style={[styles.sheet, { height: SCREEN_HEIGHT * 0.52, transform: [{ translateY: riderSheetY }] }]}>
+        <Animated.View style={[styles.sheet, { maxHeight: SCREEN_HEIGHT * 0.55, transform: [{ translateY: riderSheetY }] }]}>
           <View {...riderSheetPan.panHandlers}>
             <View style={styles.handle} />
           </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
           <View style={styles.riderRow}>
             <View style={styles.driverAvatarPro}>
               {profile.avatar_url ? (
@@ -826,49 +1016,196 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             </View>
           </View>
 
-          <View style={styles.onlineCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.onlineDot, isOnline && styles.onlineDotActive]} />
-              <View>
-                <Text style={styles.onlineLabel}>{isOnline ? 'You are Online' : 'You are Offline'}</Text>
-                <Text style={styles.onlineSub}>
-                  {isOnline && activeVehicle
-                    ? `${activeVehicle.vehicle_type} · ${activeVehicle.vehicle_plate ?? 'No plate'}`
-                    : isOnline ? 'Accepting ride requests' : 'Go online to accept rides'}
-                </Text>
+          {!activeErrand && (
+            <>
+              <View style={styles.onlineCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={[styles.onlineDot, isOnline && styles.onlineDotActive]} />
+                  <View>
+                    <Text style={styles.onlineLabel}>{isOnline ? 'You are Online' : 'You are Offline'}</Text>
+                    <Text style={styles.onlineSub}>
+                      {isOnline && activeVehicle
+                        ? `${activeVehicle.vehicle_type} · ${activeVehicle.vehicle_plate ?? 'No plate'}`
+                        : isOnline ? 'Accepting ride requests' : 'Go online to accept rides'}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={isOnline}
+                  onValueChange={toggleOnline}
+                  trackColor={{ false: '#e5e7eb', true: '#030712' }}
+                  thumbColor="#fff"
+                />
               </View>
-            </View>
-            <Switch
-              value={isOnline}
-              onValueChange={toggleOnline}
-              trackColor={{ false: '#e5e7eb', true: '#030712' }}
-              thumbColor="#fff"
-            />
-          </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>STATUS</Text>
-              <Text style={[styles.statValue, { color: isOnline ? '#10b981' : '#9ca3af' }]}>
-                {isOnline ? 'Online' : 'Offline'}
-              </Text>
-            </View>
-            <View style={[styles.statCard, { marginHorizontal: 8 }]}>
-              <Text style={styles.statLabel}>TODAY</Text>
-              <Text style={styles.statValue}>₱{todayEarnings.toFixed(0)}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>RIDES</Text>
-              <Text style={styles.statValue}>{todayRides}</Text>
-            </View>
-          </View>
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statLabel}>STATUS</Text>
+                  <Text style={[styles.statValue, { color: isOnline ? '#10b981' : '#9ca3af' }]}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </Text>
+                </View>
+                <View style={[styles.statCard, { marginHorizontal: 8 }]}>
+                  <Text style={styles.statLabel}>TODAY</Text>
+                  <Text style={styles.statValue}>₱{todayEarnings.toFixed(0)}</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statLabel}>RIDES</Text>
+                  <Text style={styles.statValue}>{todayRides}</Text>
+                </View>
+              </View>
+            </>
+          )}
 
-          {!isOnline && (
+          {/* Active errand indicator */}
+          {activeErrand && errandStatus === 'going_to_pickup' && (
+            <View style={styles.activeErrandCard}>
+              {/* Status badge */}
+              <View style={styles.activeErrandStatusRow}>
+                <View style={styles.activeErrandStatusDot} />
+                <Text style={styles.activeErrandStatusText}>On the way to pickup</Text>
+                {activeErrand.fare ? (
+                  <View style={styles.activeErrandFareChip}>
+                    <Text style={styles.activeErrandFareChipText}>₱{activeErrand.fare}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Requester */}
+              <View style={styles.activeErrandUserRow}>
+                <View style={styles.activeErrandUserAvatar}>
+                  {activeErrand.user?.avatar_url ? (
+                    <Image source={{ uri: activeErrand.user.avatar_url }} style={styles.activeErrandUserAvatarImg} />
+                  ) : (
+                    <Text style={styles.activeErrandUserAvatarText}>
+                      {(activeErrand.user?.first_name?.[0] ?? 'U').toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.activeErrandUserLabel}>REQUESTED BY</Text>
+                  <Text style={styles.activeErrandUserName}>
+                    {activeErrand.user?.first_name} {activeErrand.user?.last_name}
+                  </Text>
+                  {activeErrand.user?.phone ? (
+                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>📞 {activeErrand.user.phone}</Text>
+                  ) : null}
+                </View>
+                {activeErrand.errand_type ? (
+                  <View style={styles.activeErrandTypePill}>
+                    <Text style={styles.activeErrandTypePillText}>
+                      {activeErrand.errand_type === 'buy' ? '🛍️ Buy' : activeErrand.errand_type === 'pickup_deliver' ? '📦 P&D' : '📋 Other'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Task description */}
+              {activeErrand.description ? (
+                <View style={styles.activeErrandDescCard}>
+                  <Text style={styles.activeErrandDescText} numberOfLines={2}>{activeErrand.description}</Text>
+                </View>
+              ) : null}
+
+              {/* Pickup location */}
+              <View style={styles.activeErrandLocCard}>
+                <View style={styles.activeErrandLocRow}>
+                  <View style={styles.activeErrandDotBlack} />
+                  <Text style={styles.activeErrandLocVal} numberOfLines={2}>{activeErrand.pickup?.label}</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.errandStatusBtn} onPress={handleErrandPickedUp}>
+                <Text style={styles.errandStatusBtnText}>✓ Mark Picked Up</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.riderErrandCancelBtn, errandCanceling && styles.disabledBtn]}
+                disabled={errandCanceling}
+                onPress={confirmCancelErrand}
+              >
+                <Text style={styles.riderErrandCancelBtnText}>{errandCanceling ? 'Cancelling...' : 'Cancel Errand'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {activeErrand && errandStatus === 'going_to_dropoff' && (
+            <View style={[styles.activeErrandCard, { borderColor: '#10b981' }]}>
+              {/* Status badge */}
+              <View style={styles.activeErrandStatusRow}>
+                <View style={[styles.activeErrandStatusDot, { backgroundColor: '#10b981' }]} />
+                <Text style={[styles.activeErrandStatusText, { color: '#10b981' }]}>Delivering item</Text>
+                {activeErrand.fare ? (
+                  <View style={[styles.activeErrandFareChip, { backgroundColor: '#10b981' }]}>
+                    <Text style={styles.activeErrandFareChipText}>₱{activeErrand.fare}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Requester */}
+              <View style={styles.activeErrandUserRow}>
+                <View style={styles.activeErrandUserAvatar}>
+                  {activeErrand.user?.avatar_url ? (
+                    <Image source={{ uri: activeErrand.user.avatar_url }} style={styles.activeErrandUserAvatarImg} />
+                  ) : (
+                    <Text style={styles.activeErrandUserAvatarText}>
+                      {(activeErrand.user?.first_name?.[0] ?? 'U').toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.activeErrandUserLabel}>REQUESTED BY</Text>
+                  <Text style={styles.activeErrandUserName}>
+                    {activeErrand.user?.first_name} {activeErrand.user?.last_name}
+                  </Text>
+                  {activeErrand.user?.phone ? (
+                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>📞 {activeErrand.user.phone}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Task description */}
+              {activeErrand.description ? (
+                <View style={styles.activeErrandDescCard}>
+                  <Text style={styles.activeErrandDescText} numberOfLines={2}>{activeErrand.description}</Text>
+                </View>
+              ) : null}
+
+              {/* Recipient */}
+              {activeErrand.recipient_name ? (
+                <View style={styles.activeErrandRecipientRow}>
+                  <Text style={styles.activeErrandRecipientText}>👤 {activeErrand.recipient_name}</Text>
+                  {activeErrand.recipient_phone ? <Text style={styles.activeErrandRecipientPhone}>{activeErrand.recipient_phone}</Text> : null}
+                </View>
+              ) : null}
+
+              {/* Dropoff location */}
+              <View style={styles.activeErrandLocCard}>
+                <View style={styles.activeErrandLocRow}>
+                  <View style={styles.activeErrandDotGreen} />
+                  <Text style={styles.activeErrandLocVal} numberOfLines={2}>{activeErrand.dropoff?.label}</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={[styles.errandStatusBtn, { backgroundColor: '#10b981' }]} onPress={handleErrandCompleted}>
+                <Text style={styles.errandStatusBtnText}>✓ Mark Delivered / Completed</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.riderErrandCancelBtn, errandCanceling && styles.disabledBtn]}
+                disabled={errandCanceling}
+                onPress={confirmCancelErrand}
+              >
+                <Text style={styles.riderErrandCancelBtnText}>{errandCanceling ? 'Cancelling...' : 'Cancel Errand'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+
+          {!isOnline && !activeErrand && (
             <View style={styles.offlineBanner}>
               <Text style={styles.offlineText}>Toggle online to start receiving ride requests.</Text>
             </View>
           )}
 
+          </ScrollView>
         </Animated.View>
       )}
 
@@ -880,6 +1217,134 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
           <Text style={styles.profileBtnText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
         )}
       </TouchableOpacity>
+
+      {/* Errand request modal — slides up from bottom */}
+      <Modal visible={hasErrand && !!currentErrand && !requestAccepted && !activeErrand} transparent animationType="slide" onRequestClose={handleDeclineErrand}>
+        <View style={styles.errandModalOverlay}>
+          <View style={styles.errandModalSheet}>
+            <View style={styles.errandModalHandle} />
+
+            {/* Header: label + fare */}
+            <View style={styles.errandModalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errandModalLabel}>📦 ERRAND REQUEST</Text>
+                <View style={styles.errandTypeRow}>
+                  <View style={styles.errandTypePill}>
+                    <Text style={styles.errandTypePillText}>
+                      {currentErrand?.errand_type === 'buy' ? '🛍️ Buy' : currentErrand?.errand_type === 'pickup_deliver' ? '📦 Pickup & Deliver' : '📋 Other'}
+                    </Text>
+                  </View>
+                  <View style={styles.errandTypePill}>
+                    <Text style={styles.errandTypePillText}>{currentErrand?.vehicle_type === 'moto' ? '🏍️ Moto' : '🛺 Tricycle'}</Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={styles.errandModalFare}>₱{currentErrand?.fare}</Text>
+            </View>
+
+            {/* Requester card */}
+            <View style={styles.errandRequesterCard}>
+              <View style={styles.errandRequesterAvatar}>
+                {currentErrand?.user?.avatar_url ? (
+                  <Image source={{ uri: currentErrand.user.avatar_url }} style={styles.errandRequesterAvatarImg} />
+                ) : (
+                  <Text style={styles.errandRequesterAvatarText}>
+                    {(currentErrand?.user?.first_name?.[0] ?? 'U').toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errandRequesterLabel}>REQUESTED BY</Text>
+                <Text style={styles.errandRequesterName}>
+                  {currentErrand?.user?.first_name} {currentErrand?.user?.last_name}
+                </Text>
+                {currentErrand?.user?.phone ? (
+                  <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>📞 {currentErrand.user.phone}</Text>
+                ) : null}
+              </View>
+              <View style={styles.errandUserBadge}>
+                <Text style={styles.errandUserBadgeText}>User</Text>
+              </View>
+            </View>
+
+            <ScrollView style={{ maxHeight: 190 }} showsVerticalScrollIndicator={false}>
+              {/* Route card */}
+              <View style={styles.errandRouteCard}>
+                <View style={styles.errandRouteRow}>
+                  <View style={styles.errandRouteDotBlack} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.errandRouteLabel}>PICKUP</Text>
+                    <Text style={styles.errandRouteVal} numberOfLines={2}>{currentErrand?.pickup?.label}</Text>
+                  </View>
+                </View>
+                <View style={styles.errandRouteConnector} />
+                <View style={styles.errandRouteRow}>
+                  <View style={styles.errandRouteDotGreen} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.errandRouteLabel}>DROPOFF</Text>
+                    <Text style={styles.errandRouteVal} numberOfLines={2}>{currentErrand?.dropoff?.label}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Task description */}
+              {currentErrand?.description ? (
+                <View style={styles.errandTaskCard}>
+                  <Text style={styles.errandTaskLabel}>TASK</Text>
+                  <Text style={styles.errandTaskText}>{currentErrand.description}</Text>
+                </View>
+              ) : null}
+              {currentErrand?.instructions ? (
+                <Text style={styles.errandInstructions}>📝 {currentErrand.instructions}</Text>
+              ) : null}
+              {currentErrand?.recipient_name ? (
+                <Text style={styles.errandRecipient}>👤 {currentErrand.recipient_name} · {currentErrand.recipient_phone}</Text>
+              ) : null}
+            </ScrollView>
+
+            {/* Action buttons */}
+            <View style={styles.errandBtnRow}>
+              <TouchableOpacity style={styles.errandDeclineBtn} onPress={handleDeclineErrand}>
+                <Text style={styles.errandDeclineBtnText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.errandAcceptBtn} onPress={handleAcceptErrand}>
+                <Text style={styles.errandAcceptBtnText}>Accept ₱{currentErrand?.fare}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Errand cancel confirmation */}
+      <Modal
+        visible={showErrandCancelConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowErrandCancelConfirm(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Cancel Errand?</Text>
+            <Text style={styles.confirmMessage}>Are you sure you want to cancel this errand?</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmNoBtn}
+                disabled={errandCanceling}
+                onPress={() => setShowErrandCancelConfirm(false)}
+              >
+                <Text style={styles.confirmNoText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmYesBtn, errandCanceling && styles.disabledBtn]}
+                disabled={errandCanceling}
+                onPress={handleCancelErrand}
+              >
+                <Text style={styles.confirmYesText}>{errandCanceling ? 'Cancelling...' : 'Yes'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Vehicle selection modal */}
       <Modal visible={showVehicleSelect} transparent animationType="slide" onRequestClose={() => { setShowVehicleSelect(false); pendingOnlineRef.current = false; }}>
@@ -1026,7 +1491,7 @@ const styles = StyleSheet.create({
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 20, paddingBottom: 36, overflow: 'hidden',
+    paddingHorizontal: 20, paddingBottom: 20,
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20,
     shadowOffset: { width: 0, height: -1 }, elevation: 16,
   },
@@ -1082,6 +1547,115 @@ const styles = StyleSheet.create({
   onlineDotActive: { backgroundColor: '#10b981' },
   onlineLabel: { fontSize: 14, fontWeight: '600', color: '#030712' },
   onlineSub: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+
+  // Errand request modal
+  errandModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  errandModalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 36 },
+  errandModalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb', alignSelf: 'center', marginBottom: 18 },
+  errandModalHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
+  errandModalLabel: { fontSize: 10, fontWeight: '800', color: '#10b981', letterSpacing: 1.5, marginBottom: 8 },
+  errandModalFare: { fontSize: 28, fontWeight: '800', color: '#030712' },
+  errandTypeRow: { flexDirection: 'row', gap: 6, marginBottom: 0 },
+  errandTypePill: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  errandTypePillText: { fontSize: 11, fontWeight: '600', color: '#374151' },
+
+  // Requester card
+  errandRequesterCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f9fafb', borderRadius: 16, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#f3f4f6' },
+  errandRequesterAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  errandRequesterAvatarImg: { width: 44, height: 44, borderRadius: 22 },
+  errandRequesterAvatarText: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  errandRequesterLabel: { fontSize: 9, fontWeight: '700', color: '#9ca3af', letterSpacing: 1.2, marginBottom: 2 },
+  errandRequesterName: { fontSize: 14, fontWeight: '700', color: '#030712' },
+  errandUserBadge: { backgroundColor: '#eff6ff', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  errandUserBadgeText: { fontSize: 10, fontWeight: '700', color: '#3b82f6' },
+
+  // Route card inside modal
+  errandRouteCard: { backgroundColor: '#f9fafb', borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  errandRouteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  errandRouteDotBlack: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#030712', marginTop: 4 },
+  errandRouteDotGreen: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#10b981', marginTop: 4 },
+  errandRouteConnector: { width: 1, height: 14, backgroundColor: '#e5e7eb', marginLeft: 3, marginVertical: 3 },
+  errandRouteLabel: { fontSize: 9, fontWeight: '700', color: '#9ca3af', letterSpacing: 1 },
+  errandRouteVal: { fontSize: 13, fontWeight: '600', color: '#030712', marginTop: 1 },
+
+  // Task card
+  errandTaskCard: { backgroundColor: '#f0fdf4', borderRadius: 12, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: '#d1fae5' },
+  errandTaskLabel: { fontSize: 9, fontWeight: '700', color: '#10b981', letterSpacing: 1.2, marginBottom: 3 },
+  errandTaskText: { fontSize: 12, color: '#374151', lineHeight: 18 },
+
+  // Legacy kept for active errand cards
+  errandRequestCard: { backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 2, borderColor: '#10b981' },
+  errandRequestHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  errandRequestBadge: { fontSize: 11, fontWeight: '700', color: '#10b981' },
+  errandRequestFare: { fontSize: 18, fontWeight: '800', color: '#030712' },
+  errandTypeBadge: { fontSize: 10, fontWeight: '600', color: '#374151', backgroundColor: '#f3f4f6', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  errandVehicleBadge: { fontSize: 10, fontWeight: '600', color: '#374151', backgroundColor: '#f3f4f6', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  errandLocRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  errandLocLabel: { fontSize: 11, color: '#9ca3af', width: 18 },
+  errandLocVal: { flex: 1, fontSize: 12, color: '#030712', fontWeight: '500' },
+  errandDesc: { fontSize: 12, color: '#374151', marginTop: 4, marginBottom: 2, fontStyle: 'italic' },
+  errandInstructions: { fontSize: 11, color: '#6b7280', marginBottom: 2 },
+  errandRecipient: { fontSize: 11, color: '#6b7280', marginBottom: 6 },
+  errandBtnRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  errandDeclineBtn: { flex: 1, backgroundColor: '#f9fafb', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#e5e7eb' },
+  errandDeclineBtnText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  errandAcceptBtn: { flex: 2, backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 14, alignItems: 'center', shadowColor: '#10b981', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  errandAcceptBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  activeErrandCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 8, borderWidth: 1.5, borderColor: '#bbf7d0', shadowColor: '#10b981', shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
+
+  // Status row
+  activeErrandStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 12 },
+  activeErrandStatusDot: { width: 7, height: 7, borderRadius: 99, backgroundColor: '#f59e0b' },
+  activeErrandStatusText: { fontSize: 11, fontWeight: '700', color: '#f59e0b', letterSpacing: 0.5, flex: 1 },
+  activeErrandFareChip: { backgroundColor: '#030712', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
+  activeErrandFareChipText: { fontSize: 12, fontWeight: '800', color: '#10b981' },
+
+  // User row
+  activeErrandUserRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f9fafb', borderRadius: 12, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  activeErrandUserAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  activeErrandUserAvatarImg: { width: 38, height: 38, borderRadius: 19 },
+  activeErrandUserAvatarText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  activeErrandUserLabel: { fontSize: 9, fontWeight: '700', color: '#9ca3af', letterSpacing: 1.2, marginBottom: 1 },
+  activeErrandUserName: { fontSize: 13, fontWeight: '700', color: '#030712' },
+  activeErrandTypePill: { backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#d1fae5' },
+  activeErrandTypePillText: { fontSize: 10, fontWeight: '600', color: '#10b981' },
+
+  // Description
+  activeErrandDescCard: { backgroundColor: '#f9fafb', borderRadius: 10, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: '#f3f4f6' },
+  activeErrandDescText: { fontSize: 12, color: '#374151', lineHeight: 18 },
+
+  // Location
+  activeErrandLocCard: { backgroundColor: '#f9fafb', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  activeErrandLocRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  activeErrandDotBlack: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#030712', marginTop: 3 },
+  activeErrandDotGreen: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#10b981', marginTop: 3 },
+  activeErrandLocVal: { flex: 1, fontSize: 12, fontWeight: '600', color: '#030712', lineHeight: 18 },
+
+  // Recipient
+  activeErrandRecipientRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  activeErrandRecipientText: { fontSize: 12, fontWeight: '600', color: '#374151', flex: 1 },
+  activeErrandRecipientPhone: { fontSize: 11, color: '#9ca3af' },
+
+  // Legacy kept for reference
+  activeErrandTitle: { fontSize: 13, fontWeight: '700', color: '#10b981', marginBottom: 4 },
+  activeErrandDesc: { fontSize: 12, color: '#374151', fontStyle: 'italic', marginBottom: 4 },
+  activeErrandFare: { fontSize: 14, fontWeight: '700', color: '#030712', marginTop: 2, marginBottom: 8 },
+  errandStatusBtn: { backgroundColor: '#030712', borderRadius: 12, paddingVertical: 13, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, elevation: 2 },
+  errandStatusBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  riderErrandCancelBtn: { alignSelf: 'center', marginTop: 8, paddingVertical: 4, paddingHorizontal: 12 },
+  riderErrandCancelBtnText: { fontSize: 12, color: '#ef4444', fontWeight: '600' },
+  disabledBtn: { opacity: 0.55 },
+
+  // Confirmation modal
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  confirmCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', borderRadius: 18, padding: 20 },
+  confirmTitle: { fontSize: 18, fontWeight: '800', color: '#030712', textAlign: 'center', marginBottom: 8 },
+  confirmMessage: { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 19, marginBottom: 18 },
+  confirmActions: { flexDirection: 'row', gap: 10 },
+  confirmNoBtn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: '#f3f4f6' },
+  confirmNoText: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  confirmYesBtn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: '#ef4444' },
+  confirmYesText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   // Vehicle select modal
   vsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

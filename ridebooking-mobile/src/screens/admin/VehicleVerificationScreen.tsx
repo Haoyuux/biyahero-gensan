@@ -114,34 +114,23 @@ export default function VehicleVerificationScreen() {
       Alert.alert('Required', 'Enter a rejection reason.');
       return;
     }
-    Alert.alert(
-      `${status.charAt(0).toUpperCase() + status.slice(1)} Vehicle`,
-      `Set ${selected.rider_name ?? 'rider'}'s ${selected.vehicle_type} to ${status}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          style: status === 'rejected' ? 'destructive' : 'default',
-          onPress: async () => {
-            setSubmitting(true);
-            try {
-              await callAdminFn('admin-verify-vehicle', {
-                vehicleId: selected.id,
-                status,
-                rejectionReason: status === 'rejected' ? rejectReason.trim() : undefined,
-              });
-              setSelected(null);
-              setRejectReason('');
-              await load();
-            } catch (e: any) {
-              Alert.alert('Error', e.message);
-            } finally {
-              setSubmitting(false);
-            }
-          },
-        },
-      ],
-    );
+
+    setSubmitting(true);
+    try {
+      await callAdminFn('admin-verify-vehicle', {
+        vehicleId: selected.id,
+        status,
+        rejectionReason: status === 'rejected' ? rejectReason.trim() : undefined,
+      });
+      setSelected(null);
+      setRejectReason('');
+      await load();
+      Alert.alert('Updated', `Vehicle set to ${status}.`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return (
@@ -308,13 +297,25 @@ export default function VehicleVerificationScreen() {
                 <ActivityIndicator color="#10b981" style={{ marginTop: 20 }} />
               ) : (
                 <View style={s.actionRow}>
-                  <TouchableOpacity style={s.approveBtn} onPress={() => handleVerify('approved')}>
+                  <TouchableOpacity
+                    style={s.approveBtn}
+                    onPress={() => handleVerify('approved')}
+                    disabled={submitting}
+                  >
                     <Text style={s.approveBtnText}>Approve</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.pendingBtn} onPress={() => handleVerify('pending')}>
+                  <TouchableOpacity
+                    style={s.pendingBtn}
+                    onPress={() => handleVerify('pending')}
+                    disabled={submitting}
+                  >
                     <Text style={s.pendingBtnText}>Set Pending</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.rejectBtn} onPress={() => handleVerify('rejected')}>
+                  <TouchableOpacity
+                    style={s.rejectBtn}
+                    onPress={() => handleVerify('rejected')}
+                    disabled={submitting}
+                  >
                     <Text style={s.rejectBtnText}>Reject</Text>
                   </TouchableOpacity>
                 </View>

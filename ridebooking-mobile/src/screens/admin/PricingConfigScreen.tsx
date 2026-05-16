@@ -4,7 +4,7 @@ import {
   ScrollView, TextInput, Alert, TouchableOpacity, Switch,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { PricingConfig, TierPricing, DEFAULT_PRICING, loadPricingConfigFromDB } from '../../lib/fareService';
+import { PricingConfig, TierPricing, ErrandVehiclePricing, DEFAULT_PRICING, loadPricingConfigFromDB } from '../../lib/fareService';
 
 type Tier = 'moto' | 'tricycle' | 'eco' | 'premium';
 const TIERS: { id: Tier; label: string; color: string }[] = [
@@ -66,6 +66,22 @@ function calcPreview(f: TierForm, distKm = 5, durationMin = 12): number {
   return Math.round(base + billableKm * rate + durationMin * minRate + bookingFee);
 }
 
+interface ErrandVehicleForm {
+  baseFare: string;
+  perKmRate: string;
+  maintenanceCostPerKm: string;
+  convenienceFee: string;
+  disabled: boolean;
+}
+
+function toErrandForm(t: ErrandVehiclePricing): ErrandVehicleForm {
+  return { baseFare: String(t.baseFare), perKmRate: String(t.perKmRate), maintenanceCostPerKm: String(t.maintenanceCostPerKm), convenienceFee: String(t.convenienceFee), disabled: t.disabled };
+}
+
+function fromErrandForm(f: ErrandVehicleForm): ErrandVehiclePricing {
+  return { baseFare: parseFloat(f.baseFare)||0, perKmRate: parseFloat(f.perKmRate)||0, maintenanceCostPerKm: parseFloat(f.maintenanceCostPerKm)||0, convenienceFee: parseFloat(f.convenienceFee)||0, disabled: f.disabled };
+}
+
 export default function PricingConfigScreen() {
   const [config, setConfig] = useState<PricingConfig>(DEFAULT_PRICING);
   const [forms, setForms] = useState<Record<Tier, TierForm>>({
@@ -74,6 +90,8 @@ export default function PricingConfigScreen() {
     eco: toForm(DEFAULT_PRICING.eco),
     premium: toForm(DEFAULT_PRICING.premium),
   });
+  const [errandForms, setErrandForms] = useState({ moto: toErrandForm(DEFAULT_PRICING.errand.moto), tricycle: toErrandForm(DEFAULT_PRICING.errand.tricycle) });
+  const [errandDisabled, setErrandDisabled] = useState(false);
   const [teamDiscount, setTeamDiscount] = useState('0');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,6 +100,8 @@ export default function PricingConfigScreen() {
     const cfg = await loadPricingConfigFromDB(supabase);
     setConfig(cfg);
     setForms({ moto: toForm(cfg.moto), tricycle: toForm(cfg.tricycle), eco: toForm(cfg.eco), premium: toForm(cfg.premium) });
+    setErrandForms({ moto: toErrandForm(cfg.errand.moto), tricycle: toErrandForm(cfg.errand.tricycle) });
+    setErrandDisabled(cfg.errand.disabled);
     setTeamDiscount(String(cfg.teamBookingFeeDiscount ?? 0));
     setLoading(false);
   }, []);
@@ -101,6 +121,7 @@ export default function PricingConfigScreen() {
         tricycle: fromForm(forms.tricycle, config.tricycle),
         eco: fromForm(forms.eco, config.eco),
         premium: fromForm(forms.premium, config.premium),
+        errand: { disabled: errandDisabled, moto: fromErrandForm(errandForms.moto), tricycle: fromErrandForm(errandForms.tricycle) },
       };
       const { error } = await supabase.from('pricing_config').upsert({ id: 1, config: newConfig });
       if (error) throw error;
@@ -117,6 +138,8 @@ export default function PricingConfigScreen() {
         text: 'Reset', onPress: () => {
           setConfig(DEFAULT_PRICING);
           setForms({ moto: toForm(DEFAULT_PRICING.moto), tricycle: toForm(DEFAULT_PRICING.tricycle), eco: toForm(DEFAULT_PRICING.eco), premium: toForm(DEFAULT_PRICING.premium) });
+          setErrandForms({ moto: toErrandForm(DEFAULT_PRICING.errand.moto), tricycle: toErrandForm(DEFAULT_PRICING.errand.tricycle) });
+          setErrandDisabled(false);
           setTeamDiscount('0');
         },
       },
@@ -244,6 +267,45 @@ export default function PricingConfigScreen() {
             </View>
           </View>
         ))}
+
+        {/* Errand Pricing */}
+        <View style={[s.tierCard, errandDisabled && s.tierDisabled]}>
+          <View style={[s.tierHeader, { borderLeftColor: '#10b981' }]}>
+            <Text style={[s.tierTitle, { color: errandDisabled ? '#9ca3af' : '#10b981' }]}>📦 Errand / Sugo</Text>
+            <View style={s.disabledRow}>
+              <Text style={s.disabledLabel}>Disable errands</Text>
+              <Switch value={errandDisabled} onValueChange={setErrandDisabled} trackColor={{ true: '#ef4444' }} />
+            </View>
+          </View>
+          {(['moto', 'tricycle'] as const).map(v => (
+            <View key={v} style={{ marginTop: 14 }}>
+              <Text style={[s.tierTitle, { fontSize: 12, color: errandForms[v].disabled ? '#9ca3af' : '#374151', marginBottom: 8 }]}>
+                {v === 'moto' ? '🏍️ Motorcycle' : '🛺 Tricycle'}
+              </Text>
+              <View style={s.disabledRow}>
+                <Text style={s.disabledLabel}>Disable this vehicle</Text>
+                <Switch value={errandForms[v].disabled} onValueChange={val => setErrandForms(p => ({ ...p, [v]: { ...p[v], disabled: val } }))} trackColor={{ true: '#ef4444' }} />
+              </View>
+              {[
+                { key: 'baseFare', label: 'Base Fare (₱)' },
+                { key: 'perKmRate', label: 'Per KM Rate (₱)' },
+                { key: 'maintenanceCostPerKm', label: 'Maintenance Cost / KM (₱)' },
+                { key: 'convenienceFee', label: 'Convenience Fee (₱) — for Buy / Other' },
+              ].map(({ key, label }) => (
+                <View key={key} style={{ marginTop: 8 }}>
+                  <Text style={s.fieldLabel}>{label}</Text>
+                  <TextInput
+                    style={s.fieldInput}
+                    value={(errandForms[v] as any)[key]}
+                    onChangeText={val => setErrandForms(p => ({ ...p, [v]: { ...p[v], [key]: val } }))}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor="#9ca3af"
+                  />
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
 
         <TouchableOpacity style={[s.saveBtn, saving && s.disabled]} disabled={saving} onPress={save}>
           <Text style={s.saveBtnText}>{saving ? 'Saving…' : 'Save Pricing Config'}</Text>
