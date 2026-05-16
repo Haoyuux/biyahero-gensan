@@ -59,6 +59,26 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export type UserRole = 'super_admin' | 'admin' | 'team_leader' | 'rider' | 'user';
+export type VehicleStatus = 'pending' | 'approved' | 'rejected';
+
+export interface RiderVehicle {
+  id: string;
+  rider_id: string;
+  vehicle_number: number;
+  vehicle_type: string;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_plate: string | null;
+  vehicle_color: string | null;
+  vehicle_image_url: string | null;
+  or_url: string | null;
+  cr_url: string | null;
+  status: VehicleStatus;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
 export type RiderStatus = 'unsubmitted' | 'pending' | 'approved' | 'rejected';
 
 export interface Profile {

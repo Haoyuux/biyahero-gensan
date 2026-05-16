@@ -11,7 +11,10 @@
       "WebSearch",
       "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; $env:PATH = \"$env:JAVA_HOME\\\\bin;$env:PATH\"; Set-Location \"D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-mobile\\\\android\"; .\\\\gradlew assembleDebug 2>&1)",
       "PowerShell(cmd /c \"dir D:\\\\Project\\\\Github\\\\fetch\\\\fetch-gensan\\\\ridebooking-mobile\\\\android\\\\app\\\\src\\\\main\\\\res\\\\mipmap-xxhdpi\\\\ic_launcher.webp 2>&1\")",
-      "Skill(superpowers:executing-plans)"
+      "Skill(superpowers:executing-plans)",
+      "Bash(curl -s 'https://fnxhdsxslbkggtjnaxoj.supabase.co/rest/v1/user_vouchers?select=id,status,used_at,ride_id,voucher_id&user_id=eq.1aec8608-9e1e-4e7d-8220-c91af321734e&voucher_id=eq.9b6e6660-ae7c-437c-95f0-f85b51055aac' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueGhkc3hzbGJrZ2d0am5heG9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY0NzE3OSwiZXhwIjoyMDkwMjIzMTc5fQ.RVcPg_BL2cdhNLXQSVy0zUPzNb6DirzsMSidZY65e-c' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueGhkc3hzbGJrZ2d0am5heG9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY0NzE3OSwiZXhwIjoyMDkwMjIzMTc5fQ.RVcPg_BL2cdhNLXQSVy0zUPzNb6DirzsMSidZY65e-c')",
+      "Bash(curl -s 'https://fnxhdsxslbkggtjnaxoj.supabase.co/rest/v1/rides?select=id,fare,voucher_discount,voucher_id,completed_at,status&user_id=eq.1aec8608-9e1e-4e7d-8220-c91af321734e&voucher_id=eq.9b6e6660-ae7c-437c-95f0-f85b51055aac' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueGhkc3hzbGJrZ2d0am5heG9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY0NzE3OSwiZXhwIjoyMDkwMjIzMTc5fQ.RVcPg_BL2cdhNLXQSVy0zUPzNb6DirzsMSidZY65e-c' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueGhkc3hzbGJrZ2d0am5heG9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY0NzE3OSwiZXhwIjoyMDkwMjIzMTc5fQ.RVcPg_BL2cdhNLXQSVy0zUPzNb6DirzsMSidZY65e-c')",
+      "Bash(curl *)"
     ]
   }
 }

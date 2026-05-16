@@ -23,7 +23,7 @@ import ChatHistoryScreen from './ChatHistoryScreen';
 import * as Notifications from 'expo-notifications';
 
 type Step = 'home' | 'select' | 'searching' | 'matched' | 'review';
-type TierId = 'moto' | 'eco' | 'premium';
+type TierId = 'moto' | 'tricycle' | 'eco' | 'premium';
 type ActiveField = 'pickup' | 'dropoff' | null;
 
 interface Favorite {
@@ -35,6 +35,7 @@ interface Favorite {
 
 const TIERS = [
   { id: 'moto' as TierId, name: 'Motorcycle', emoji: '🏍️', time: '2-3 min', capacity: '1 passenger' },
+  { id: 'tricycle' as TierId, name: 'Tricycle', emoji: '🛺', time: '3-5 min', capacity: '2 passengers' },
   { id: 'eco' as TierId, name: 'Standard Car', emoji: '🚕', time: '4-5 min', capacity: '3 passengers' },
   { id: 'premium' as TierId, name: 'Premium', emoji: '🚙', time: '5-7 min', capacity: '4 passengers' },
 ];

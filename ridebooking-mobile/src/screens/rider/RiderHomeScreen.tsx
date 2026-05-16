@@ -9,7 +9,7 @@ import * as KeepAwake from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
-import { supabase, Profile } from '../../lib/supabase';
+import { supabase, Profile, RiderVehicle } from '../../lib/supabase';
 import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -66,6 +66,12 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const [isOnline, setIsOnline] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+
+  // Vehicle selection
+  const [approvedVehicles, setApprovedVehicles] = useState<RiderVehicle[]>([]);
+  const [activeVehicle, setActiveVehicle] = useState<RiderVehicle | null>(null);
+  const [showVehicleSelect, setShowVehicleSelect] = useState(false);
+  const pendingOnlineRef = useRef(false);
 
   // Today stats
   const [todayEarnings, setTodayEarnings] = useState(0);
@@ -184,6 +190,17 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     supabase.from('profiles').update({ is_online: false }).eq('id', profile.id);
     unregisterPushToken();
   }, []);
+
+  // Load approved vehicles
+  useEffect(() => {
+    supabase
+      .from('vehicles')
+      .select('*')
+      .eq('rider_id', profile.id)
+      .eq('status', 'approved')
+      .order('vehicle_number', { ascending: true })
+      .then(({ data }) => setApprovedVehicles((data ?? []) as RiderVehicle[]));
+  }, [profile.id]);
 
   // GPS
   useEffect(() => {
@@ -443,17 +460,48 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     }
   }, [showChat, messages]);
 
+  const goOnlineWithVehicle = async (vehicle: RiderVehicle) => {
+    setActiveVehicle(vehicle);
+    // Sync selected vehicle to profiles so rest of app sees correct vehicle
+    await supabase.from('profiles').update({
+      vehicle_type: vehicle.vehicle_type,
+      vehicle_make: vehicle.vehicle_make,
+      vehicle_model: vehicle.vehicle_model,
+      vehicle_plate: vehicle.vehicle_plate,
+      vehicle_color: vehicle.vehicle_color,
+      vehicle_image_url: vehicle.vehicle_image_url,
+      is_online: true,
+    }).eq('id', profile.id);
+    await registerPushToken();
+    isOnlineRef.current = true;
+    setIsOnline(true);
+  };
+
   const toggleOnline = async (value: boolean) => {
-    isOnlineRef.current = value;
-    setIsOnline(value);
     if (!value) {
+      // Going offline — straightforward
+      isOnlineRef.current = false;
+      setIsOnline(false);
       setHasRequest(false);
       setRequestQueue([]);
+      setActiveVehicle(null);
       await unregisterPushToken();
-    } else {
-      await registerPushToken();
+      await supabase.from('profiles').update({ is_online: false }).eq('id', profile.id);
+      return;
     }
-    await supabase.from('profiles').update({ is_online: value }).eq('id', profile.id);
+    // Going online — need an approved vehicle
+    if (approvedVehicles.length === 0) {
+      Alert.alert('No Approved Vehicle', 'You need at least one approved vehicle before going online. Submit your vehicle for verification.');
+      return;
+    }
+    if (approvedVehicles.length === 1) {
+      // Auto-select the only vehicle
+      await goOnlineWithVehicle(approvedVehicles[0]);
+      return;
+    }
+    // Multiple vehicles — prompt selection
+    pendingOnlineRef.current = true;
+    setShowVehicleSelect(true);
   };
 
   const handleAccept = async () => {
@@ -783,7 +831,11 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
               <View style={[styles.onlineDot, isOnline && styles.onlineDotActive]} />
               <View>
                 <Text style={styles.onlineLabel}>{isOnline ? 'You are Online' : 'You are Offline'}</Text>
-                <Text style={styles.onlineSub}>{isOnline ? 'Accepting ride requests' : 'Go online to accept rides'}</Text>
+                <Text style={styles.onlineSub}>
+                  {isOnline && activeVehicle
+                    ? `${activeVehicle.vehicle_type} · ${activeVehicle.vehicle_plate ?? 'No plate'}`
+                    : isOnline ? 'Accepting ride requests' : 'Go online to accept rides'}
+                </Text>
               </View>
             </View>
             <Switch
@@ -828,6 +880,46 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
           <Text style={styles.profileBtnText}>{(profile.first_name?.[0] ?? 'R').toUpperCase()}</Text>
         )}
       </TouchableOpacity>
+
+      {/* Vehicle selection modal */}
+      <Modal visible={showVehicleSelect} transparent animationType="slide" onRequestClose={() => { setShowVehicleSelect(false); pendingOnlineRef.current = false; }}>
+        <View style={styles.vsOverlay}>
+          <View style={styles.vsSheet}>
+            <Text style={styles.vsTitle}>Select Vehicle</Text>
+            <Text style={styles.vsSub}>Choose which vehicle you're using today</Text>
+            {approvedVehicles.map(v => (
+              <TouchableOpacity
+                key={v.id}
+                style={styles.vsItem}
+                onPress={async () => {
+                  setShowVehicleSelect(false);
+                  pendingOnlineRef.current = false;
+                  await goOnlineWithVehicle(v);
+                }}
+              >
+                <View style={styles.vsItemLeft}>
+                  <Text style={styles.vsItemEmoji}>
+                    {v.vehicle_type === 'Tricycle' ? '🛺' : v.vehicle_type === 'Car' ? '🚕' : v.vehicle_type === 'Van' ? '🚐' : '🏍️'}
+                  </Text>
+                  <View>
+                    <Text style={styles.vsItemType}>{v.vehicle_type}</Text>
+                    <Text style={styles.vsItemDetail}>
+                      {[v.vehicle_make, v.vehicle_model].filter(Boolean).join(' ')}
+                      {v.vehicle_plate ? ` · ${v.vehicle_plate}` : ''}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.vsItemNum}>
+                  {['', '1st', '2nd', '3rd', '4th', '5th'][v.vehicle_number] ?? `#${v.vehicle_number}`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.vsCancelBtn} onPress={() => { setShowVehicleSelect(false); pendingOnlineRef.current = false; }}>
+              <Text style={styles.vsCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Profile menu modal */}
       <Modal visible={showProfileMenu} transparent animationType="fade" onRequestClose={() => setShowProfileMenu(false)}>
@@ -990,6 +1082,20 @@ const styles = StyleSheet.create({
   onlineDotActive: { backgroundColor: '#10b981' },
   onlineLabel: { fontSize: 14, fontWeight: '600', color: '#030712' },
   onlineSub: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+
+  // Vehicle select modal
+  vsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  vsSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },
+  vsTitle: { fontSize: 18, fontWeight: '800', color: '#030712', marginBottom: 4 },
+  vsSub: { fontSize: 13, color: '#9ca3af', marginBottom: 20 },
+  vsItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f9fafb', borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  vsItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  vsItemEmoji: { fontSize: 28 },
+  vsItemType: { fontSize: 15, fontWeight: '700', color: '#030712' },
+  vsItemDetail: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  vsItemNum: { fontSize: 11, fontWeight: '700', color: '#9ca3af', backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  vsCancelBtn: { marginTop: 8, paddingVertical: 14, alignItems: 'center' },
+  vsCancelText: { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
 
   statsRow: { flexDirection: 'row', marginBottom: 12 },
   statCard: { flex: 1, backgroundColor: '#f9fafb', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#f3f4f6', alignItems: 'center' },

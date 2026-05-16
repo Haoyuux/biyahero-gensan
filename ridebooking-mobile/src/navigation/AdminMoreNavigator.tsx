@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { AdminMoreStackParamList } from './adminTypes';
 import AdminModulesScreen from '../screens/admin/AdminModulesScreen';
+import VehicleVerificationScreen from '../screens/admin/VehicleVerificationScreen';
 import DriverManagementScreen from '../screens/admin/DriverManagementScreen';
 import TeamManagementScreen from '../screens/admin/TeamManagementScreen';
 import AdminNewsScreen from '../screens/admin/AdminNewsScreen';
@@ -21,6 +22,7 @@ export default function AdminMoreNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="AdminModules" component={AdminModulesScreen} />
+      <Stack.Screen name="VehicleVerification" component={VehicleVerificationScreen} />
       <Stack.Screen name="DriverManagement" component={DriverManagementScreen} />
       <Stack.Screen name="TeamManagement" component={TeamManagementScreen} />
       <Stack.Screen name="AdminNews" component={AdminNewsScreen} />

@@ -53,6 +53,7 @@ interface UserVoucherRow {
   ride_date: string | null;
   ride_pickup: string | null;
   voucher_discount_paid: boolean | null;
+  isDirectRide?: boolean; // row came from rides table, not user_vouchers
 }
 
 interface VoucherForm {
@@ -187,8 +188,11 @@ export default function VouchersScreen() {
 
       // Rides that used the voucher without a user_vouchers row (applied directly at booking)
       const uvRideIds = new Set(uvRows.map((r: any) => r.ride_id).filter(Boolean));
+      // Exclude rides for users who already have a user_vouchers entry — prevents duplicates
+      // when user_vouchers.ride_id is null (not linked back after ride completion)
+      const uvUserIds = new Set(uvRows.map((r: any) => r.user_id));
       const extraRideRows: UserVoucherRow[] = rideRows
-        .filter((r: any) => !uvRideIds.has(r.id))
+        .filter((r: any) => !uvRideIds.has(r.id) && !uvUserIds.has(r.user_id))
         .map((r: any) => ({
           id: r.id,
           user_id: r.user_id,
@@ -204,6 +208,7 @@ export default function VouchersScreen() {
           ride_date: r.completed_at,
           ride_pickup: r.pickup_label,
           voucher_discount_paid: r.voucher_discount_paid ?? null,
+          isDirectRide: true,
         }));
 
       setClaimRows([...claimedRows, ...extraRideRows]);
@@ -214,13 +219,14 @@ export default function VouchersScreen() {
   };
 
   const handleRemoveClaim = (row: UserVoucherRow) => {
-    if (row.used_at !== null) {
-      Alert.alert('Cannot Remove', 'This voucher was already used in a ride.');
+    if (row.isDirectRide) {
+      Alert.alert('Cannot Remove', 'This is a ride record, not a saved voucher entry.');
       return;
     }
+    const usedWarning = row.used_at !== null ? '\n\nNote: This voucher was already used in a ride.' : '';
     Alert.alert(
       'Remove Voucher',
-      `Remove this saved voucher from ${row.user_name ?? 'user'}?`,
+      `Remove this voucher from ${row.user_name ?? 'user'}?${usedWarning}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -470,9 +476,11 @@ export default function VouchersScreen() {
                         </View>
                       )}
 
-                      <TouchableOpacity style={s.removeClaimBtn} onPress={() => handleRemoveClaim(row)}>
-                        <Text style={s.removeClaimBtnText}>Remove from user</Text>
-                      </TouchableOpacity>
+                      {!row.isDirectRide && (
+                        <TouchableOpacity style={s.removeClaimBtn} onPress={() => handleRemoveClaim(row)}>
+                          <Text style={s.removeClaimBtnText}>Remove from user</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ))}
                 </ScrollView>

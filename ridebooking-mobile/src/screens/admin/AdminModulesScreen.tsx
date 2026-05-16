@@ -12,6 +12,7 @@ const PHASES = [
     label: 'PHASE 2 — FLEET & CONTENT',
     modules: [
       { route: 'DriverManagement', title: 'Driver Mgmt', icon: 'people', color: '#3b82f6' },
+      { route: 'VehicleVerification', title: 'Vehicles', icon: 'car-sport', color: '#f97316' },
       { route: 'TeamManagement', title: 'Teams', icon: 'people-circle', color: '#8b5cf6' },
       { route: 'AdminNews', title: 'News Feed', icon: 'newspaper', color: '#f59e0b' },
     ],

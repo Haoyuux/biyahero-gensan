@@ -1,5 +1,6 @@
 export type AdminMoreStackParamList = {
   AdminModules: undefined;
+  VehicleVerification: undefined;
   DriverManagement: undefined;
   TeamManagement: undefined;
   AdminNews: undefined;

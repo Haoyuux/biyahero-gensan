@@ -6,9 +6,10 @@ import {
 import { supabase } from '../../lib/supabase';
 import { PricingConfig, TierPricing, DEFAULT_PRICING, loadPricingConfigFromDB } from '../../lib/fareService';
 
-type Tier = 'moto' | 'eco' | 'premium';
+type Tier = 'moto' | 'tricycle' | 'eco' | 'premium';
 const TIERS: { id: Tier; label: string; color: string }[] = [
   { id: 'moto', label: 'Moto', color: '#f59e0b' },
+  { id: 'tricycle', label: 'Tricycle', color: '#f97316' },
   { id: 'eco', label: 'Eco', color: '#10b981' },
   { id: 'premium', label: 'Premium', color: '#6366f1' },
 ];
@@ -69,6 +70,7 @@ export default function PricingConfigScreen() {
   const [config, setConfig] = useState<PricingConfig>(DEFAULT_PRICING);
   const [forms, setForms] = useState<Record<Tier, TierForm>>({
     moto: toForm(DEFAULT_PRICING.moto),
+    tricycle: toForm(DEFAULT_PRICING.tricycle),
     eco: toForm(DEFAULT_PRICING.eco),
     premium: toForm(DEFAULT_PRICING.premium),
   });
@@ -79,7 +81,7 @@ export default function PricingConfigScreen() {
   const load = useCallback(async () => {
     const cfg = await loadPricingConfigFromDB(supabase);
     setConfig(cfg);
-    setForms({ moto: toForm(cfg.moto), eco: toForm(cfg.eco), premium: toForm(cfg.premium) });
+    setForms({ moto: toForm(cfg.moto), tricycle: toForm(cfg.tricycle), eco: toForm(cfg.eco), premium: toForm(cfg.premium) });
     setTeamDiscount(String(cfg.teamBookingFeeDiscount ?? 0));
     setLoading(false);
   }, []);
@@ -96,6 +98,7 @@ export default function PricingConfigScreen() {
       const newConfig: PricingConfig = {
         teamBookingFeeDiscount: parseFloat(teamDiscount) || 0,
         moto: fromForm(forms.moto, config.moto),
+        tricycle: fromForm(forms.tricycle, config.tricycle),
         eco: fromForm(forms.eco, config.eco),
         premium: fromForm(forms.premium, config.premium),
       };
@@ -113,7 +116,7 @@ export default function PricingConfigScreen() {
       {
         text: 'Reset', onPress: () => {
           setConfig(DEFAULT_PRICING);
-          setForms({ moto: toForm(DEFAULT_PRICING.moto), eco: toForm(DEFAULT_PRICING.eco), premium: toForm(DEFAULT_PRICING.premium) });
+          setForms({ moto: toForm(DEFAULT_PRICING.moto), tricycle: toForm(DEFAULT_PRICING.tricycle), eco: toForm(DEFAULT_PRICING.eco), premium: toForm(DEFAULT_PRICING.premium) });
           setTeamDiscount('0');
         },
       },

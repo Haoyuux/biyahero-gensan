@@ -12,6 +12,7 @@ export interface TierPricing {
 
 export interface PricingConfig {
   moto: TierPricing;
+  tricycle: TierPricing;
   eco: TierPricing;
   premium: TierPricing;
   teamBookingFeeDiscount: number;
@@ -33,6 +34,11 @@ export const DEFAULT_PRICING: PricingConfig = {
     bookingFeeType: 'static', maintenanceCostPerKm: 2,
     perKmThresholdEnabled: false, perKmThreshold: 0, disabled: false,
   },
+  tricycle: {
+    baseFare: 50, perKmRate: 14, perMinuteRate: 2, bookingFee: 5,
+    bookingFeeType: 'static', maintenanceCostPerKm: 2,
+    perKmThresholdEnabled: false, perKmThreshold: 0, disabled: false,
+  },
   eco: {
     baseFare: 60, perKmRate: 18, perMinuteRate: 3, bookingFee: 8,
     bookingFeeType: 'static', maintenanceCostPerKm: 3,
@@ -46,7 +52,7 @@ export const DEFAULT_PRICING: PricingConfig = {
 };
 
 export function calculateFare(
-  tierId: 'moto' | 'eco' | 'premium',
+  tierId: 'moto' | 'tricycle' | 'eco' | 'premium',
   distanceM: number,
   durationS: number,
   config: PricingConfig = DEFAULT_PRICING,
@@ -78,6 +84,7 @@ export async function loadPricingConfigFromDB(supabase: any): Promise<PricingCon
     return {
       teamBookingFeeDiscount: saved.teamBookingFeeDiscount ?? DEFAULT_PRICING.teamBookingFeeDiscount,
       moto: { ...DEFAULT_PRICING.moto, ...saved.moto },
+      tricycle: { ...DEFAULT_PRICING.tricycle, ...saved.tricycle },
       eco: { ...DEFAULT_PRICING.eco, ...saved.eco },
       premium: { ...DEFAULT_PRICING.premium, ...saved.premium },
     };

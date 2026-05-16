@@ -50,14 +50,32 @@ Deno.serve(async (req) => {
 
     if (uvError) throw uvError
 
-    // Fetch all rides that used this voucher
-    const { data: rideRows, error: rideError } = await admin
+    // Fetch all rides that used this voucher (by voucher_id column)
+    const { data: ridesByVoucher, error: rideError } = await admin
       .from('rides')
       .select('id, user_id, fare, voucher_discount, completed_at, pickup_label, voucher_discount_paid, status')
       .eq('voucher_id', voucherId)
       .order('completed_at', { ascending: false })
 
     if (rideError) throw rideError
+
+    // Also fetch rides linked via user_vouchers.ride_id (handles cases where ride lacks voucher_id)
+    const linkedRideIds = (uvRows ?? []).map((r: any) => r.ride_id).filter(Boolean)
+    let ridesByLinkedId: any[] = []
+    if (linkedRideIds.length) {
+      const { data } = await admin
+        .from('rides')
+        .select('id, user_id, fare, voucher_discount, completed_at, pickup_label, voucher_discount_paid, status')
+        .in('id', linkedRideIds)
+      ridesByLinkedId = data ?? []
+    }
+
+    // Merge, deduplicate by ride ID
+    const ridesSeen = new Set<string>()
+    const rideRows: any[] = []
+    for (const r of [...(ridesByVoucher ?? []), ...ridesByLinkedId]) {
+      if (!ridesSeen.has(r.id)) { ridesSeen.add(r.id); rideRows.push(r) }
+    }
 
     // Fetch profiles for all user IDs found
     const uvUserIds = (uvRows ?? []).map((r: any) => r.user_id)
