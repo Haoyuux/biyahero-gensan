@@ -103,6 +103,7 @@ import {
   type Profile,
   type RiderStatus,
   type AdminRole,
+  type RiderVehicle,
 } from "@/src/lib/supabase";
 import {
   calculateFare,
@@ -4160,6 +4161,22 @@ const RiderProfileScreen = ({
   const [vehicleModel, setVehicleModel] = useState(profile.vehicle_model || "");
   const [vehiclePlate, setVehiclePlate] = useState(profile.vehicle_plate || "");
   const [vehicleColor, setVehicleColor] = useState(profile.vehicle_color || "");
+
+  // Multi-vehicle (vehicles table)
+  const [vehicles, setVehicles] = useState<RiderVehicle[]>([]);
+  const [showVehicleModal, setShowVehicleModal] = useState(false);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [viewingVehicle, setViewingVehicle] = useState<RiderVehicle | null>(null);
+  const [savingVehicle, setSavingVehicle] = useState(false);
+  const [vForm, setVForm] = useState({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "" });
+  const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th"];
+  const STATUS_COLOR: Record<string, string> = { pending: "#f59e0b", approved: "#10b981", rejected: "#ef4444" };
+  const VEMOJI: Record<string, string> = { Motorcycle: "🏍️", Tricycle: "🛺", Car: "🚕", Van: "🚐" };
+
+  useEffect(() => {
+    supabase.from("vehicles").select("*").eq("rider_id", profile.id).order("vehicle_number", { ascending: true })
+      .then(({ data }) => setVehicles((data ?? []) as RiderVehicle[]));
+  }, [profile.id]);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || "");
   const [coverUrl, setCoverUrl] = useState(profile.cover_photo_url || "");
   const [licenseUrl, setLicenseUrl] = useState(
@@ -4307,6 +4324,39 @@ const RiderProfileScreen = ({
     rejected: { bg: "bg-red-100", text: "text-red-700", label: "Rejected" },
   };
   const status = statusBadge[profile.rider_status] || statusBadge.unsubmitted;
+
+  const reloadVehicles = async () => {
+    const { data } = await supabase.from("vehicles").select("*").eq("rider_id", profile.id).order("vehicle_number", { ascending: true });
+    setVehicles((data ?? []) as RiderVehicle[]);
+  };
+
+  const openAddVehicle = () => {
+    setEditingVehicleId(null);
+    setVForm({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "" });
+    setShowVehicleModal(true);
+  };
+
+  const openEditVehicle = (v: RiderVehicle) => {
+    setEditingVehicleId(v.id);
+    setVForm({ vehicle_type: v.vehicle_type, vehicle_make: v.vehicle_make ?? "", vehicle_model: v.vehicle_model ?? "", vehicle_plate: v.vehicle_plate ?? "", vehicle_color: v.vehicle_color ?? "" });
+    setShowVehicleModal(true);
+  };
+
+  const handleSaveVehicleForm = async () => {
+    if (!vForm.vehicle_type) return;
+    setSavingVehicle(true);
+    if (editingVehicleId) {
+      await supabase.from("vehicles").update({ ...vForm, vehicle_plate: vForm.vehicle_plate.toUpperCase() || null, status: "pending" }).eq("id", editingVehicleId);
+    } else {
+      const nextNum = vehicles.length > 0 ? Math.max(...vehicles.map(v => v.vehicle_number)) + 1 : 1;
+      await supabase.from("vehicles").insert({ rider_id: profile.id, vehicle_number: nextNum, status: "pending", ...vForm, vehicle_plate: vForm.vehicle_plate.toUpperCase() || null });
+    }
+    await reloadVehicles();
+    setShowVehicleModal(false);
+    setEditingVehicleId(null);
+    setVForm({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "" });
+    setSavingVehicle(false);
+  };
 
   const DocUpload = ({
     label,
@@ -4556,6 +4606,46 @@ const RiderProfileScreen = ({
                   ))}
                 </div>
               </div>
+              {/* My Vehicles */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">My Vehicles</h3>
+                  <button onClick={openAddVehicle} className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors">+ Add</button>
+                </div>
+                {vehicles.length === 0 ? (
+                  <button onClick={openAddVehicle} className="w-full py-4 rounded-2xl border-2 border-dashed border-gray-200 text-sm font-normal text-gray-400 hover:border-emerald-400 hover:text-emerald-600 transition-colors">
+                    + Register Your Vehicle
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    {vehicles.map(v => (
+                      <div key={v.id} className="bg-white rounded-2xl px-4 py-3 border border-gray-100 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex-shrink-0 bg-gray-100 rounded-xl w-9 h-9 flex items-center justify-center text-base">{VEMOJI[v.vehicle_type] ?? "🚗"}</div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{ORDINAL[v.vehicle_number] ?? `#${v.vehicle_number}`}</span>
+                              <span className="text-sm font-normal text-gray-800 truncate">{v.vehicle_type}{v.vehicle_make ? ` · ${v.vehicle_make}` : ""}{v.vehicle_model ? ` ${v.vehicle_model}` : ""}</span>
+                            </div>
+                            {v.vehicle_plate && <p className="text-xs text-gray-400 font-mono mt-0.5">{v.vehicle_plate}</p>}
+                            {v.status === "rejected" && v.rejection_reason && <p className="text-xs text-red-500 mt-0.5">Rejected: {v.rejection_reason}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{ color: STATUS_COLOR[v.status], backgroundColor: STATUS_COLOR[v.status] + "20" }}>
+                            {v.status === "pending" ? "Pending" : v.status === "approved" ? "Approved" : "Rejected"}
+                          </span>
+                          {v.status === "approved"
+                            ? <button onClick={() => setViewingVehicle(v)} className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition-colors">View 🔒</button>
+                            : <button onClick={() => openEditVehicle(v)} className="text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-100 transition-colors">Edit</button>
+                          }
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Documents */}
               <div>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
@@ -4838,6 +4928,80 @@ const RiderProfileScreen = ({
           )}
         </div>
       </div>
+      {/* Add / Edit Vehicle Modal */}
+      {showVehicleModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-950">{editingVehicleId ? "Edit Vehicle" : "Add Vehicle"}</h2>
+              <button onClick={() => setShowVehicleModal(false)} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+            </div>
+            <div className="overflow-y-auto px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Vehicle Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Motorcycle", "Tricycle", "Car", "Van"].map(t => (
+                    <button key={t} type="button" onClick={() => setVForm(f => ({ ...f, vehicle_type: t }))}
+                      className={`py-3 rounded-2xl text-sm font-normal border-2 flex items-center justify-center gap-2 transition-all ${vForm.vehicle_type === t ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}>
+                      {t === "Car" || t === "Van" ? <Car size={15} /> : <Bike size={15} />} {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {[["Make / Brand", "vehicle_make", "Honda"], ["Model", "vehicle_model", "Click 125i"], ["Plate Number", "vehicle_plate", "ABC 1234"], ["Color", "vehicle_color", "Black"]].map(([label, key, placeholder]) => (
+                <div key={key}>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
+                  <input value={(vForm as any)[key]} onChange={e => setVForm(f => ({ ...f, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              ))}
+              {editingVehicleId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-700">Saving changes will reset status to Pending for re-verification.</div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button onClick={() => setShowVehicleModal(false)} className="flex-1 py-3.5 rounded-2xl border-2 border-gray-200 text-sm font-normal text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSaveVehicleForm} disabled={savingVehicle || !vForm.vehicle_type}
+                className="flex-1 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                {savingVehicle ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                {editingVehicleId ? "Save Changes" : "Submit for Approval"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Approved Vehicle (read-only) */}
+      {viewingVehicle && (
+        <div className="fixed inset-0 z-[200] bg-black/60 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold text-gray-950">{viewingVehicle.vehicle_type}</h2>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ color: "#10b981", backgroundColor: "#10b98120" }}>Approved 🔒</span>
+              </div>
+              <button onClick={() => setViewingVehicle(null)} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+            </div>
+            <div className="overflow-y-auto px-6 py-4 space-y-2">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Vehicle Details — {ORDINAL[viewingVehicle.vehicle_number] ?? `#${viewingVehicle.vehicle_number}`}</p>
+              {[["Type", viewingVehicle.vehicle_type], ["Make", viewingVehicle.vehicle_make ?? "—"], ["Model", viewingVehicle.vehicle_model ?? "—"], ["Plate", viewingVehicle.vehicle_plate ?? "—"], ["Color", viewingVehicle.vehicle_color ?? "—"]].map(([label, val]) => (
+                <div key={label} className="bg-gray-50 rounded-2xl px-4 py-3 flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+                  <span className={`text-sm font-normal text-gray-800 ${label === "Plate" ? "font-mono tracking-widest" : ""}`}>{val}</span>
+                </div>
+              ))}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 mt-4">
+                <p className="text-xs text-emerald-700 text-center">This vehicle is approved and cannot be edited. Contact support if changes are needed.</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setViewingVehicle(null)} className="w-full py-3.5 rounded-2xl border-2 border-gray-200 text-sm font-normal text-gray-600 hover:bg-gray-50">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </motion.div>
   );
 };
@@ -5655,6 +5819,26 @@ const RiderDashboard = ({
     setTimeout(() => setRiderNotification(null), 3500);
   };
   const [isOnline, setIsOnline] = useState(false);
+  const [approvedVehicles, setApprovedVehicles] = useState<RiderVehicle[]>([]);
+  const [activeVehicle, setActiveVehicle] = useState<RiderVehicle | null>(null);
+  const [showVehicleSelect, setShowVehicleSelect] = useState(false);
+
+  useEffect(() => {
+    if (!currentProfile?.id || currentProfile.role !== "rider") return;
+    supabase.from("vehicles").select("*").eq("rider_id", currentProfile.id).eq("status", "approved").order("vehicle_number", { ascending: true })
+      .then(({ data }) => setApprovedVehicles((data ?? []) as RiderVehicle[]));
+  }, [currentProfile?.id]);
+
+  const goOnlineWithVehicle = async (vehicle: RiderVehicle) => {
+    setActiveVehicle(vehicle);
+    setIsOnline(true);
+    if (currentProfile?.id) {
+      await supabase.from("profiles").update({ vehicle_type: vehicle.vehicle_type, vehicle_make: vehicle.vehicle_make, vehicle_model: vehicle.vehicle_model, vehicle_plate: vehicle.vehicle_plate, vehicle_color: vehicle.vehicle_color, is_online: true }).eq("id", currentProfile.id);
+      localStorage.removeItem("fetch_fcm_token");
+      initFCM().then((token) => { if (!token) return; localStorage.setItem("fetch_fcm_token", token); saveFCMToken(currentProfile.id, token); }).catch(console.error);
+    }
+  };
+
   useEffect(() => {
     if (!isOnline) return;
     return onForegroundMessage((payload) => {
@@ -7282,27 +7466,26 @@ const RiderDashboard = ({
                         </div>
                       ) : null}
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (maintenanceMode === "half" && !isOnline) return;
-                          if (
-                            !isOnline &&
-                            (riderLocationDenied ||
-                              (remittanceRequired && hasPendingRemit))
-                          )
+                          if (!isOnline && (riderLocationDenied || (remittanceRequired && hasPendingRemit))) return;
+                          if (isOnline) {
+                            // Going offline
+                            setIsOnline(false);
+                            setActiveVehicle(null);
+                            if (currentProfile?.id) await supabase.from("profiles").update({ is_online: false }).eq("id", currentProfile.id);
                             return;
-                          const newOnline = !isOnline;
-                          setIsOnline(newOnline);
-                          if (newOnline && currentProfile?.id) {
-                            // Clear cached token to force fresh registration after SW change
-                            localStorage.removeItem('fetch_fcm_token');
-                            initFCM()
-                              .then((token) => {
-                                if (!token) return;
-                                localStorage.setItem('fetch_fcm_token', token);
-                                saveFCMToken(currentProfile.id, token);
-                              })
-                              .catch(console.error);
                           }
+                          // Going online — need approved vehicle
+                          if (approvedVehicles.length === 0) {
+                            alert("No approved vehicle. Submit a vehicle for verification first.");
+                            return;
+                          }
+                          if (approvedVehicles.length === 1) {
+                            await goOnlineWithVehicle(approvedVehicles[0]);
+                            return;
+                          }
+                          setShowVehicleSelect(true);
                         }}
                         className={`w-full py-[15px] rounded-xl font-normal text-[15px] transition-colors ${
                           isOnline
@@ -7322,6 +7505,49 @@ const RiderDashboard = ({
                       </button>
                     </motion.div>
                   ) : null}
+
+                  {/* Active vehicle indicator */}
+                  {isOnline && activeVehicle && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                      <span className="text-xl">{activeVehicle.vehicle_type === "Tricycle" ? "🛺" : activeVehicle.vehicle_type === "Car" ? "🚕" : activeVehicle.vehicle_type === "Van" ? "🚐" : "🏍️"}</span>
+                      <div>
+                        <p className="text-xs font-bold text-emerald-700">Active Vehicle</p>
+                        <p className="text-sm font-normal text-emerald-900">{activeVehicle.vehicle_type}{activeVehicle.vehicle_make ? ` · ${activeVehicle.vehicle_make}` : ""}{activeVehicle.vehicle_plate ? ` · ${activeVehicle.vehicle_plate}` : ""}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Vehicle selection modal */}
+                  {showVehicleSelect && (
+                    <div className="fixed inset-0 z-[300] bg-black/60 flex items-end sm:items-center justify-center p-4">
+                      <div className="bg-white rounded-3xl w-full max-w-md">
+                        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+                          <h2 className="text-lg font-bold text-gray-950">Select Vehicle</h2>
+                          <p className="text-sm text-gray-400 mt-1">Choose which vehicle you're using today</p>
+                        </div>
+                        <div className="px-6 py-4 space-y-3">
+                          {approvedVehicles.map(v => (
+                            <button key={v.id} onClick={async () => { setShowVehicleSelect(false); await goOnlineWithVehicle(v); }}
+                              className="w-full flex items-center justify-between bg-gray-50 hover:bg-emerald-50 border border-gray-200 hover:border-emerald-300 rounded-2xl px-4 py-4 transition-all text-left">
+                              <div className="flex items-center gap-3">
+                                <span className="text-2xl">{v.vehicle_type === "Tricycle" ? "🛺" : v.vehicle_type === "Car" ? "🚕" : v.vehicle_type === "Van" ? "🚐" : "🏍️"}</span>
+                                <div>
+                                  <p className="font-bold text-gray-950 text-sm">{v.vehicle_type}{v.vehicle_make ? ` · ${v.vehicle_make}` : ""}{v.vehicle_model ? ` ${v.vehicle_model}` : ""}</p>
+                                  {v.vehicle_plate && <p className="text-xs text-gray-400 font-mono">{v.vehicle_plate}</p>}
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+                                {["", "1st", "2nd", "3rd", "4th", "5th"][v.vehicle_number] ?? `#${v.vehicle_number}`}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="px-6 pb-6">
+                          <button onClick={() => setShowVehicleSelect(false)} className="w-full py-3.5 rounded-2xl border-2 border-gray-200 text-sm font-normal text-gray-500 hover:bg-gray-50">Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Team membership card */}
                   {riderTeam && (
