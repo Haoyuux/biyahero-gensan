@@ -17,6 +17,7 @@ export interface TierPricing {
 
 export interface PricingConfig {
   moto: TierPricing;
+  tricycle: TierPricing;
   eco: TierPricing;
   premium: TierPricing;
   teamBookingFeeDiscount: number; // percentage 0-100, applied at remittance time
@@ -38,6 +39,17 @@ export const DEFAULT_PRICING: PricingConfig = {
   moto: {
     baseFare: 40,
     perKmRate: 12,        // ₱10 revenue + ₱2 maintenance
+    perMinuteRate: 2,
+    bookingFee: 5,
+    bookingFeeType: 'static',
+    maintenanceCostPerKm: 2,
+    perKmThresholdEnabled: false,
+    perKmThreshold: 0,
+    disabled: false,
+  },
+  tricycle: {
+    baseFare: 50,
+    perKmRate: 14,        // ₱12 revenue + ₱2 maintenance
     perMinuteRate: 2,
     bookingFee: 5,
     bookingFeeType: 'static',
@@ -80,7 +92,7 @@ export const DEFAULT_PRICING: PricingConfig = {
  * Total Fare = baseFare + (distanceKm × perKmRate) + (durationMin × perMinuteRate) + computedBookingFee
  */
 export function calculateFare(
-  tierId: 'moto' | 'eco' | 'premium',
+  tierId: 'moto' | 'tricycle' | 'eco' | 'premium',
   distanceM: number,
   durationS: number,
   config: PricingConfig = DEFAULT_PRICING,
@@ -117,9 +129,10 @@ export function loadPricingConfig(): PricingConfig {
       const parsed = JSON.parse(raw) as Partial<PricingConfig>;
       return {
         teamBookingFeeDiscount: parsed.teamBookingFeeDiscount ?? DEFAULT_PRICING.teamBookingFeeDiscount,
-        moto:    { ...DEFAULT_PRICING.moto,    ...parsed.moto },
-        eco:     { ...DEFAULT_PRICING.eco,     ...parsed.eco },
-        premium: { ...DEFAULT_PRICING.premium, ...parsed.premium },
+        moto:     { ...DEFAULT_PRICING.moto,     ...parsed.moto },
+        tricycle: { ...DEFAULT_PRICING.tricycle, ...parsed.tricycle },
+        eco:      { ...DEFAULT_PRICING.eco,      ...parsed.eco },
+        premium:  { ...DEFAULT_PRICING.premium,  ...parsed.premium },
       };
     }
   } catch { /* ignore */ }
@@ -144,9 +157,10 @@ export async function loadPricingConfigFromDB(): Promise<PricingConfig> {
     const saved = data.config as Partial<PricingConfig>;
     const merged: PricingConfig = {
       teamBookingFeeDiscount: saved.teamBookingFeeDiscount ?? DEFAULT_PRICING.teamBookingFeeDiscount,
-      moto:    { ...DEFAULT_PRICING.moto,    ...saved.moto },
-      eco:     { ...DEFAULT_PRICING.eco,     ...saved.eco },
-      premium: { ...DEFAULT_PRICING.premium, ...saved.premium },
+      moto:     { ...DEFAULT_PRICING.moto,     ...saved.moto },
+      tricycle: { ...DEFAULT_PRICING.tricycle, ...saved.tricycle },
+      eco:      { ...DEFAULT_PRICING.eco,      ...saved.eco },
+      premium:  { ...DEFAULT_PRICING.premium,  ...saved.premium },
     };
     // Cache locally so offline/fallback reads get the latest
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));

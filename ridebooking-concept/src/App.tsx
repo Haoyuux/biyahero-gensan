@@ -453,6 +453,14 @@ const RIDE_OPTIONS = [
     capacity: 1,
   },
   {
+    id: "tricycle",
+    name: "Tricycle",
+    time: "3 min",
+    price: 55,
+    icon: Bike,
+    capacity: 2,
+  },
+  {
     id: "eco",
     name: "Economy Car",
     time: "4 min",
@@ -4720,18 +4728,14 @@ const RiderProfileScreen = ({
                 </h3>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    {["Motorcycle", "Car"].map((t) => (
+                    {(["Motorcycle", "Tricycle", "Car", "Van"] as const).map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setVehicleType(t)}
                         className={`py-3 rounded-2xl text-sm font-normal border-2 transition-all flex items-center justify-center gap-2 ${vehicleType === t ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}
                       >
-                        {t === "Motorcycle" ? (
-                          <Bike size={16} />
-                        ) : (
-                          <Car size={16} />
-                        )}{" "}
+                        {t === "Car" || t === "Van" ? <Car size={16} /> : <Bike size={16} />}
                         {t}
                       </button>
                     ))}
@@ -14139,9 +14143,10 @@ const AdminDashboard = ({
                 </p>
               </div>
               <div className="space-y-4">
-                {(["moto", "eco", "premium"] as const).map((tier) => {
+                {(["moto", "tricycle", "eco", "premium"] as const).map((tier) => {
                   const labels: Record<string, string> = {
                     moto: "Motorcycle",
+                    tricycle: "Tricycle",
                     eco: "Economy Car",
                     premium: "Premium Car",
                   };
@@ -17037,7 +17042,7 @@ const AdminDashboard = ({
           const passengerName = passenger
             ? (`${passenger.first_name || ""} ${passenger.last_name || ""}`.trim() || passenger.full_name || "Passenger")
             : "Passenger";
-          const tierLabel: Record<string, string> = { moto: "Motorcycle", eco: "Economy", premium: "Premium" };
+          const tierLabel: Record<string, string> = { moto: "Motorcycle", tricycle: "Tricycle", eco: "Economy", premium: "Premium" };
           return (
             <motion.div
               initial={{ opacity: 0 }}
@@ -18436,9 +18441,9 @@ const SelectPanel = ({
   const dragControls = useDragControls();
 
   const dynamicRides = RIDE_OPTIONS.map((ride) => {
-    const tierCfg = (pricingConfig ?? DEFAULT_PRICING)[ride.id as "moto" | "eco" | "premium"];
+    const tierCfg = (pricingConfig ?? DEFAULT_PRICING)[ride.id as "moto" | "tricycle" | "eco" | "premium"];
     const breakdown = calculateFare(
-      ride.id as "moto" | "eco" | "premium",
+      ride.id as "moto" | "tricycle" | "eco" | "premium",
       distanceM,
       durationS,
       pricingConfig ?? DEFAULT_PRICING,
@@ -18638,7 +18643,7 @@ const SelectPanel = ({
                 {selectedBreakdown &&
                   (() => {
                     const cfg = (pricingConfig ?? DEFAULT_PRICING)[
-                      selectedRide as "moto" | "eco" | "premium"
+                      selectedRide as "moto" | "tricycle" | "eco" | "premium"
                     ];
                     const totalKm = distanceM / 1000;
                     const billableKm = cfg.perKmThresholdEnabled
@@ -19219,7 +19224,7 @@ const MatchedPanel = ({
   const activeFare: FareBreakdown =
     fareBreakdown ??
     calculateFare(
-      selectedRide as "moto" | "eco" | "premium",
+      selectedRide as "moto" | "tricycle" | "eco" | "premium",
       routeInfo?.distance ?? 0,
       routeInfo?.duration ?? 0,
       pricingConfig ?? DEFAULT_PRICING,
@@ -19422,7 +19427,7 @@ const MatchedPanel = ({
                 {/* Fare breakdown */}
                 {(() => {
                   const cfg = (pricingConfig ?? DEFAULT_PRICING)[
-                    selectedRide as "moto" | "eco" | "premium"
+                    selectedRide as "moto" | "tricycle" | "eco" | "premium"
                   ];
                   const totalKm = (routeInfo?.distance ?? 0) / 1000;
                   const durMin = Math.round((routeInfo?.duration ?? 0) / 60);
