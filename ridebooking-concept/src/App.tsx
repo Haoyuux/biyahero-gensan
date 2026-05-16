@@ -4175,7 +4175,7 @@ const RiderProfileScreen = ({
   const VEMOJI: Record<string, string> = { Motorcycle: "🏍️", Tricycle: "🛺", Car: "🚕", Van: "🚐" };
 
   useEffect(() => {
-    supabase.from("vehicles").select("*").eq("rider_id", profile.id).order("vehicle_number", { ascending: true })
+    supabaseAdmin.from("vehicles").select("*").eq("rider_id", profile.id).order("vehicle_number", { ascending: true })
       .then(({ data }) => setVehicles((data ?? []) as RiderVehicle[]));
   }, [profile.id]);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || "");
@@ -4327,7 +4327,7 @@ const RiderProfileScreen = ({
   const status = statusBadge[profile.rider_status] || statusBadge.unsubmitted;
 
   const reloadVehicles = async () => {
-    const { data } = await supabase.from("vehicles").select("*").eq("rider_id", profile.id).order("vehicle_number", { ascending: true });
+    const { data } = await supabaseAdmin.from("vehicles").select("*").eq("rider_id", profile.id).order("vehicle_number", { ascending: true });
     setVehicles((data ?? []) as RiderVehicle[]);
   };
 
@@ -4904,15 +4904,45 @@ const RiderProfileScreen = ({
               </div>
               <button onClick={() => setViewingVehicle(null)} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
             </div>
-            <div className="overflow-y-auto px-6 py-4 space-y-2">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Vehicle Details — {ORDINAL[viewingVehicle.vehicle_number] ?? `#${viewingVehicle.vehicle_number}`}</p>
+            <div className="overflow-y-auto px-6 py-4 space-y-3">
+              {/* Vehicle photo */}
+              {viewingVehicle.vehicle_image_url ? (
+                <a href={viewingVehicle.vehicle_image_url} target="_blank" rel="noopener noreferrer">
+                  <img src={viewingVehicle.vehicle_image_url} alt="Vehicle" className="w-full h-40 object-cover rounded-2xl hover:opacity-90 cursor-zoom-in transition-opacity" />
+                  <p className="text-xs text-gray-400 text-center mt-1">Tap to enlarge ↗</p>
+                </a>
+              ) : (
+                <div className="w-full h-20 bg-gray-100 rounded-2xl flex items-center justify-center gap-2">
+                  <span className="text-2xl">{viewingVehicle.vehicle_type === "Tricycle" ? "🛺" : viewingVehicle.vehicle_type === "Car" ? "🚕" : viewingVehicle.vehicle_type === "Van" ? "🚐" : "🏍️"}</span>
+                  <span className="text-xs text-gray-400">No vehicle photo</span>
+                </div>
+              )}
+
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vehicle Details — {ORDINAL[viewingVehicle.vehicle_number] ?? `#${viewingVehicle.vehicle_number}`}</p>
               {[["Type", viewingVehicle.vehicle_type], ["Make", viewingVehicle.vehicle_make ?? "—"], ["Model", viewingVehicle.vehicle_model ?? "—"], ["Plate", viewingVehicle.vehicle_plate ?? "—"], ["Color", viewingVehicle.vehicle_color ?? "—"]].map(([label, val]) => (
                 <div key={label} className="bg-gray-50 rounded-2xl px-4 py-3 flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</span>
                   <span className={`text-sm font-normal text-gray-800 ${label === "Plate" ? "font-mono tracking-widest" : ""}`}>{val}</span>
                 </div>
               ))}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 mt-4">
+
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents</p>
+              {([
+                { label: "Official Receipt (OR)", url: viewingVehicle.or_url },
+                { label: "Certificate of Registration (CR)", url: viewingVehicle.cr_url },
+              ] as { label: string; url: string | null }[]).map(({ label, url }) => (
+                <div key={label} className="bg-gray-50 rounded-2xl px-4 py-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</p>
+                    <p className={`text-xs mt-0.5 font-medium ${url ? "text-emerald-600" : "text-gray-400"}`}>{url ? "✓ Uploaded" : "Not uploaded"}</p>
+                  </div>
+                  {url && (
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition-colors">View ↗</a>
+                  )}
+                </div>
+              ))}
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
                 <p className="text-xs text-emerald-700 text-center">This vehicle is approved and cannot be edited. Contact support if changes are needed.</p>
               </div>
             </div>
@@ -5746,7 +5776,7 @@ const RiderDashboard = ({
 
   useEffect(() => {
     if (!currentProfile?.id || currentProfile.role !== "rider") return;
-    supabase.from("vehicles").select("*").eq("rider_id", currentProfile.id).eq("status", "approved").order("vehicle_number", { ascending: true })
+    supabaseAdmin.from("vehicles").select("*").eq("rider_id", currentProfile.id).eq("status", "approved").order("vehicle_number", { ascending: true })
       .then(({ data }) => setApprovedVehicles((data ?? []) as RiderVehicle[]));
   }, [currentProfile?.id]);
 
