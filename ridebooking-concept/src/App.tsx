@@ -4168,7 +4168,8 @@ const RiderProfileScreen = ({
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [viewingVehicle, setViewingVehicle] = useState<RiderVehicle | null>(null);
   const [savingVehicle, setSavingVehicle] = useState(false);
-  const [vForm, setVForm] = useState({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "" });
+  const [vForm, setVForm] = useState({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "", or_url: "", cr_url: "", vehicle_image_url: "" });
+  const [vUploading, setVUploading] = useState<string | null>(null);
   const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th"];
   const STATUS_COLOR: Record<string, string> = { pending: "#f59e0b", approved: "#10b981", rejected: "#ef4444" };
   const VEMOJI: Record<string, string> = { Motorcycle: "🏍️", Tricycle: "🛺", Car: "🚕", Van: "🚐" };
@@ -4332,13 +4333,13 @@ const RiderProfileScreen = ({
 
   const openAddVehicle = () => {
     setEditingVehicleId(null);
-    setVForm({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "" });
+    setVForm({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "", or_url: "", cr_url: "", vehicle_image_url: "" });
     setShowVehicleModal(true);
   };
 
   const openEditVehicle = (v: RiderVehicle) => {
     setEditingVehicleId(v.id);
-    setVForm({ vehicle_type: v.vehicle_type, vehicle_make: v.vehicle_make ?? "", vehicle_model: v.vehicle_model ?? "", vehicle_plate: v.vehicle_plate ?? "", vehicle_color: v.vehicle_color ?? "" });
+    setVForm({ vehicle_type: v.vehicle_type, vehicle_make: v.vehicle_make ?? "", vehicle_model: v.vehicle_model ?? "", vehicle_plate: v.vehicle_plate ?? "", vehicle_color: v.vehicle_color ?? "", or_url: v.or_url ?? "", cr_url: v.cr_url ?? "", vehicle_image_url: v.vehicle_image_url ?? "" });
     setShowVehicleModal(true);
   };
 
@@ -4354,8 +4355,20 @@ const RiderProfileScreen = ({
     await reloadVehicles();
     setShowVehicleModal(false);
     setEditingVehicleId(null);
-    setVForm({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "" });
+    setVForm({ vehicle_type: "", vehicle_make: "", vehicle_model: "", vehicle_plate: "", vehicle_color: "", or_url: "", cr_url: "", vehicle_image_url: "" });
     setSavingVehicle(false);
+  };
+
+  const handleVehicleUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: "or_url" | "cr_url" | "vehicle_image_url") => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setVUploading(field);
+    try {
+      const url = await uploadImage("documents", profile.id, file);
+      if (url) setVForm(f => ({ ...f, [field]: url }));
+    } catch { /* silent */ }
+    setVUploading(null);
   };
 
   const DocUpload = ({
@@ -4579,33 +4592,6 @@ const RiderProfileScreen = ({
                   ))}
                 </div>
               </div>
-              {/* Vehicle Info */}
-              <div>
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                  Vehicle Information
-                </h3>
-                <div className="space-y-2">
-                  {[
-                    { label: "Type", value: profile.vehicle_type },
-                    { label: "Make / Brand", value: profile.vehicle_make },
-                    { label: "Model", value: profile.vehicle_model },
-                    { label: "Plate Number", value: profile.vehicle_plate },
-                    { label: "Color", value: profile.vehicle_color },
-                  ].map(({ label, value }) => (
-                    <div
-                      key={label}
-                      className="bg-white rounded-2xl px-4 py-3 border border-gray-100 flex justify-between items-center"
-                    >
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                        {label}
-                      </span>
-                      <span className="font-normal text-gray-800 text-sm">
-                        {value || "—"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
               {/* My Vehicles */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -4657,22 +4643,8 @@ const RiderProfileScreen = ({
                     type="license"
                     url={licenseUrl}
                   />
-                  <DocUpload
-                    label="OR (Official Receipt)"
-                    type="or"
-                    url={orUrl}
-                  />
-                  <DocUpload
-                    label="CR (Certificate of Registration)"
-                    type="cr"
-                    url={crUrl}
-                  />
-                  <DocUpload
-                    label="Vehicle Photo"
-                    type="vehicle"
-                    url={vehicleImageUrl}
-                  />
                 </div>
+                <p className="text-xs text-gray-400 mt-2">OR, CR, and Vehicle Photo are submitted per vehicle.</p>
                 {error && (
                   <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm font-medium text-red-600 mt-3">
                     {error}
@@ -4811,65 +4783,6 @@ const RiderProfileScreen = ({
                   </div>
                 </div>
               </div>
-              {/* Vehicle fields */}
-              <div>
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                  Vehicle Information
-                </h3>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["Motorcycle", "Tricycle", "Car", "Van"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setVehicleType(t)}
-                        className={`py-3 rounded-2xl text-sm font-normal border-2 transition-all flex items-center justify-center gap-2 ${vehicleType === t ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-200 text-gray-600"}`}
-                      >
-                        {t === "Car" || t === "Van" ? <Car size={16} /> : <Bike size={16} />}
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                  {[
-                    {
-                      label: "Make / Brand",
-                      value: vehicleMake,
-                      set: setVehicleMake,
-                      placeholder: "e.g. Toyota",
-                    },
-                    {
-                      label: "Model",
-                      value: vehicleModel,
-                      set: setVehicleModel,
-                      placeholder: "e.g. Vios",
-                    },
-                    {
-                      label: "Plate Number",
-                      value: vehiclePlate,
-                      set: setVehiclePlate,
-                      placeholder: "e.g. ABC 1234",
-                    },
-                    {
-                      label: "Color",
-                      value: vehicleColor,
-                      set: setVehicleColor,
-                      placeholder: "e.g. White",
-                    },
-                  ].map(({ label, value, set, placeholder }) => (
-                    <div key={label}>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                        {label}
-                      </label>
-                      <input
-                        value={value}
-                        onChange={(e) => set(e.target.value)}
-                        placeholder={placeholder}
-                        className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
               {/* Docs in edit mode */}
               <div>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
@@ -4881,22 +4794,8 @@ const RiderProfileScreen = ({
                     type="license"
                     url={licenseUrl}
                   />
-                  <DocUpload
-                    label="OR (Official Receipt)"
-                    type="or"
-                    url={orUrl}
-                  />
-                  <DocUpload
-                    label="CR (Certificate of Registration)"
-                    type="cr"
-                    url={crUrl}
-                  />
-                  <DocUpload
-                    label="Vehicle Photo"
-                    type="vehicle"
-                    url={vehicleImageUrl}
-                  />
                 </div>
+                <p className="text-xs text-gray-400 mt-2">OR, CR, and Vehicle Photo are submitted per vehicle in My Vehicles.</p>
               </div>
               {error && (
                 <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm font-medium text-red-600">
@@ -4956,6 +4855,28 @@ const RiderProfileScreen = ({
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
                 </div>
               ))}
+              {/* Vehicle documents */}
+              {([
+                { field: "vehicle_image_url" as const, label: "Vehicle Photo" },
+                { field: "or_url" as const, label: "Official Receipt (OR)" },
+                { field: "cr_url" as const, label: "Certificate of Registration (CR)" },
+              ]).map(({ field, label }) => (
+                <div key={field}>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{label}</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-gray-200 hover:border-emerald-400 cursor-pointer transition-colors text-sm text-gray-500 hover:text-emerald-600">
+                      <input type="file" accept="image/*,.pdf" className="hidden" onChange={e => handleVehicleUpload(e, field)} />
+                      {vUploading === field ? <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /> : <Upload size={14} />}
+                      {vForm[field] ? "Replace" : "Upload"}
+                    </label>
+                    {vForm[field] && (
+                      <a href={vForm[field]} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100">View ↗</a>
+                    )}
+                  </div>
+                  {vForm[field] && <p className="text-xs text-emerald-600 mt-1">✓ Uploaded</p>}
+                </div>
+              ))}
+
               {editingVehicleId && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-700">Saving changes will reset status to Pending for re-verification.</div>
               )}
