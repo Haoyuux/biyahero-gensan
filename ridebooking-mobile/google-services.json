@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "683688974446",
+    "project_id": "biyahero-89e8f",
+    "storage_bucket": "biyahero-89e8f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:683688974446:android:fc30858dbda8913f64ee7f",
+        "android_client_info": {
+          "package_name": "com.biyahero.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUERCZR5hDaOELIVwBe059hM2Yl7wudxM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
