@@ -120,9 +120,9 @@ export default function RiderProfileScreen() {
 
 
   const uploadToStorage = async (uri: string, mimeType: string, bucket: string, path: string) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return supabase.storage.from(bucket).upload(path, blob, { contentType: mimeType, upsert: true });
+    const formData = new FormData();
+    formData.append('file', { uri, name: path.split('/').pop() ?? 'file', type: mimeType } as any);
+    return supabase.storage.from(bucket).upload(path, formData, { contentType: mimeType, upsert: true });
   };
 
   const resolveExt = (asset: { mimeType?: string; uri: string }) => {
@@ -176,7 +176,7 @@ export default function RiderProfileScreen() {
       if (upErr) { Alert.alert('Upload failed', upErr.message); return; }
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
       const url = urlData.publicUrl;
-      await supabase.from('profiles').update({ license_url: url }).eq('id', profile.id);
+      await supabase.from('profiles').update({ license_url: url, license_status: 'pending' }).eq('id', profile.id);
       setLicenseUrl(url);
       refetchProfile();
     } catch (e: any) {

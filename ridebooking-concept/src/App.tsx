@@ -92,6 +92,8 @@ import {
   uploadImage,
   getRiderProfiles,
   setRiderStatus,
+  setLicenseStatus,
+  setVehicleStatusAdmin,
   getAdminRoles,
   createAdminRole,
   updateAdminRole,
@@ -4386,6 +4388,7 @@ const RiderProfileScreen = ({
       vehicle_plate: vehiclePlate,
       vehicle_color: vehicleColor,
       drivers_license_url: licenseUrl || null,
+      ...(licenseUrl && licenseUrl !== profile.drivers_license_url ? { license_status: 'pending' } : {}),
       or_url: orUrl || null,
       cr_url: crUrl || null,
       vehicle_image_url: vehicleImageUrl || null,
@@ -8119,7 +8122,20 @@ const RiderDashboard = ({
                                     .eq("id", currentProfile.id);
                                 return;
                               }
-                              // Going online — need approved vehicle
+                              // Going online — validate license and vehicle
+                              if (!currentProfile?.drivers_license_url) {
+                                alert("Please upload your Driver's License in your Profile before going online.");
+                                return;
+                              }
+                              if (currentProfile?.license_status !== 'approved') {
+                                const msg = currentProfile?.license_status === 'pending'
+                                  ? "Your driver's license is pending approval. Please wait for admin verification."
+                                  : currentProfile?.license_status === 'rejected'
+                                  ? "Your driver's license was rejected. Please re-upload in your Profile."
+                                  : "Your driver's license has not been submitted yet.";
+                                alert(msg);
+                                return;
+                              }
                               if (approvedVehicles.length === 0) {
                                 alert(
                                   "No approved vehicle. Submit a vehicle for verification first.",
@@ -12338,7 +12354,10 @@ const AdminDashboard = ({
   const [riders, setRiders] = useState<Profile[]>([]);
   const [ridersLoading, setRidersLoading] = useState(false);
   const [selectedRider, setSelectedRider] = useState<Profile | null>(null);
+  const [selectedRiderVehicles, setSelectedRiderVehicles] = useState<RiderVehicle[]>([]);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [licenseUpdating, setLicenseUpdating] = useState(false);
+  const [vehicleUpdating, setVehicleUpdating] = useState<string | null>(null);
   const [pricingCfg, setPricingCfg] = useState<PricingConfig>(() =>
     loadPricingConfig(),
   );
@@ -12830,6 +12849,30 @@ const AdminDashboard = ({
       });
     })();
   }, [activeTab]);
+
+  const selectRiderForReview = async (rider: Profile) => {
+    setSelectedRider(rider);
+    const { data } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('rider_id', rider.id)
+      .order('vehicle_number', { ascending: true });
+    setSelectedRiderVehicles((data ?? []) as RiderVehicle[]);
+  };
+
+  const handleLicenseStatusChange = async (riderId: string, status: 'approved' | 'rejected') => {
+    setLicenseUpdating(true);
+    const ok = await setLicenseStatus(riderId, status);
+    if (ok) setSelectedRider(prev => prev ? { ...prev, license_status: status } : prev);
+    setLicenseUpdating(false);
+  };
+
+  const handleVehicleStatusChange = async (vehicleId: string, status: 'approved' | 'rejected') => {
+    setVehicleUpdating(vehicleId);
+    const ok = await setVehicleStatusAdmin(vehicleId, status);
+    if (ok) setSelectedRiderVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, status } : v));
+    setVehicleUpdating(null);
+  };
 
   const handleStatusChange = async (riderId: string, status: RiderStatus) => {
     setStatusUpdating(true);
@@ -14275,7 +14318,7 @@ const AdminDashboard = ({
                                 </td>
                                 <td className="px-5 py-4">
                                   <button
-                                    onClick={() => setSelectedRider(r)}
+                                    onClick={() => selectRiderForReview(r)}
                                     className="text-[12px] font-normal text-gray-500 hover:text-gray-900 transition-colors"
                                   >
                                     View
@@ -14891,97 +14934,90 @@ const AdminDashboard = ({
                           </div>
                         </div>
 
-                        {/* Documents */}
+                        {/* Driver's License */}
                         <div>
-                          <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest mb-3">
-                            Uploaded Documents
-                          </p>
-                          <div className="space-y-2">
-                            {[
-                              {
-                                label: "Driver's License",
-                                url: selectedRider.drivers_license_url,
-                              },
-                              {
-                                label: "OR (Official Receipt)",
-                                url: selectedRider.or_url,
-                              },
-                              {
-                                label: "CR (Certificate of Registration)",
-                                url: selectedRider.cr_url,
-                              },
-                              {
-                                label: "Vehicle Photo",
-                                url: selectedRider.vehicle_image_url,
-                              },
-                            ].map(({ label, url }) => (
-                              <div
-                                key={label}
-                                className="border border-gray-100 rounded-xl overflow-hidden"
-                              >
-                                <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100">
-                                  {label}
-                                </p>
-                                {url ? (
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <img
-                                      src={url}
-                                      alt={label}
-                                      className="w-full max-h-56 object-contain bg-gray-100 hover:opacity-90 transition-opacity cursor-zoom-in"
-                                    />
-                                  </a>
-                                ) : (
-                                  <div className="px-4 py-5 flex items-center gap-2 text-gray-300">
-                                    <AlertCircle size={14} />
-                                    <span className="text-[12px] font-medium">
-                                      Not uploaded yet
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Driver's License</p>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              selectedRider.license_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                              selectedRider.license_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              selectedRider.license_status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>{selectedRider.license_status ?? 'unsubmitted'}</span>
+                          </div>
+                          {selectedRider.drivers_license_url ? (
+                            <a href={selectedRider.drivers_license_url} target="_blank" rel="noopener noreferrer">
+                              <img src={selectedRider.drivers_license_url} alt="License" className="w-full max-h-48 object-contain bg-gray-100 rounded-xl hover:opacity-90 cursor-zoom-in" />
+                            </a>
+                          ) : (
+                            <div className="px-4 py-5 flex items-center gap-2 text-gray-300 border border-gray-100 rounded-xl">
+                              <AlertCircle size={14} /><span className="text-[12px] font-medium">Not uploaded yet</span>
+                            </div>
+                          )}
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={() => handleLicenseStatusChange(selectedRider.id, 'approved')} disabled={licenseUpdating || !selectedRider.drivers_license_url} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-bold disabled:opacity-40">
+                              {licenseUpdating ? '...' : 'Approve License'}
+                            </button>
+                            <button onClick={() => handleLicenseStatusChange(selectedRider.id, 'rejected')} disabled={licenseUpdating || !selectedRider.drivers_license_url} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-40">
+                              Reject License
+                            </button>
                           </div>
                         </div>
 
-                        {/* Approve / Reject */}
-                        <div className="space-y-2.5 pt-1">
-                          <button
-                            onClick={() =>
-                              handleStatusChange(selectedRider.id, "approved")
-                            }
-                            disabled={statusUpdating}
-                            className="w-full py-3.5 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            {statusUpdating ? (
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : null}
-                            Approve
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleStatusChange(selectedRider.id, "rejected")
-                            }
-                            disabled={statusUpdating}
-                            className="w-full py-3.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
-                          {(selectedRider.rider_status === "approved" ||
-                            selectedRider.rider_status === "rejected") && (
-                            <button
-                              onClick={() =>
-                                handleStatusChange(selectedRider.id, "pending")
-                              }
-                              disabled={statusUpdating}
-                              className="w-full py-3.5 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-colors disabled:opacity-50"
-                            >
-                              Reset to Pending
+                        {/* Vehicles */}
+                        {selectedRiderVehicles.length > 0 ? selectedRiderVehicles.map((v, idx) => (
+                          <div key={v.id}>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vehicle {idx + 1} — {v.vehicle_type}{v.vehicle_plate ? ` · ${v.vehicle_plate}` : ''}</p>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                v.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                v.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                              }`}>{v.status}</span>
+                            </div>
+                            <div className="space-y-2">
+                              {[{ label: 'OR', url: v.or_url }, { label: 'CR', url: v.cr_url }, { label: 'Photo', url: v.vehicle_image_url }].map(({ label, url }) => (
+                                <div key={label} className="border border-gray-100 rounded-xl overflow-hidden">
+                                  <p className="text-[10px] font-normal text-gray-400 uppercase tracking-widest px-4 py-2 bg-gray-50 border-b border-gray-100">{label}</p>
+                                  {url ? (
+                                    <a href={url} target="_blank" rel="noopener noreferrer">
+                                      <img src={url} alt={label} className="w-full max-h-48 object-contain bg-gray-100 hover:opacity-90 cursor-zoom-in" />
+                                    </a>
+                                  ) : (
+                                    <div className="px-4 py-5 flex items-center gap-2 text-gray-300"><AlertCircle size={14} /><span className="text-[12px] font-medium">Not uploaded</span></div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <button onClick={() => handleVehicleStatusChange(v.id, 'approved')} disabled={vehicleUpdating === v.id} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-bold disabled:opacity-40">
+                                {vehicleUpdating === v.id ? '...' : 'Approve Vehicle'}
+                              </button>
+                              <button onClick={() => handleVehicleStatusChange(v.id, 'rejected')} disabled={vehicleUpdating === v.id} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-40">
+                                Reject Vehicle
+                              </button>
+                            </div>
+                          </div>
+                        )) : (
+                          <div className="text-[12px] text-gray-400 text-center py-3">No vehicles registered yet.</div>
+                        )}
+
+                        {/* Overall Account */}
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Overall Account</p>
+                          <div className="space-y-2.5">
+                            <button onClick={() => handleStatusChange(selectedRider.id, "approved")} disabled={statusUpdating} className="w-full py-3.5 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                              {statusUpdating ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                              Approve Account
                             </button>
-                          )}
+                            <button onClick={() => handleStatusChange(selectedRider.id, "rejected")} disabled={statusUpdating} className="w-full py-3.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50">
+                              Reject Account
+                            </button>
+                            {(selectedRider.rider_status === "approved" || selectedRider.rider_status === "rejected") && (
+                              <button onClick={() => handleStatusChange(selectedRider.id, "pending")} disabled={statusUpdating} className="w-full py-3.5 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-colors disabled:opacity-50">
+                                Reset to Pending
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -15174,7 +15210,7 @@ const AdminDashboard = ({
                                   </td>
                                   <td className="px-5 py-4">
                                     <button
-                                      onClick={() => setSelectedRider(r)}
+                                      onClick={() => selectRiderForReview(r)}
                                       className="flex items-center gap-1.5 text-[12px] font-normal text-gray-500 hover:text-gray-900 transition-colors"
                                     >
                                       <Eye size={13} /> View

@@ -23,7 +23,8 @@
       "Bash(npx prettier *)",
       "PowerShell(Get-Process *)",
       "PowerShell(Get-PSDrive *)",
-      "PowerShell(Get-Item \"C:\\\\p\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\release\\\\app-release.apk\" | Select-Object FullName, @{N='Size\\(MB\\)';E={[math]::Round\\($_.Length/1MB,2\\)}}, LastWriteTime)"
+      "PowerShell(Get-Item \"C:\\\\p\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\release\\\\app-release.apk\" | Select-Object FullName, @{N='Size\\(MB\\)';E={[math]::Round\\($_.Length/1MB,2\\)}}, LastWriteTime)",
+      "Bash(supabase --version)"
     ]
   }
 }

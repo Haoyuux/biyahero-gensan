@@ -67,6 +67,7 @@ export interface Profile {
   vehicle_plate: string | null;
   vehicle_color: string | null;
   drivers_license_url: string | null;
+  license_status: 'unsubmitted' | 'pending' | 'approved' | 'rejected' | null;
   or_url: string | null;
   cr_url: string | null;
   vehicle_image_url: string | null;
@@ -119,6 +120,20 @@ export async function updateProfile(userId: string, updates: Partial<Profile>): 
     .single();
   if (error) return null;
   return data as Profile;
+}
+
+export async function setLicenseStatus(targetUserId: string, status: 'approved' | 'rejected' | 'pending'): Promise<boolean> {
+  const { error } = await supabase.from('profiles').update({ license_status: status }).eq('id', targetUserId);
+  return !error;
+}
+
+export async function setVehicleStatusAdmin(vehicleId: string, status: 'approved' | 'rejected' | 'pending'): Promise<boolean> {
+  const { error } = await supabase.from('vehicles').update({
+    status,
+    rejection_reason: status !== 'rejected' ? null : undefined,
+    reviewed_at: new Date().toISOString(),
+  }).eq('id', vehicleId);
+  return !error;
 }
 
 export async function setRiderStatus(targetUserId: string, status: RiderStatus): Promise<boolean> {
@@ -230,12 +245,11 @@ export async function uploadImage(
 ): Promise<string | null> {
   const ext = file.name.split('.').pop();
   const path = `${userId}/${Date.now()}.${ext}`;
-  const client = bucket === 'documents' ? supabaseAdmin : supabase;
-  const { error } = await client.storage.from(bucket).upload(path, file, { upsert: true });
+  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
   if (error) {
     console.error(`uploadImage [${bucket}]:`, error.message);
     return null;
   }
-  const { data } = client.storage.from(bucket).getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }

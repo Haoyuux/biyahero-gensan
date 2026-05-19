@@ -3,8 +3,8 @@ import {
   View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity,
   SafeAreaView, RefreshControl, Modal, ScrollView, Image, Alert, TextInput,
 } from 'react-native';
-import { supabase, Profile } from '../../lib/supabase';
-import { verifyRider } from '../../lib/adminService';
+import { supabase, Profile, RiderVehicle } from '../../lib/supabase';
+import { verifyRider, updateLicenseStatus, updateVehicleStatus } from '../../lib/adminService';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
 const FILTERS: StatusFilter[] = ['all', 'pending', 'approved', 'rejected'];
@@ -31,7 +31,10 @@ export default function RiderVerificationScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<StatusFilter>('pending');
   const [selected, setSelected] = useState<Profile | null>(null);
+  const [selectedVehicles, setSelectedVehicles] = useState<RiderVehicle[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingLicense, setSubmittingLicense] = useState(false);
+  const [submittingVehicleId, setSubmittingVehicleId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
@@ -54,6 +57,61 @@ export default function RiderVerificationScreen() {
       r.email.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
+
+  const selectRider = async (rider: Profile) => {
+    setSelected(rider);
+    const { data } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('rider_id', rider.id)
+      .order('vehicle_number', { ascending: true });
+    setSelectedVehicles((data ?? []) as RiderVehicle[]);
+  };
+
+  const handleLicenseAction = async (status: 'approved' | 'rejected') => {
+    if (!selected) return;
+    Alert.alert(
+      `${status === 'approved' ? 'Approve' : 'Reject'} Driver's License`,
+      `${status === 'approved' ? 'Approve' : 'Reject'} the license for ${selected.full_name ?? selected.email}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: status === 'rejected' ? 'destructive' : 'default',
+          onPress: async () => {
+            setSubmittingLicense(true);
+            try {
+              await updateLicenseStatus(selected.id, status);
+              setSelected(prev => prev ? { ...prev, license_status: status } : prev);
+            } catch (e: any) { Alert.alert('Error', e.message); }
+            finally { setSubmittingLicense(false); }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleVehicleAction = async (vehicle: RiderVehicle, status: 'approved' | 'rejected') => {
+    Alert.alert(
+      `${status === 'approved' ? 'Approve' : 'Reject'} Vehicle`,
+      `${status === 'approved' ? 'Approve' : 'Reject'} ${vehicle.vehicle_type} (${vehicle.vehicle_plate ?? 'no plate'})?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: status === 'rejected' ? 'destructive' : 'default',
+          onPress: async () => {
+            setSubmittingVehicleId(vehicle.id);
+            try {
+              await updateVehicleStatus(vehicle.id, status);
+              setSelectedVehicles(prev => prev.map(v => v.id === vehicle.id ? { ...v, status } : v));
+            } catch (e: any) { Alert.alert('Error', e.message); }
+            finally { setSubmittingVehicleId(null); }
+          },
+        },
+      ],
+    );
+  };
 
   const handleVerify = async (status: 'approved' | 'rejected' | 'pending') => {
     if (!selected) return;
@@ -133,7 +191,7 @@ export default function RiderVerificationScreen() {
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity style={s.reviewBtn} onPress={() => setSelected(item)}>
+              <TouchableOpacity style={s.reviewBtn} onPress={() => selectRider(item)}>
                 <Text style={s.reviewBtnText}>Review</Text>
               </TouchableOpacity>
             </View>
@@ -171,46 +229,110 @@ export default function RiderVerificationScreen() {
                 )}
               </View>
 
-              <Text style={s.sectionLabel}>VEHICLE</Text>
+              {/* DRIVER'S LICENSE */}
+              <Text style={s.sectionLabel}>DRIVER'S LICENSE</Text>
               <View style={s.infoCard}>
-                <Row label="Type" value={selected.vehicle_type ?? '—'} />
-                <Row label="Make/Model" value={[selected.vehicle_make, selected.vehicle_model].filter(Boolean).join(' ') || '—'} />
-                <Row label="Plate" value={selected.vehicle_plate ?? '—'} />
-                <Row label="Color" value={selected.vehicle_color ?? '—'} />
-              </View>
-
-              <Text style={s.sectionLabel}>DOCUMENTS</Text>
-              <View style={s.docsRow}>
-                {[
-                  { label: "Driver's License", url: selected.license_url },
-                  { label: 'OR', url: selected.or_url },
-                  { label: 'CR', url: selected.cr_url },
-                  { label: 'Vehicle Photo', url: selected.vehicle_image_url },
-                ].map(doc => (
-                  <View key={doc.label} style={s.docBox}>
-                    <Text style={s.docLabel}>{doc.label}</Text>
-                    {doc.url
-                      ? <Image source={{ uri: doc.url }} style={s.docImg} resizeMode="cover" />
-                      : <View style={s.docPlaceholder}><Text style={s.docPlaceholderText}>No file</Text></View>
-                    }
+                <Row label="Status">
+                  <View style={[s.badge, { backgroundColor: (STATUS_COLOR[selected.license_status ?? 'unsubmitted']) + '20' }]}>
+                    <Text style={[s.badgeText, { color: STATUS_COLOR[selected.license_status ?? 'unsubmitted'] }]}>
+                      {selected.license_status ?? 'unsubmitted'}
+                    </Text>
                   </View>
-                ))}
+                </Row>
+              </View>
+              <View style={s.docsRow}>
+                <View style={s.docBox}>
+                  <Text style={s.docLabel}>License Photo</Text>
+                  {selected.license_url
+                    ? <Image source={{ uri: selected.license_url }} style={s.docImg} resizeMode="cover" />
+                    : <View style={s.docPlaceholder}><Text style={s.docPlaceholderText}>No file</Text></View>
+                  }
+                </View>
+              </View>
+              <View style={s.actions}>
+                <TouchableOpacity
+                  style={[s.actionBtn, { backgroundColor: '#10b981' }, (submittingLicense || !selected.license_url) && s.disabled]}
+                  disabled={submittingLicense || !selected.license_url}
+                  onPress={() => handleLicenseAction('approved')}
+                >
+                  <Text style={s.actionBtnText}>Approve License</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.actionBtn, { backgroundColor: '#ef4444' }, (submittingLicense || !selected.license_url) && s.disabled]}
+                  disabled={submittingLicense || !selected.license_url}
+                  onPress={() => handleLicenseAction('rejected')}
+                >
+                  <Text style={s.actionBtnText}>Reject License</Text>
+                </TouchableOpacity>
               </View>
 
+              {/* VEHICLES */}
+              {selectedVehicles.length > 0 ? selectedVehicles.map((v, idx) => (
+                <View key={v.id}>
+                  <Text style={s.sectionLabel}>VEHICLE {idx + 1} — {v.vehicle_type?.toUpperCase()}{v.vehicle_plate ? ` · ${v.vehicle_plate}` : ''}</Text>
+                  <View style={s.infoCard}>
+                    <Row label="Make/Model" value={[v.vehicle_make, v.vehicle_model].filter(Boolean).join(' ') || '—'} />
+                    <Row label="Color" value={v.vehicle_color ?? '—'} />
+                    <Row label="Status">
+                      <View style={[s.badge, { backgroundColor: (STATUS_COLOR[v.status]) + '20' }]}>
+                        <Text style={[s.badgeText, { color: STATUS_COLOR[v.status] }]}>{v.status}</Text>
+                      </View>
+                    </Row>
+                  </View>
+                  <View style={s.docsRow}>
+                    {[
+                      { label: 'OR', url: v.or_url },
+                      { label: 'CR', url: v.cr_url },
+                      { label: 'Photo', url: v.vehicle_image_url },
+                    ].map(doc => (
+                      <View key={doc.label} style={s.docBox}>
+                        <Text style={s.docLabel}>{doc.label}</Text>
+                        {doc.url
+                          ? <Image source={{ uri: doc.url }} style={s.docImg} resizeMode="cover" />
+                          : <View style={s.docPlaceholder}><Text style={s.docPlaceholderText}>No file</Text></View>
+                        }
+                      </View>
+                    ))}
+                  </View>
+                  <View style={s.actions}>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#10b981' }, submittingVehicleId === v.id && s.disabled]}
+                      disabled={submittingVehicleId === v.id}
+                      onPress={() => handleVehicleAction(v, 'approved')}
+                    >
+                      <Text style={s.actionBtnText}>Approve Vehicle</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: '#ef4444' }, submittingVehicleId === v.id && s.disabled]}
+                      disabled={submittingVehicleId === v.id}
+                      onPress={() => handleVehicleAction(v, 'rejected')}
+                    >
+                      <Text style={s.actionBtnText}>Reject Vehicle</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )) : (
+                <View style={s.infoCard}>
+                  <Text style={[s.rowValue, { color: '#9ca3af' }]}>No vehicles registered yet.</Text>
+                </View>
+              )}
+
+              {/* OVERALL ACCOUNT */}
+              <Text style={s.sectionLabel}>OVERALL ACCOUNT</Text>
               <View style={s.actions}>
                 <TouchableOpacity
                   style={[s.actionBtn, { backgroundColor: '#10b981' }, submitting && s.disabled]}
                   disabled={submitting}
                   onPress={() => handleVerify('approved')}
                 >
-                  <Text style={s.actionBtnText}>Approve</Text>
+                  <Text style={s.actionBtnText}>Approve Account</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.actionBtn, { backgroundColor: '#ef4444' }, submitting && s.disabled]}
                   disabled={submitting}
                   onPress={() => handleVerify('rejected')}
                 >
-                  <Text style={s.actionBtnText}>Reject</Text>
+                  <Text style={s.actionBtnText}>Reject Account</Text>
                 </TouchableOpacity>
                 {(selected.rider_status === 'approved' || selected.rider_status === 'rejected') && (
                   <TouchableOpacity

@@ -109,6 +109,7 @@ export interface Profile {
   or_url: string | null;
   cr_url: string | null;
   license_url: string | null;
+  license_status: 'unsubmitted' | 'pending' | 'approved' | 'rejected' | null;
   expo_push_token: string | null;
   // Admin
   admin_role_ids: string[];
