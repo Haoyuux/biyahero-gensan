@@ -8,6 +8,7 @@ import AdminRemittancesScreen from '../screens/admin/AdminRemittancesScreen';
 import UserBlockingScreen from '../screens/admin/UserBlockingScreen';
 import AdminProfileScreen from '../screens/admin/AdminProfileScreen';
 import AdminMoreNavigator from './AdminMoreNavigator';
+import { useUpdate } from '../contexts/UpdateContext';
 
 const Tab = createBottomTabNavigator();
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -19,7 +20,20 @@ const TabIcon = ({ icon, label, focused }: { icon: IoniconsName; label: string; 
   </View>
 );
 
-export default function AdminNavigator() {
+function MoreTabIcon({ focused }: { focused: boolean }) {
+  const { updateAvailable, updateReady } = useUpdate();
+  return (
+    <View style={t.iconWrap}>
+      <View>
+        <Ionicons name={focused ? 'grid' : 'grid-outline'} size={22} color={focused ? '#030712' : '#9ca3af'} />
+        {(updateAvailable || updateReady) && <View style={t.dot} />}
+      </View>
+      <Text style={[t.label, focused && t.labelActive]} numberOfLines={1} adjustsFontSizeToFit>More</Text>
+    </View>
+  );
+}
+
+function AdminTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false, tabBarStyle: t.bar, tabBarShowLabel: false }}>
       <Tab.Screen
@@ -45,7 +59,7 @@ export default function AdminNavigator() {
       <Tab.Screen
         name="AdminMore"
         component={AdminMoreNavigator}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'grid' : 'grid-outline'} label="More" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <MoreTabIcon focused={focused} /> }}
       />
       <Tab.Screen
         name="AdminProfile"
@@ -56,6 +70,10 @@ export default function AdminNavigator() {
   );
 }
 
+export default function AdminNavigator() {
+  return <AdminTabs />;
+}
+
 const t = StyleSheet.create({
   bar: {
     backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6',
@@ -64,4 +82,8 @@ const t = StyleSheet.create({
   iconWrap: { alignItems: 'center', justifyContent: 'center', gap: 2, width: 60 },
   label: { fontSize: 9, fontWeight: '600', color: '#9ca3af', textAlign: 'center' },
   labelActive: { color: '#030712' },
+  dot: {
+    position: 'absolute', top: -2, right: -4,
+    width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444',
+  },
 });

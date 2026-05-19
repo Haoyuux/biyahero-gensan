@@ -10,6 +10,7 @@ import { calculateErrandFare, ErrandFareBreakdown, loadPricingConfigFromDB, Pric
 import { fetchUserVouchers, quoteVoucher, markVoucherUsed, UserVoucher } from '../../lib/voucherService';
 import { useProfile } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
 
 const genUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
   const r = Math.random() * 16 | 0;
@@ -18,7 +19,7 @@ const genUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c 
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'Accept-Language': 'en' } });
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'Accept-Language': 'en', 'User-Agent': 'BiyaheroApp/1.0 (com.biyahero.app)' } });
     const data = await res.json();
     const parts = [data.address?.road, data.address?.suburb, data.address?.city || data.address?.town].filter(Boolean);
     return parts.slice(0, 2).join(', ') || data.display_name?.split(',').slice(0, 2).join(', ') || 'Selected location';
@@ -80,8 +81,89 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
   const [matchedMapReady, setMatchedMapReady] = useState(false);
   const matchedMapRef = useRef<OsmMapHandle>(null);
   const broadcastIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const broadcastPayloadRef = useRef<any>(null);
   const channelRef = useRef<any>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Chat
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatScrollRef = useRef<ScrollView>(null);
+
+  // Refs so closures (channel handlers) always see current values without re-subscribing
+  const stepRef = useRef<ErrandStep>('type');
+  const pickupCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const dropoffCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastRiderPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastRiderRouteTimeRef = useRef<number>(0);
+  const matchedMapReadyRef = useRef(false);
+
+  useEffect(() => { stepRef.current = step; }, [step]);
+  useEffect(() => { pickupCoordsRef.current = pickupCoords; }, [pickupCoords]);
+  useEffect(() => { dropoffCoordsRef.current = dropoffCoords; }, [dropoffCoords]);
+
+  // Draw route from rider's current position to pickup (matched) or dropoff (picked_up)
+  const drawRiderRoute = useCallback(async (riderLat: number, riderLng: number, forceImmediate = false) => {
+    const now = Date.now();
+    if (!forceImmediate && now - lastRiderRouteTimeRef.current < 8000) return;
+    lastRiderRouteTimeRef.current = now;
+    const target = stepRef.current === 'picked_up' ? dropoffCoordsRef.current : pickupCoordsRef.current;
+    if (!target) return;
+    try {
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${target.lng},${target.lat}?overview=full&geometries=geojson&alternatives=3`
+      );
+      const data = await res.json();
+      if (!data.routes?.[0]) return;
+      const route = data.routes.reduce((best: any, r: any) => r.distance < best.distance ? r : best, data.routes[0]);
+      const coords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
+      matchedMapRef.current?.drawRoute(coords);
+    } catch { /* silent */ }
+  }, []);
+
+  // When step flips to picked_up, immediately reroute from rider to dropoff
+  useEffect(() => {
+    if ((step === 'matched' || step === 'picked_up') && lastRiderPosRef.current) {
+      lastRiderRouteTimeRef.current = 0;
+      drawRiderRoute(lastRiderPosRef.current.lat, lastRiderPosRef.current.lng, true);
+    }
+  }, [step, drawRiderRoute]);
+
+  // Subscribe to chat messages when errand is active
+  useEffect(() => {
+    if ((step !== 'matched' && step !== 'picked_up') || !currentErrandId) return;
+    fetchMessages(currentErrandId).then(setChatMessages);
+    const unsub = subscribeToMessages(currentErrandId, (msg) => {
+      if (msg.sender_id === profile.id) return;
+      setChatMessages(prev => [...prev, msg]);
+      if (!showChat) setChatUnread(c => c + 1);
+    });
+    return unsub;
+  }, [step, currentErrandId]);
+
+  useEffect(() => { if (showChat) setChatUnread(0); }, [showChat]);
+  useEffect(() => {
+    if (showChat) setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }, [chatMessages, showChat]);
+
+  const handleSendErrandChat = async () => {
+    const text = chatInput.trim();
+    if (!text || !currentErrandId) return;
+    setChatInput('');
+    const temp: ChatMessage = {
+      id: `tmp-${Date.now()}`,
+      ride_id: currentErrandId,
+      sender_id: profile.id,
+      sender_role: 'user',
+      sender_name: profile.first_name ?? 'User',
+      content: text,
+      created_at: new Date().toISOString(),
+    };
+    setChatMessages(prev => [...prev, temp]);
+    await sendMessage(currentErrandId, profile.id, 'user', profile.first_name ?? 'User', text);
+  };
 
   const connectToChannel = (errandId: string, savedStep: string) => {
     const ch = supabase.channel('errands');
@@ -95,7 +177,15 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
     });
     ch.on('broadcast', { event: 'ERRAND_RIDER_LOCATION' }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
-      matchedMapRef.current?.setRiderLocation(msg.payload.lat, msg.payload.lng);
+      const { lat, lng } = msg.payload;
+      const isFirst = !lastRiderPosRef.current;
+      lastRiderPosRef.current = { lat, lng };
+      if (matchedMapReadyRef.current) {
+        matchedMapRef.current?.setRiderLocation(lat, lng);
+        // On first location, pan to the rider so they're visible
+        if (isFirst) matchedMapRef.current?.flyTo(lat, lng, 14);
+      }
+      drawRiderRoute(lat, lng);
     });
     ch.on('broadcast', { event: 'ERRAND_PICKED_UP' }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
@@ -119,11 +209,11 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
       onClose();
     });
     ch.subscribe();
-    // If still searching, resume broadcast
+    // If still searching, repeat broadcast with full payload so late-joining riders see all details
     if (savedStep === 'searching') {
       broadcastIntervalRef.current = setInterval(() => {
         if (broadcastIntervalRef.current) {
-          ch.send({ type: 'broadcast', event: 'REQUEST_ERRAND', payload: { errandId } });
+          ch.send({ type: 'broadcast', event: 'REQUEST_ERRAND', payload: broadcastPayloadRef.current ?? { errandId } });
         }
       }, 4000);
     }
@@ -207,11 +297,12 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
 
   const fetchRoute = useCallback(async (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
     try {
-      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`);
+      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&alternatives=3`);
       const data = await res.json();
       if (!data.routes?.[0]) return;
-      setRouteDistance(data.routes[0].distance);
-      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
+      const route = data.routes.reduce((best: any, r: any) => r.distance < best.distance ? r : best, data.routes[0]);
+      setRouteDistance(route.distance);
+      const coords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
       errandMapRef.current?.drawRoute(coords);
     } catch { /* silent */ }
   }, []);
@@ -246,10 +337,15 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
     finally { setLocatingMe(false); }
   };
 
+  const nominatimHeaders = {
+    'Accept-Language': 'en',
+    'User-Agent': 'BiyaheroApp/1.0 (com.biyahero.app)',
+  };
+
   const searchErrand = useCallback(async (query: string, type: 'pickup' | 'dropoff') => {
     if (query.length < 3) { type === 'pickup' ? setPickupSugg([]) : setDropoffSugg([]); return; }
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=ph&viewbox=124.5,5.5,126.5,8.5&bounded=1`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=ph&viewbox=124.5,5.5,126.5,8.5&bounded=1`, { headers: nominatimHeaders });
       const data = await res.json();
       type === 'pickup' ? setPickupSugg(data) : setDropoffSugg(data);
     } catch { /* silent */ }
@@ -350,7 +446,8 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
     };
     AsyncStorage.setItem(ERRAND_KEY, JSON.stringify(saveState));
 
-    // Connect channel + start broadcast
+    // Connect channel + start broadcast (store full payload so interval can re-send it)
+    broadcastPayloadRef.current = payload;
     connectToChannel(errandId, 'searching');
     channelRef.current?.send({ type: 'broadcast', event: 'REQUEST_ERRAND', payload });
 
@@ -396,40 +493,117 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
   // ─── STEP: LOCATION ────────────────────────────────────────────────────────────
   if (step === 'location') return (
     <View style={{ flex: 1 }}>
-      {/* Map */}
-      <OsmMap
-        ref={errandMapRef}
-        style={{ flex: 1 }}
-        onMapReady={() => {
-          setMapReady(true);
-          errandMapRef.current?.flyTo(6.1106, 125.1741, 14);
-          if (pickupCoords) {
-            errandMapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
-            if (dropoffCoords) {
-              errandMapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, '🏁 Dropoff');
-              fetchRoute(pickupCoords, dropoffCoords);
+      {/* Map + bottom panel — absoluteFill so the top bar sibling can sit on top */}
+      <KeyboardAvoidingView style={StyleSheet.absoluteFill} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <OsmMap
+          ref={errandMapRef}
+          style={{ flex: 1 }}
+          onMapReady={() => {
+            setMapReady(true);
+            errandMapRef.current?.flyTo(6.1106, 125.1741, 14);
+            if (pickupCoords) {
+              errandMapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
+              if (dropoffCoords) {
+                errandMapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, '🏁 Dropoff');
+                fetchRoute(pickupCoords, dropoffCoords);
+              }
             }
-          }
-        }}
-        onLocationTap={async (lat, lng) => {
-          if (activeField) return; // don't interfere while search is open
-          await setLocation(lat, lng, activeLocType);
-          errandMapRef.current?.flyTo(lat, lng, 16);
-        }}
-        onPickupDragged={async (lat, lng) => {
-          const label = await reverseGeocode(lat, lng);
-          setPickupLabel(label); setPickupCoords({ lat, lng });
-          if (dropoffCoords) fetchRoute({ lat, lng }, dropoffCoords);
-        }}
-        onDestDragged={async (lat, lng) => {
-          const label = await reverseGeocode(lat, lng);
-          setDropoffLabel(label); setDropoffCoords({ lat, lng });
-          if (pickupCoords) fetchRoute(pickupCoords, { lat, lng });
-        }}
-      />
+          }}
+          onLocationTap={async (lat, lng) => {
+            if (activeField) return;
+            await setLocation(lat, lng, activeLocType);
+            errandMapRef.current?.flyTo(lat, lng, 16);
+          }}
+          onPickupDragged={async (lat, lng) => {
+            const label = await reverseGeocode(lat, lng);
+            setPickupLabel(label); setPickupCoords({ lat, lng });
+            if (dropoffCoords) fetchRoute({ lat, lng }, dropoffCoords);
+          }}
+          onDestDragged={async (lat, lng) => {
+            const label = await reverseGeocode(lat, lng);
+            setDropoffLabel(label); setDropoffCoords({ lat, lng });
+            if (pickupCoords) fetchRoute(pickupCoords, { lat, lng });
+          }}
+        />
 
-      {/* Top back button */}
-      <View style={s.mapTopBar}>
+      {/* Bottom search panel */}
+      <View style={s.mapBottomPanel}>
+        {/* Pickup field */}
+        <View style={[s.searchRow, activeField === 'pickup' && s.searchRowActive]}>
+          <Text style={s.searchDot}>📍</Text>
+          <TextInput
+            style={s.searchFieldInput}
+            placeholder="Pickup location"
+            placeholderTextColor="#9ca3af"
+            value={pickupLabel}
+            onFocus={() => { setActiveField('pickup'); setActiveLocType('pickup'); }}
+            onChangeText={v => {
+              setPickupLabel(v);
+              clearTimeout(searchTimer.current!);
+              searchTimer.current = setTimeout(() => searchErrand(v, 'pickup'), 400);
+            }}
+          />
+          <TouchableOpacity style={s.myLocBtn} onPress={useCurrentLocation} disabled={locatingMe}>
+            {locatingMe
+              ? <ActivityIndicator size="small" color="#3b82f6" />
+              : <Text style={s.myLocBtnText}>Me</Text>
+            }
+          </TouchableOpacity>
+        </View>
+        {activeField === 'pickup' && pickupSugg.length > 0 && (
+          <ScrollView style={s.suggestionList} keyboardShouldPersistTaps="handled">
+            {pickupSugg.map((item, i) => (
+              <TouchableOpacity key={i} style={s.suggItem} onPress={() => selectSugg(item, 'pickup')}>
+                <Text style={s.suggItemText} numberOfLines={2}>{item.display_name.split(',').slice(0, 3).join(', ')}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Dropoff field */}
+        <View style={[s.searchRow, activeField === 'dropoff' && s.searchRowActive, { marginTop: 8 }]}>
+          <Text style={s.searchDot}>🏁</Text>
+          <TextInput
+            style={s.searchFieldInput}
+            placeholder="Dropoff location"
+            placeholderTextColor="#9ca3af"
+            value={dropoffLabel}
+            onFocus={() => { setActiveField('dropoff'); setActiveLocType('dropoff'); }}
+            onChangeText={v => {
+              setDropoffLabel(v);
+              clearTimeout(searchTimer.current!);
+              searchTimer.current = setTimeout(() => searchErrand(v, 'dropoff'), 400);
+            }}
+          />
+        </View>
+        {activeField === 'dropoff' && dropoffSugg.length > 0 && (
+          <ScrollView style={s.suggestionList} keyboardShouldPersistTaps="handled">
+            {dropoffSugg.map((item, i) => (
+              <TouchableOpacity key={i} style={s.suggItem} onPress={() => selectSugg(item, 'dropoff')}>
+                <Text style={s.suggItemText} numberOfLines={2}>{item.display_name.split(',').slice(0, 3).join(', ')}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Hint */}
+        {!activeField && (
+          <Text style={s.mapTapHint}>Or tap the map to pin {activeLocType === 'pickup' ? 'pickup 📍' : 'dropoff 🏁'}</Text>
+        )}
+
+        <TouchableOpacity
+          style={[s.nextBtn, (!pickupCoords || !dropoffCoords) && s.nextBtnDisabled, { marginTop: 10 }]}
+          disabled={!pickupCoords || !dropoffCoords}
+          onPress={() => { setActiveField(null); setStep('details'); }}
+        >
+          <Text style={s.nextBtnText}>Confirm Locations →</Text>
+        </TouchableOpacity>
+      </View>
+      </KeyboardAvoidingView>
+
+      {/* Top back button — sibling of KAV rendered after it, so it sits above the WebView
+          and reliably receives touches even on Android where WebView captures all native touches */}
+      <View style={s.mapTopBar} pointerEvents="box-none">
         <TouchableOpacity onPress={() => setStep('type')} style={s.mapBackBtn}>
           <Text style={s.mapBackText}>←</Text>
         </TouchableOpacity>
@@ -440,83 +614,6 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
           </View>
         )}
       </View>
-
-      {/* Bottom search panel */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={s.mapBottomPanel}>
-
-          {/* Pickup field */}
-          <View style={[s.searchRow, activeField === 'pickup' && s.searchRowActive]}>
-            <Text style={s.searchDot}>📍</Text>
-            <TextInput
-              style={s.searchFieldInput}
-              placeholder="Pickup location"
-              placeholderTextColor="#9ca3af"
-              value={pickupLabel}
-              onFocus={() => { setActiveField('pickup'); setActiveLocType('pickup'); }}
-              onChangeText={v => {
-                setPickupLabel(v);
-                clearTimeout(searchTimer.current!);
-                searchTimer.current = setTimeout(() => searchErrand(v, 'pickup'), 400);
-              }}
-            />
-            <TouchableOpacity style={s.myLocBtn} onPress={useCurrentLocation} disabled={locatingMe}>
-              {locatingMe
-                ? <ActivityIndicator size="small" color="#3b82f6" />
-                : <Text style={s.myLocBtnText}>Me</Text>
-              }
-            </TouchableOpacity>
-          </View>
-          {activeField === 'pickup' && pickupSugg.length > 0 && (
-            <ScrollView style={s.suggestionList} keyboardShouldPersistTaps="handled">
-              {pickupSugg.map((item, i) => (
-                <TouchableOpacity key={i} style={s.suggItem} onPress={() => selectSugg(item, 'pickup')}>
-                  <Text style={s.suggItemText} numberOfLines={2}>{item.display_name.split(',').slice(0, 3).join(', ')}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Dropoff field */}
-          <View style={[s.searchRow, activeField === 'dropoff' && s.searchRowActive, { marginTop: 8 }]}>
-            <Text style={s.searchDot}>🏁</Text>
-            <TextInput
-              style={s.searchFieldInput}
-              placeholder="Dropoff location"
-              placeholderTextColor="#9ca3af"
-              value={dropoffLabel}
-              onFocus={() => { setActiveField('dropoff'); setActiveLocType('dropoff'); }}
-              onChangeText={v => {
-                setDropoffLabel(v);
-                clearTimeout(searchTimer.current!);
-                searchTimer.current = setTimeout(() => searchErrand(v, 'dropoff'), 400);
-              }}
-            />
-          </View>
-          {activeField === 'dropoff' && dropoffSugg.length > 0 && (
-            <ScrollView style={s.suggestionList} keyboardShouldPersistTaps="handled">
-              {dropoffSugg.map((item, i) => (
-                <TouchableOpacity key={i} style={s.suggItem} onPress={() => selectSugg(item, 'dropoff')}>
-                  <Text style={s.suggItemText} numberOfLines={2}>{item.display_name.split(',').slice(0, 3).join(', ')}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Hint */}
-          {!activeField && (
-            <Text style={s.mapTapHint}>Or tap the map to pin {activeLocType === 'pickup' ? 'pickup 📍' : 'dropoff 🏁'}</Text>
-          )}
-
-          <TouchableOpacity
-            style={[s.nextBtn, (!pickupCoords || !dropoffCoords) && s.nextBtnDisabled, { marginTop: 10 }]}
-            disabled={!pickupCoords || !dropoffCoords}
-            onPress={() => { setActiveField(null); setStep('details'); }}
-          >
-            <Text style={s.nextBtnText}>Confirm Locations →</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
     </View>
   );
 
@@ -742,17 +839,30 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
         ref={matchedMapRef}
         style={{ flex: 1 }}
         onMapReady={() => {
+          matchedMapReadyRef.current = true;
           setMatchedMapReady(true);
-          if (pickupCoords) {
-            matchedMapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
-            matchedMapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 15);
-          }
+          if (pickupCoords) matchedMapRef.current?.setUserLocation(pickupCoords.lat, pickupCoords.lng);
           if (dropoffCoords) {
             matchedMapRef.current?.setDestination(dropoffCoords.lat, dropoffCoords.lng, '🏁 Dropoff');
             matchedMapRef.current?.setDestDraggable(false);
           }
           matchedMapRef.current?.setPickupDraggable(false);
-          if (pickupCoords && dropoffCoords) fetchRoute(pickupCoords, dropoffCoords);
+          if (lastRiderPosRef.current) {
+            // Rider location already received — show rider + draw live route
+            matchedMapRef.current?.setRiderLocation(lastRiderPosRef.current.lat, lastRiderPosRef.current.lng);
+            matchedMapRef.current?.flyTo(lastRiderPosRef.current.lat, lastRiderPosRef.current.lng, 14);
+            lastRiderRouteTimeRef.current = 0;
+            drawRiderRoute(lastRiderPosRef.current.lat, lastRiderPosRef.current.lng, true);
+          } else {
+            // No rider yet — zoom to show both pickup & dropoff markers and wait for rider
+            if (pickupCoords && dropoffCoords) {
+              const midLat = (pickupCoords.lat + dropoffCoords.lat) / 2;
+              const midLng = (pickupCoords.lng + dropoffCoords.lng) / 2;
+              matchedMapRef.current?.flyTo(midLat, midLng, 13);
+            } else if (pickupCoords) {
+              matchedMapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 14);
+            }
+          }
         }}
       />
 
@@ -789,7 +899,12 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
                 <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>📞 {matchedRider.phone}</Text>
               ) : null}
             </View>
-            <View style={s.fareChip}><Text style={s.fareChipText}>₱{finalFare}</Text></View>
+            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+              <View style={s.fareChip}><Text style={s.fareChipText}>₱{finalFare}</Text></View>
+              <TouchableOpacity style={s.chatBtn} onPress={() => setShowChat(true)}>
+                <Text style={s.chatBtnText}>💬{chatUnread > 0 ? ` ${chatUnread}` : ''}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -866,6 +981,65 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
           )
         )}
       </ScrollView>
+
+      {/* Chat overlay */}
+      {showChat && (
+        <KeyboardAvoidingView
+          style={s.chatOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={s.chatHeader}>
+            <TouchableOpacity onPress={() => setShowChat(false)} style={s.chatBackBtn}>
+              <Text style={s.chatBackText}>←</Text>
+            </TouchableOpacity>
+            <View style={s.chatAvatarCircle}>
+              <Text style={s.chatAvatarText}>{(matchedRider?.first_name?.[0] ?? 'R').toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.chatName}>{matchedRider?.first_name} {matchedRider?.last_name}</Text>
+              <Text style={s.chatRole}>RIDER</Text>
+            </View>
+          </View>
+          <ScrollView
+            ref={chatScrollRef}
+            style={s.chatMessages}
+            contentContainerStyle={s.chatMsgContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {chatMessages.length === 0 && (
+              <Text style={s.chatEmpty}>No messages yet. Say hi! 👋</Text>
+            )}
+            {chatMessages.map(m => {
+              const isMe = m.sender_id === profile.id;
+              return (
+                <View key={m.id} style={[s.msgRow, isMe ? s.msgRowMe : s.msgRowThem]}>
+                  <View style={[s.msgBubble, isMe ? s.msgBubbleMe : s.msgBubbleThem]}>
+                    <Text style={[s.msgText, isMe ? s.msgTextMe : s.msgTextThem]}>{m.content}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+          <View style={s.chatInputRow}>
+            <TextInput
+              style={s.chatInput}
+              placeholder="Type a message..."
+              placeholderTextColor="#9ca3af"
+              value={chatInput}
+              onChangeText={setChatInput}
+              onSubmitEditing={handleSendErrandChat}
+              returnKeyType="send"
+            />
+            <TouchableOpacity
+              style={[s.sendBtn, !chatInput.trim() && { opacity: 0.4 }]}
+              onPress={handleSendErrandChat}
+              disabled={!chatInput.trim()}
+            >
+              <Text style={s.sendBtnText}>→</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 
@@ -1008,4 +1182,34 @@ const s = StyleSheet.create({
   matchedRecipient: { fontSize: 11, color: '#6b7280', marginTop: 2 },
   errandCancelInline: { marginTop: 10, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 14 },
   errandCancelInlineText: { fontSize: 12, color: '#ef4444', fontWeight: '600' },
+
+  // Chat button on rider card
+  chatBtn: { backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#d1fae5' },
+  chatBtnText: { fontSize: 13, fontWeight: '700', color: '#10b981' },
+
+  // Chat overlay
+  chatOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#fff', zIndex: 100 },
+  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingTop: Platform.OS === 'ios' ? 54 : 14 },
+  chatBackBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  chatBackText: { fontSize: 22, color: '#030712' },
+  chatAvatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center' },
+  chatAvatarText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  chatName: { fontSize: 14, fontWeight: '700', color: '#030712' },
+  chatRole: { fontSize: 9, color: '#9ca3af', fontWeight: '700', letterSpacing: 1 },
+  chatMessages: { flex: 1, backgroundColor: '#f6f7f9' },
+  chatMsgContent: { padding: 16, gap: 8 },
+  chatEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 40 },
+  msgRow: { flexDirection: 'row' },
+  msgRowMe: { justifyContent: 'flex-end' },
+  msgRowThem: { justifyContent: 'flex-start' },
+  msgBubble: { maxWidth: '75%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 9 },
+  msgBubbleMe: { backgroundColor: '#030712', borderBottomRightRadius: 4 },
+  msgBubbleThem: { backgroundColor: '#fff', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#e5e7eb' },
+  msgText: { fontSize: 14, lineHeight: 20 },
+  msgTextMe: { color: '#fff' },
+  msgTextThem: { color: '#111827' },
+  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  chatInput: { flex: 1, backgroundColor: '#f3f4f6', borderRadius: 99, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#111827' },
+  sendBtn: { width: 44, height: 44, borderRadius: 99, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center' },
+  sendBtnText: { fontSize: 18, color: '#fff', fontWeight: '700' },
 });

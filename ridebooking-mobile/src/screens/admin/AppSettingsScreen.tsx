@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getAppSettings, updateAppSettings, uploadSettingImage, AppSettings } from '../../lib/settingsService';
+import { useUpdate } from '../../contexts/UpdateContext';
 
 export default function AppSettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -19,6 +20,7 @@ export default function AppSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingQr, setUploadingQr] = useState(false);
+  const { updateAvailable, isDownloading, isChecking, progress, updateReady, checkForUpdate, downloadUpdate, applyUpdate } = useUpdate();
 
   const load = useCallback(async () => {
     const s = await getAppSettings();
@@ -84,6 +86,59 @@ export default function AppSettingsScreen() {
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.content}>
         <Text style={s.pageTitle}>App Settings</Text>
+
+        <Text style={s.sectionLabel}>APP UPDATE</Text>
+        <View style={s.card}>
+          {updateReady ? (
+            <>
+              <View style={s.updateRow}>
+                <View style={[s.updateDot, { backgroundColor: '#10b981' }]} />
+                <Text style={s.updateTitle}>Update ready to apply</Text>
+              </View>
+              <Text style={s.updateHint}>Download complete. Tap below to restart and apply.</Text>
+              <TouchableOpacity style={s.updateBtn} onPress={applyUpdate}>
+                <Text style={s.updateBtnText}>Restart Now</Text>
+              </TouchableOpacity>
+            </>
+          ) : updateAvailable ? (
+            <>
+              <View style={s.updateRow}>
+                <View style={[s.updateDot, { backgroundColor: '#f59e0b' }]} />
+                <Text style={s.updateTitle}>New update available</Text>
+              </View>
+              <Text style={s.updateHint}>A new version of Biyahero is ready to download.</Text>
+              {isDownloading ? (
+                <View style={{ marginTop: 12 }}>
+                  <View style={s.progressHeader}>
+                    <Text style={s.updateHint}>Downloading...</Text>
+                    <Text style={[s.updateHint, { fontWeight: '700', color: '#030712' }]}>{progress}%</Text>
+                  </View>
+                  <View style={s.progressTrack}>
+                    <View style={[s.progressFill, { width: `${progress}%` as any }]} />
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity style={s.updateBtn} onPress={downloadUpdate}>
+                  <Text style={s.updateBtnText}>Download Update</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            <>
+              <View style={s.updateRow}>
+                <View style={[s.updateDot, { backgroundColor: '#10b981' }]} />
+                <Text style={s.updateTitle}>App is up to date</Text>
+              </View>
+              <TouchableOpacity
+                style={[s.checkBtn, isChecking && s.disabled]}
+                onPress={checkForUpdate}
+                disabled={isChecking}
+              >
+                <Text style={s.checkBtnText}>{isChecking ? 'Checking...' : 'Check for Updates'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
 
         <Text style={s.sectionLabel}>APP IDENTITY</Text>
         <View style={s.card}>
@@ -198,4 +253,15 @@ const s = StyleSheet.create({
   saveBtn: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   disabled: { opacity: 0.6 },
+  updateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  updateDot: { width: 10, height: 10, borderRadius: 5 },
+  updateTitle: { fontSize: 14, fontWeight: '700', color: '#030712' },
+  updateHint: { fontSize: 12, color: '#6b7280', marginBottom: 4 },
+  updateBtn: { backgroundColor: '#030712', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
+  updateBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  checkBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
+  checkBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  progressTrack: { height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: 8, backgroundColor: '#10b981', borderRadius: 4 },
 });

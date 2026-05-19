@@ -44,6 +44,7 @@
       ]
     },
     "plugins": [
+      "expo-updates",
       "expo-secure-store",
       [
         "expo-location",
@@ -62,6 +63,13 @@
       ],
       "expo-web-browser"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/6a2352a2-9e24-401f-9273-41843f055a2b",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": "1.0.0",
     "extra": {
       "eas": {
         "projectId": "6a2352a2-9e24-401f-9273-41843f055a2b"

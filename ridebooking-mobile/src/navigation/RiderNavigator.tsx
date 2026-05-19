@@ -12,6 +12,7 @@ import TeamScreen from '../screens/rider/TeamScreen';
 import NewsScreen from '../screens/rider/NewsScreen';
 import { useProfile } from '../contexts/AuthContext';
 import * as Notifications from 'expo-notifications';
+import { useUpdate } from '../contexts/UpdateContext';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,6 +31,19 @@ const TabIcon = ({ icon, label, focused }: { icon: IoniconsName; label: string; 
     <Text style={[tabStyles.label, focused && tabStyles.labelActive]} numberOfLines={1} adjustsFontSizeToFit>{label}</Text>
   </View>
 );
+
+function ProfileTabIcon({ focused }: { focused: boolean }) {
+  const { updateAvailable, updateReady } = useUpdate();
+  return (
+    <View style={tabStyles.iconWrap}>
+      <View>
+        <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={focused ? '#030712' : '#9ca3af'} />
+        {(updateAvailable || updateReady) && <View style={tabStyles.dot} />}
+      </View>
+      <Text style={[tabStyles.label, focused && tabStyles.labelActive]} numberOfLines={1} adjustsFontSizeToFit>Profile</Text>
+    </View>
+  );
+}
 
 interface Props { appSettings: AppSettings | null; }
 
@@ -96,7 +110,7 @@ export default function RiderNavigator({ appSettings }: Props) {
 
         <Tab.Screen
           name="Profile"
-          options={{ tabBarIcon: ({ focused }) => <TabIcon icon={focused ? 'person' : 'person-outline'} label="Profile" focused={focused} /> }}
+          options={{ tabBarIcon: ({ focused }) => <ProfileTabIcon focused={focused} /> }}
           component={RiderProfileScreen}
         />
       </Tab.Navigator>
@@ -128,4 +142,5 @@ const tabStyles = StyleSheet.create({
     borderBottomColor: '#fde68a',
   },
   maintenanceText: { fontSize: 12, color: '#92400e', fontWeight: '500', textAlign: 'center' },
+  dot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' },
 });

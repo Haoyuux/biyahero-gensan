@@ -15,6 +15,8 @@ export interface ErrandVehiclePricing {
   perKmRate: number;
   maintenanceCostPerKm: number;
   convenienceFee: number;
+  freeKmEnabled: boolean;
+  freeKm: number;
   disabled: boolean;
 }
 
@@ -74,8 +76,8 @@ export const DEFAULT_PRICING: PricingConfig = {
   },
   errand: {
     disabled: false,
-    moto: { baseFare: 35, perKmRate: 10, maintenanceCostPerKm: 2, convenienceFee: 15, disabled: false },
-    tricycle: { baseFare: 45, perKmRate: 12, maintenanceCostPerKm: 2, convenienceFee: 15, disabled: false },
+    moto: { baseFare: 35, perKmRate: 10, maintenanceCostPerKm: 2, convenienceFee: 15, freeKmEnabled: false, freeKm: 0, disabled: false },
+    tricycle: { baseFare: 45, perKmRate: 12, maintenanceCostPerKm: 2, convenienceFee: 15, freeKmEnabled: false, freeKm: 0, disabled: false },
   },
 };
 
@@ -108,7 +110,8 @@ export function calculateErrandFare(
 ): ErrandFareBreakdown {
   const p = config.errand[vehicleType];
   const distanceKm = distanceM / 1000;
-  const distanceFee = Math.round(distanceKm * p.perKmRate * 10) / 10;
+  const billableKm = p.freeKmEnabled ? Math.max(0, distanceKm - (p.freeKm ?? 0)) : distanceKm;
+  const distanceFee = Math.round(billableKm * p.perKmRate * 10) / 10;
   const convenienceFee = errandType === 'pickup_deliver' ? 0 : p.convenienceFee;
   const total = Math.round(p.baseFare + distanceFee + convenienceFee);
   return { baseFare: p.baseFare, distanceFee, convenienceFee, total, distanceKm };
