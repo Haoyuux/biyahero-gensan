@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Alert, ActivityIndicator, ScrollView, Animated, PanResponder,
-  KeyboardAvoidingView, Platform, Modal, Image, Linking, useWindowDimensions,
+  KeyboardAvoidingView, Platform, Modal, Image, Linking, useWindowDimensions, Keyboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -109,6 +109,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   // Destination
   const [destination, setDestination] = useState('');
@@ -356,6 +357,13 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     return () => clearTimeout(t);
   }, []);
 
+  // Keyboard height tracking for Android bottom sheet
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', e => setKeyboardOffset(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOffset(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
   // Nominatim search
   const activeQuery = activeField === 'pickup' ? pickupQuery : activeField === 'dropoff' ? dropoffQuery : '';
   useEffect(() => {
@@ -365,7 +373,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       setSearchLoading(true);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(activeQuery)}&limit=5&countrycodes=ph&viewbox=118.3,10.2,127.5,4.5&bounded=1`,
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(activeQuery)}&limit=5&countrycodes=ph&viewbox=118.3,10.2,127.5,4.5`,
           { headers: nominatimHeaders },
         );
         setSuggestions(await res.json());
@@ -378,11 +386,11 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
   const fetchRoute = useCallback(async (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
     try {
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`,
+        `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&alternatives=3`,
       );
       const data = await res.json();
       if (!data.routes?.[0]) return;
-      const route = data.routes[0];
+      const route = data.routes.reduce((best: any, r: any) => r.distance < best.distance ? r : best, data.routes[0]);
       setRouteDistance(route.distance);
       setRouteDuration(route.duration);
       const coords: [number, number][] = route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
@@ -395,11 +403,12 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     if (!pickupCoords) return;
     try {
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${pickupCoords.lng},${pickupCoords.lat}?overview=full&geometries=geojson`,
+        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${pickupCoords.lng},${pickupCoords.lat}?overview=full&geometries=geojson&alternatives=3`,
       );
       const data = await res.json();
       if (!data.routes?.[0]) return;
-      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+      const route = data.routes.reduce((best: any, r: any) => r.distance < best.distance ? r : best, data.routes[0]);
+      const coords: [number, number][] = route.geometry.coordinates.map(
         ([lng, lat]: [number, number]) => [lat, lng],
       );
       mapRef.current?.drawRoute(coords);
@@ -410,11 +419,12 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     if (!destinationCoords) return;
     try {
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${destinationCoords.lng},${destinationCoords.lat}?overview=full&geometries=geojson`,
+        `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${destinationCoords.lng},${destinationCoords.lat}?overview=full&geometries=geojson&alternatives=3`,
       );
       const data = await res.json();
       if (!data.routes?.[0]) return;
-      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+      const route = data.routes.reduce((best: any, r: any) => r.distance < best.distance ? r : best, data.routes[0]);
+      const coords: [number, number][] = route.geometry.coordinates.map(
         ([lng, lat]: [number, number]) => [lat, lng],
       );
       mapRef.current?.drawRoute(coords);
@@ -784,7 +794,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       const hasSuggestions = suggestions.length > 0;
       const showExpanded = isExpanded || hasSuggestions;
       return (
-        <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.sheet, { bottom: keyboardOffset }]}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -938,7 +948,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
               <Text style={styles.errandBtnDesc}>Send a rider on an errand</Text>
             </TouchableOpacity>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       );
     }
 
@@ -1080,6 +1090,18 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     }
 
     // ── MATCHED ───────────────────────────────────────────────────────────────
+    if (step === 'matched' && !activeRider) {
+      return (
+        <View style={[styles.sheet, styles.centerSheet]}>
+          <View style={styles.handle} />
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={{ marginTop: 12, fontSize: 15, color: '#6b7280' }}>Reconnecting to your ride...</Text>
+          <TouchableOpacity style={[styles.cancelRideBtn, { marginTop: 20 }]} onPress={cancelBooking}>
+            <Text style={styles.cancelRideBtnText}>Cancel Ride</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     if (step === 'matched' && activeRider) {
       const etaMin = routeDuration ? Math.max(1, Math.round(routeDuration / 60)) : null;
       const distKm = routeDistance ? (routeDistance / 1000).toFixed(1) : null;
@@ -1373,8 +1395,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
         </TouchableOpacity>
       )}
 
-      {/* Map legend — matched step only */}
-      {step === 'matched' && (
+      {/* Map legend */}
+      {(step === 'matched' || step === 'searching' || step === 'select') && (
         <View style={styles.legend}>
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: '#3b82f6' }]} />

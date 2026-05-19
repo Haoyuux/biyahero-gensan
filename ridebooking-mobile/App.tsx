@@ -1,8 +1,9 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Linking, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Linking, Platform, Modal, TouchableOpacity, Alert } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
+import { UpdateProvider, useUpdate } from './src/contexts/UpdateContext';
 
 // Web relay: when Supabase redirects to the Metro dev server via IP (http://10.x.x.x:8082/auth?code=xxx),
 // relay to the native app via exp:// deep link.
@@ -31,6 +32,8 @@ export default function App() {
   const [fontsLoaded] = useFonts({ ...Ionicons.font });
   const { session, profile, loading, signOut, refetchProfile } = useAuth();
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+
+
 
   useEffect(() => {
     const handleUrl = async ({ url }: { url: string }) => {
@@ -100,18 +103,84 @@ export default function App() {
   const isAdmin = profile.role === 'admin' || profile.role === 'super_admin';
 
   return (
-    <AuthProvider value={{ profile, signOut, refetchProfile }}>
-      <NavigationContainer>
-        {isAdmin
-          ? <AdminNavigator />
-          : isRider
-          ? <RiderNavigator appSettings={appSettings} />
-          : <UserNavigator />}
-      </NavigationContainer>
-    </AuthProvider>
+    <UpdateProvider>
+      <AuthProvider value={{ profile, signOut, refetchProfile }}>
+        <NavigationContainer>
+          {isAdmin
+            ? <AdminNavigator />
+            : isRider
+            ? <RiderNavigator appSettings={appSettings} />
+            : <UserNavigator />}
+        </NavigationContainer>
+        <GlobalUpdateModal />
+      </AuthProvider>
+    </UpdateProvider>
+  );
+}
+
+function GlobalUpdateModal() {
+  const { updateAvailable, updateReady, isDownloading, progress, downloadUpdate, applyUpdate } = useUpdate();
+  const [dismissed, setDismissed] = useState(false);
+  const visible = !dismissed && (updateAvailable || updateReady);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { if (!isDownloading) setDismissed(true); }}>
+      <View style={um.overlay}>
+        <View style={um.card}>
+          {!isDownloading && (
+            <TouchableOpacity style={um.closeBtn} onPress={() => setDismissed(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={um.closeTxt}>✕</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={um.emoji}>{updateReady ? '✅' : '🔄'}</Text>
+          <Text style={um.title}>{updateReady ? 'Update Ready' : 'New Update Available'}</Text>
+          <Text style={um.subtitle}>
+            {updateReady
+              ? 'Download complete. Restart the app to apply the new version.'
+              : 'A new version of Biyahero is ready to install.'}
+          </Text>
+          {isDownloading ? (
+            <View style={{ marginTop: 16 }}>
+              <View style={um.progressHeader}>
+                <Text style={um.progressLabel}>Downloading...</Text>
+                <Text style={um.progressPct}>{progress}%</Text>
+              </View>
+              <View style={um.track}>
+                <View style={[um.fill, { width: `${progress}%` as any }]} />
+              </View>
+            </View>
+          ) : updateReady ? (
+            <TouchableOpacity style={um.btn} onPress={applyUpdate}>
+              <Text style={um.btnTxt}>Restart Now</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={um.btn} onPress={downloadUpdate}>
+              <Text style={um.btnTxt}>Download & Install</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' },
+});
+
+const um = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end', padding: 16, paddingBottom: 40, backgroundColor: 'rgba(0,0,0,0.4)' },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 24, alignItems: 'center' },
+  closeBtn: { position: 'absolute', top: 14, right: 16 },
+  closeTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+  emoji: { fontSize: 36, marginBottom: 10 },
+  title: { fontSize: 18, fontWeight: '700', color: '#030712', marginBottom: 6, textAlign: 'center' },
+  subtitle: { fontSize: 13, color: '#6b7280', textAlign: 'center', marginBottom: 4, lineHeight: 20 },
+  btn: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
+  btnTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  progressLabel: { fontSize: 12, color: '#6b7280' },
+  progressPct: { fontSize: 12, fontWeight: '700', color: '#030712' },
+  track: { height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, overflow: 'hidden', width: '100%' },
+  fill: { height: 8, backgroundColor: '#10b981', borderRadius: 4 },
 });

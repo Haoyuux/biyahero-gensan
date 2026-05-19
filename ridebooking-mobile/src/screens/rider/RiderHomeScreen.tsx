@@ -64,6 +64,10 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const alertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const alertNotifIdsRef = useRef<string[]>([]);
   const notifiedRideIdsRef = useRef<Set<string>>(new Set());
+  const errandAlertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const errandAlertNotifIdsRef = useRef<string[]>([]);
+  const notifiedErrandIdsRef = useRef<Set<string>>(new Set());
+  const hasErrandRef = useRef(false);
 
   const [isOnline, setIsOnline] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -99,12 +103,19 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const [errandCanceling, setErrandCanceling] = useState(false);
   const [showErrandCancelConfirm, setShowErrandCancelConfirm] = useState(false);
 
-  // Chat
+  // Chat (regular ride)
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const chatScrollRef = useRef<ScrollView>(null);
+
+  // Chat (errand)
+  const [showErrandChat, setShowErrandChat] = useState(false);
+  const [errandChatMessages, setErrandChatMessages] = useState<ChatMessage[]>([]);
+  const [errandChatInput, setErrandChatInput] = useState('');
+  const [errandChatUnread, setErrandChatUnread] = useState(0);
+  const errandChatScrollRef = useRef<ScrollView>(null);
 
   const stopRideRequestAlert = () => {
     if (alertIntervalRef.current) {
@@ -115,6 +126,18 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       Notifications.cancelScheduledNotificationAsync(id).catch(() => {})
     );
     alertNotifIdsRef.current = [];
+    Vibration.cancel();
+  };
+
+  const stopErrandAlert = () => {
+    if (errandAlertIntervalRef.current) {
+      clearInterval(errandAlertIntervalRef.current);
+      errandAlertIntervalRef.current = null;
+    }
+    errandAlertNotifIdsRef.current.forEach(id =>
+      Notifications.cancelScheduledNotificationAsync(id).catch(() => {})
+    );
+    errandAlertNotifIdsRef.current = [];
     Vibration.cancel();
   };
 
@@ -131,11 +154,12 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   const fetchRiderRoute = async (from: { lat: number; lng: number }, to: { lat: number; lng: number }) => {
     try {
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`,
+        `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&alternatives=3`,
       );
       const data = await res.json();
       if (!data.routes?.[0]) return;
-      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+      const route = data.routes.reduce((best: any, r: any) => r.distance < best.distance ? r : best, data.routes[0]);
+      const coords: [number, number][] = route.geometry.coordinates.map(
         ([lng, lat]: [number, number]) => [lat, lng],
       );
       mapRef.current?.drawRoute(coords);
@@ -267,12 +291,19 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
                 }
               }
             }
-            if (activeErrandRef.current) {
-              const ch = errandChannelRef.current ?? supabase.channel('errands');
-              ch.send({
+            if (activeErrandRef.current && errandChannelRef.current) {
+              errandChannelRef.current.send({
                 type: 'broadcast', event: 'ERRAND_RIDER_LOCATION',
                 payload: { errandId: activeErrandRef.current.errandId, lat: latitude, lng: longitude },
               });
+              // Redraw route every 3 GPS ticks (~9s) toward current target
+              if (riderTargetRef.current) {
+                routeTickRef.current++;
+                if (routeTickRef.current >= 3) {
+                  routeTickRef.current = 0;
+                  fetchRiderRoute({ lat: latitude, lng: longitude }, riderTargetRef.current);
+                }
+              }
             }
           }
         },
@@ -333,13 +364,13 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   // Keep screen awake during active booking so rider can navigate
   useEffect(() => {
-    if (requestAccepted) {
+    if (requestAccepted || activeErrand) {
       KeepAwake.activateKeepAwakeAsync('rider-active-ride');
     } else {
       KeepAwake.deactivateKeepAwake('rider-active-ride');
     }
     return () => { KeepAwake.deactivateKeepAwake('rider-active-ride'); };
-  }, [requestAccepted]);
+  }, [requestAccepted, activeErrand]);
 
   // Reset sheet to expanded when active ride state changes
   useEffect(() => { riderSheetY.setValue(0); }, [requestAccepted]);
@@ -439,18 +470,31 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     return () => { ridesChannelRef.current = null; supabase.removeChannel(ch); };
   }, [isOnline]);
 
-  // Errands channel
+  useEffect(() => { hasErrandRef.current = hasErrand; }, [hasErrand]);
+
+  // Errands channel — depends only on isOnline so it stays alive across accept/decline
   useEffect(() => {
     if (!isOnline) return;
     const errandCh = supabase.channel('errands');
     errandCh.on('broadcast', { event: 'REQUEST_ERRAND' }, ({ payload }) => {
-      if (hasErrand || activeErrand) return;
+      // Use refs so the closure never goes stale when hasErrand / activeErrand change
+      if (hasErrandRef.current || activeErrandRef.current) return;
+      // Deduplicate — user broadcasts every 4s
+      if (!notifiedErrandIdsRef.current.has(payload.errandId)) {
+        notifiedErrandIdsRef.current.add(payload.errandId);
+        const userName = [payload.user?.first_name, payload.user?.last_name].filter(Boolean).join(' ') || 'User';
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: '📦 New Errand Request',
+            body: `₱${payload.fare} · ${userName} · ${(payload.description ?? '').slice(0, 40)}`,
+            sound: true,
+            channelId: 'ride-requests',
+          },
+          trigger: null,
+        });
+      }
       setCurrentErrand(payload);
       setHasErrand(true);
-      Notifications.scheduleNotificationAsync({
-        content: { title: '📦 New Errand Request', body: `₱${payload.fare} · ${payload.description?.slice(0, 40)}`, sound: true, channelId: 'ride-requests' },
-        trigger: null,
-      });
     });
     errandCh.on('broadcast', { event: 'CANCEL_ERRAND' }, ({ payload }) => {
       if (currentErrand?.errandId === payload.errandId) { setHasErrand(false); setCurrentErrand(null); }
@@ -465,7 +509,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     errandCh.subscribe();
     errandChannelRef.current = errandCh;
     return () => { errandChannelRef.current = null; supabase.removeChannel(errandCh); };
-  }, [isOnline, hasErrand, activeErrand]);
+  }, [isOnline]);
 
   // Pop from queue
   useEffect(() => {
@@ -502,6 +546,23 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     return () => stopRideRequestAlert();
   }, [hasRequest, currentRequest]);
 
+  // Errand alert loop — vibrate + repeat notification every 10s while an errand request is pending
+  useEffect(() => {
+    if (!hasErrand || !currentErrand) return;
+    const title = '📦 New Errand Request';
+    const userName = [currentErrand.user?.first_name, currentErrand.user?.last_name].filter(Boolean).join(' ') || 'User';
+    const body = `₱${currentErrand.fare} · ${userName} · ${(currentErrand.description ?? '').slice(0, 40)}`;
+    Vibration.vibrate([0, 400, 200, 400, 200, 400]);
+    errandAlertIntervalRef.current = setInterval(() => {
+      Vibration.vibrate([0, 400, 200, 400, 200, 400]);
+      Notifications.scheduleNotificationAsync({
+        content: { title, body, sound: true, channelId: 'ride-requests' },
+        trigger: null,
+      }).then(id => errandAlertNotifIdsRef.current.push(id)).catch(() => {});
+    }, 10000);
+    return () => stopErrandAlert();
+  }, [hasErrand, currentErrand]);
+
   // Chat subscription when active ride
   useEffect(() => {
     if (!acceptedRideIdRef.current) return;
@@ -521,6 +582,26 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [showChat, messages]);
+
+  // Chat subscription when active errand
+  useEffect(() => {
+    const errandId = activeErrand?.errandId;
+    if (!errandId) return;
+    fetchMessages(errandId).then(setErrandChatMessages);
+    const unsub = subscribeToMessages(errandId, (msg) => {
+      if (msg.sender_id === profile.id) return;
+      setErrandChatMessages(prev => [...prev, msg]);
+      if (!showErrandChat) setErrandChatUnread(c => c + 1);
+    });
+    return unsub;
+  }, [activeErrand?.errandId]);
+
+  useEffect(() => {
+    if (showErrandChat) {
+      setErrandChatUnread(0);
+      setTimeout(() => errandChatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [showErrandChat, errandChatMessages]);
 
   const goOnlineWithVehicle = async (vehicle: RiderVehicle) => {
     setActiveVehicle(vehicle);
@@ -624,6 +705,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
   const handleAcceptErrand = async () => {
     if (!currentErrand) return;
+    stopErrandAlert();
     const errandId = currentErrand.errandId;
     const riderName = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
     const { data: accepted, error } = await supabase.rpc('accept_errand', {
@@ -653,12 +735,17 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       mapRef.current?.setPickupDraggable(false);
       mapRef.current?.flyTo(currentErrand.pickup.coords.lat, currentErrand.pickup.coords.lng, 15);
       if (riderCurrentLocRef.current) {
+        routeTickRef.current = 0;
         fetchRiderRoute(riderCurrentLocRef.current, currentErrand.pickup.coords);
+      } else {
+        // GPS not ready yet — draw route on next tick
+        routeTickRef.current = 4;
       }
     }
   };
 
   const handleDeclineErrand = () => {
+    stopErrandAlert();
     setHasErrand(false);
     setCurrentErrand(null);
   };
@@ -836,6 +923,86 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     setMessages(prev => [...prev, tempMsg]);
     await sendMessage(rideId, profile.id, 'rider', profile.first_name ?? 'Rider', text);
   };
+
+  const handleSendErrandChat = async () => {
+    const text = errandChatInput.trim();
+    const errandId = activeErrand?.errandId;
+    if (!text || !errandId) return;
+    setErrandChatInput('');
+    const tempMsg: ChatMessage = {
+      id: `tmp-${Date.now()}`,
+      ride_id: errandId,
+      sender_id: profile.id,
+      sender_role: 'rider',
+      sender_name: profile.first_name ?? 'Rider',
+      content: text,
+      created_at: new Date().toISOString(),
+    };
+    setErrandChatMessages(prev => [...prev, tempMsg]);
+    await sendMessage(errandId, profile.id, 'rider', profile.first_name ?? 'Rider', text);
+  };
+
+  // ─── Errand chat overlay ────────────────────────────────────────────────────
+  if (showErrandChat) {
+    const userName = activeErrand?.user?.first_name ?? 'User';
+    const userLastName = activeErrand?.user?.last_name ?? '';
+    return (
+      <KeyboardAvoidingView style={styles.chatContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.chatHeader}>
+          <TouchableOpacity onPress={() => setShowErrandChat(false)} style={styles.chatBack}>
+            <Text style={styles.chatBackText}>←</Text>
+          </TouchableOpacity>
+          <View style={styles.chatAvatar}>
+            <Text style={styles.chatAvatarText}>{(userName[0] ?? 'U').toUpperCase()}</Text>
+          </View>
+          <View>
+            <Text style={styles.chatName}>{userName} {userLastName}</Text>
+            <Text style={styles.chatRole}>User</Text>
+          </View>
+        </View>
+        <ScrollView
+          ref={errandChatScrollRef}
+          style={styles.chatMessages}
+          contentContainerStyle={{ padding: 16, gap: 8 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {errandChatMessages.length === 0 && (
+            <Text style={styles.chatEmpty}>No messages yet.</Text>
+          )}
+          {errandChatMessages.map(m => {
+            const isMe = m.sender_id === profile.id;
+            return (
+              <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowThem]}>
+                <View style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleThem]}>
+                  <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextThem]}>
+                    {m.content}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+        <View style={styles.chatInputRow}>
+          <TextInput
+            style={styles.chatInput}
+            placeholder="Type a message..."
+            placeholderTextColor="#9ca3af"
+            value={errandChatInput}
+            onChangeText={setErrandChatInput}
+            onSubmitEditing={handleSendErrandChat}
+            returnKeyType="send"
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !errandChatInput.trim() && styles.sendBtnDisabled]}
+            onPress={handleSendErrandChat}
+            disabled={!errandChatInput.trim()}
+          >
+            <Text style={styles.sendBtnText}>→</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
 
   // ─── Chat overlay ───────────────────────────────────────────────────────────
   if (showChat) {
@@ -1118,6 +1285,9 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
               <TouchableOpacity style={styles.errandStatusBtn} onPress={handleErrandPickedUp}>
                 <Text style={styles.errandStatusBtnText}>✓ Mark Picked Up</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.errandChatBtn} onPress={() => setShowErrandChat(true)}>
+                <Text style={styles.errandChatBtnText}>💬 Chat with User{errandChatUnread > 0 ? ` (${errandChatUnread})` : ''}</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.riderErrandCancelBtn, errandCanceling && styles.disabledBtn]}
                 disabled={errandCanceling}
@@ -1135,7 +1305,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
                 <Text style={[styles.activeErrandStatusText, { color: '#10b981' }]}>Delivering item</Text>
                 {activeErrand.fare ? (
                   <View style={[styles.activeErrandFareChip, { backgroundColor: '#10b981' }]}>
-                    <Text style={styles.activeErrandFareChipText}>₱{activeErrand.fare}</Text>
+                    <Text style={[styles.activeErrandFareChipText, { color: '#fff' }]}>₱{activeErrand.fare}</Text>
                   </View>
                 ) : null}
               </View>
@@ -1187,6 +1357,9 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
 
               <TouchableOpacity style={[styles.errandStatusBtn, { backgroundColor: '#10b981' }]} onPress={handleErrandCompleted}>
                 <Text style={styles.errandStatusBtnText}>✓ Mark Delivered / Completed</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.errandChatBtn} onPress={() => setShowErrandChat(true)}>
+                <Text style={styles.errandChatBtnText}>💬 Chat with User{errandChatUnread > 0 ? ` (${errandChatUnread})` : ''}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.riderErrandCancelBtn, errandCanceling && styles.disabledBtn]}
@@ -1642,6 +1815,8 @@ const styles = StyleSheet.create({
   activeErrandFare: { fontSize: 14, fontWeight: '700', color: '#030712', marginTop: 2, marginBottom: 8 },
   errandStatusBtn: { backgroundColor: '#030712', borderRadius: 12, paddingVertical: 13, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, elevation: 2 },
   errandStatusBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  errandChatBtn: { marginTop: 8, borderRadius: 12, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: '#d1fae5', backgroundColor: '#f0fdf4' },
+  errandChatBtnText: { fontSize: 13, fontWeight: '700', color: '#10b981' },
   riderErrandCancelBtn: { alignSelf: 'center', marginTop: 8, paddingVertical: 4, paddingHorizontal: 12 },
   riderErrandCancelBtnText: { fontSize: 12, color: '#ef4444', fontWeight: '600' },
   disabledBtn: { opacity: 0.55 },

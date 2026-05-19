@@ -6,6 +6,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { supabase, RiderVehicle } from '../../lib/supabase';
 import { useProfile } from '../../contexts/AuthContext';
+import { useUpdate } from '../../contexts/UpdateContext';
 
 const VEHICLE_TYPES = ['Motorcycle', 'Tricycle', 'Car', 'Van'];
 
@@ -37,6 +38,7 @@ const EMPTY_VEHICLE_FORM = {
 
 export default function RiderProfileScreen() {
   const { profile, refetchProfile, signOut } = useProfile();
+  const { updateAvailable, updateReady, isDownloading, isChecking, progress, checkForUpdate, downloadUpdate, applyUpdate } = useUpdate();
 
   // Personal info
   const [editingPersonal, setEditingPersonal] = useState(false);
@@ -695,6 +697,45 @@ export default function RiderProfileScreen() {
         ))}
       </View>
 
+      {/* App Update */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>App Update</Text>
+        {updateReady ? (
+          <>
+            <Text style={styles.updateStatus}>✅ Update ready to apply</Text>
+            <TouchableOpacity style={styles.updateBtn} onPress={applyUpdate}>
+              <Text style={styles.updateBtnText}>Restart Now</Text>
+            </TouchableOpacity>
+          </>
+        ) : updateAvailable ? (
+          <>
+            <Text style={styles.updateStatus}>🔄 New update available</Text>
+            {isDownloading ? (
+              <View style={{ marginTop: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={styles.updateHint}>Downloading...</Text>
+                  <Text style={[styles.updateHint, { fontWeight: '700', color: '#030712' }]}>{progress}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${progress}%` as any }]} />
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.updateBtn} onPress={downloadUpdate}>
+                <Text style={styles.updateBtnText}>Download & Install</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={styles.updateStatus}>✅ App is up to date</Text>
+            <TouchableOpacity style={styles.checkBtn} onPress={checkForUpdate} disabled={isChecking}>
+              <Text style={styles.checkBtnText}>{isChecking ? 'Checking...' : 'Check for Updates'}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
       {/* Sign out */}
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
@@ -765,6 +806,14 @@ const styles = StyleSheet.create({
 
   signOutBtn: { backgroundColor: '#fff', borderRadius: 16, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
   signOutText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
+  updateStatus: { fontSize: 13, color: '#374151', marginBottom: 8, marginTop: 4 },
+  updateHint: { fontSize: 12, color: '#6b7280' },
+  updateBtn: { backgroundColor: '#030712', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+  updateBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  checkBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
+  checkBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  progressTrack: { height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: 8, backgroundColor: '#10b981', borderRadius: 4 },
 
   docHint: { fontSize: 12, color: '#9ca3af', marginBottom: 14, marginTop: 2 },
   docRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },

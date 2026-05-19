@@ -71,15 +71,17 @@ interface ErrandVehicleForm {
   perKmRate: string;
   maintenanceCostPerKm: string;
   convenienceFee: string;
+  freeKmEnabled: boolean;
+  freeKm: string;
   disabled: boolean;
 }
 
 function toErrandForm(t: ErrandVehiclePricing): ErrandVehicleForm {
-  return { baseFare: String(t.baseFare), perKmRate: String(t.perKmRate), maintenanceCostPerKm: String(t.maintenanceCostPerKm), convenienceFee: String(t.convenienceFee), disabled: t.disabled };
+  return { baseFare: String(t.baseFare), perKmRate: String(t.perKmRate), maintenanceCostPerKm: String(t.maintenanceCostPerKm), convenienceFee: String(t.convenienceFee), freeKmEnabled: t.freeKmEnabled ?? false, freeKm: String(t.freeKm ?? 0), disabled: t.disabled };
 }
 
 function fromErrandForm(f: ErrandVehicleForm): ErrandVehiclePricing {
-  return { baseFare: parseFloat(f.baseFare)||0, perKmRate: parseFloat(f.perKmRate)||0, maintenanceCostPerKm: parseFloat(f.maintenanceCostPerKm)||0, convenienceFee: parseFloat(f.convenienceFee)||0, disabled: f.disabled };
+  return { baseFare: parseFloat(f.baseFare)||0, perKmRate: parseFloat(f.perKmRate)||0, maintenanceCostPerKm: parseFloat(f.maintenanceCostPerKm)||0, convenienceFee: parseFloat(f.convenienceFee)||0, freeKmEnabled: f.freeKmEnabled, freeKm: parseFloat(f.freeKm)||0, disabled: f.disabled };
 }
 
 export default function PricingConfigScreen() {
@@ -139,7 +141,7 @@ export default function PricingConfigScreen() {
           setConfig(DEFAULT_PRICING);
           setForms({ moto: toForm(DEFAULT_PRICING.moto), tricycle: toForm(DEFAULT_PRICING.tricycle), eco: toForm(DEFAULT_PRICING.eco), premium: toForm(DEFAULT_PRICING.premium) });
           setErrandForms({ moto: toErrandForm(DEFAULT_PRICING.errand.moto), tricycle: toErrandForm(DEFAULT_PRICING.errand.tricycle) });
-          setErrandDisabled(false);
+          setErrandDisabled(DEFAULT_PRICING.errand.disabled);
           setTeamDiscount('0');
         },
       },
@@ -303,6 +305,26 @@ export default function PricingConfigScreen() {
                   />
                 </View>
               ))}
+              <View style={[s.thresholdHeader, { marginTop: 12 }]}>
+                <Text style={s.fieldLabel}>Free Distance Threshold</Text>
+                <Switch
+                  value={errandForms[v].freeKmEnabled}
+                  onValueChange={val => setErrandForms(p => ({ ...p, [v]: { ...p[v], freeKmEnabled: val } }))}
+                  trackColor={{ true: '#10b981' }}
+                />
+              </View>
+              {errandForms[v].freeKmEnabled && (
+                <View style={s.fieldRow}>
+                  <Text style={s.fieldLabel}>Free km (before per-km charges)</Text>
+                  <TextInput
+                    style={s.fieldInput}
+                    value={errandForms[v].freeKm}
+                    onChangeText={val => setErrandForms(p => ({ ...p, [v]: { ...p[v], freeKm: val } }))}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor="#9ca3af"
+                  />
+                </View>
+              )}
             </View>
           ))}
         </View>

@@ -20,7 +20,10 @@
       "Bash(node *)",
       "Bash(npm run *)",
       "Read(//c/Files/Project/fetch/fetch-gensan/ridebooking-concept/**)",
-      "Bash(npx prettier *)"
+      "Bash(npx prettier *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-PSDrive *)",
+      "PowerShell(Get-Item \"C:\\\\p\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\release\\\\app-release.apk\" | Select-Object FullName, @{N='Size\\(MB\\)';E={[math]::Round\\($_.Length/1MB,2\\)}}, LastWriteTime)"
     ]
   }
 }

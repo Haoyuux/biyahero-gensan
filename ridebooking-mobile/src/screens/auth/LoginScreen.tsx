@@ -310,6 +310,8 @@ export default function LoginScreen() {
 
       <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
       <PrivacyModal visible={showPrivacy} onClose={() => setShowPrivacy(false)} />
+
+      <Text style={styles.buildLabel}>Build: v1</Text>
     </View>
   );
 }
@@ -322,6 +324,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 999, borderBottomRightRadius: 999,
   },
   content: { width: '100%', maxWidth: 320, alignItems: 'center', paddingHorizontal: 32 },
+  buildLabel: { position: 'absolute', bottom: 16, fontSize: 11, color: '#4b5563', fontWeight: '500' },
   logoWrap: { alignItems: 'center', marginBottom: 56 },
   logoImage: { width: 220, height: 110, marginBottom: 4 },
   appName: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.5, marginBottom: 4 },
