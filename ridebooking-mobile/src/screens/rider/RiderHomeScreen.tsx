@@ -632,7 +632,20 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
       await supabase.from('profiles').update({ is_online: false }).eq('id', profile.id);
       return;
     }
-    // Going online — need an approved vehicle
+    // Going online — validate license and vehicle
+    if (!profile.license_url) {
+      Alert.alert("Driver's License Required", "Please upload your Driver's License in your Profile before going online.");
+      return;
+    }
+    if (profile.license_status !== 'approved') {
+      const msg = profile.license_status === 'pending'
+        ? "Your driver's license is pending approval. Please wait for admin verification."
+        : profile.license_status === 'rejected'
+        ? "Your driver's license was rejected. Please re-upload in your Profile."
+        : "Your driver's license has not been submitted yet.";
+      Alert.alert("License Not Approved", msg);
+      return;
+    }
     if (approvedVehicles.length === 0) {
       Alert.alert('No Approved Vehicle', 'You need at least one approved vehicle before going online. Submit your vehicle for verification.');
       return;

@@ -28,6 +28,35 @@ export const verifyRider = (
   status: 'approved' | 'rejected' | 'pending',
 ) => callAdminFn('admin-verify-rider', { riderId, status });
 
+// License approval — direct DB update
+export const updateLicenseStatus = async (
+  riderId: string,
+  status: 'approved' | 'rejected' | 'pending',
+) => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ license_status: status })
+    .eq('id', riderId);
+  if (error) throw error;
+};
+
+// Vehicle approval — direct DB update
+export const updateVehicleStatus = async (
+  vehicleId: string,
+  status: 'approved' | 'rejected' | 'pending',
+  rejectionReason?: string,
+) => {
+  const { error } = await supabase
+    .from('vehicles')
+    .update({
+      status,
+      rejection_reason: rejectionReason ?? null,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', vehicleId);
+  if (error) throw error;
+};
+
 // Phase 1 — Remittances
 export const reviewRemittance = (
   id: string,
