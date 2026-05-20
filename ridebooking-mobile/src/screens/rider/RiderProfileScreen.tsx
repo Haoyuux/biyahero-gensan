@@ -83,9 +83,9 @@ export default function RiderProfileScreen() {
   useEffect(() => {
     supabase
       .from('rides')
-      .select('id, pickup_label, dropoff_label, fare, ride_type, created_at, status, rating')
+      .select('id, pickup_label, dropoff_label, fare, ride_type, completed_at, status, rating')
       .eq('rider_id', profile.id)
-      .order('created_at', { ascending: false })
+      .order('completed_at', { ascending: false })
       .limit(30)
       .then(({ data }) => setRides(data ?? []));
     supabase
@@ -120,9 +120,9 @@ export default function RiderProfileScreen() {
 
 
   const uploadToStorage = async (uri: string, mimeType: string, bucket: string, path: string) => {
-    const formData = new FormData();
-    formData.append('file', { uri, name: path.split('/').pop() ?? 'file', type: mimeType } as any);
-    return supabase.storage.from(bucket).upload(path, formData, { contentType: mimeType, upsert: true });
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return supabase.storage.from(bucket).upload(path, blob, { contentType: mimeType, upsert: true });
   };
 
   const resolveExt = (asset: { mimeType?: string; uri: string }) => {
@@ -171,12 +171,13 @@ export default function RiderProfileScreen() {
       const asset = result.assets[0];
       const ext = resolveExt(asset);
       const mimeType = asset.mimeType ?? `image/${ext}`;
-      const path = `documents/${profile.id}/${docType}.${ext}`;
+      const path = `${profile.id}/${docType}.${ext}`;
       const { error: upErr } = await uploadToStorage(asset.uri, mimeType, 'documents', path);
       if (upErr) { Alert.alert('Upload failed', upErr.message); return; }
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
       const url = urlData.publicUrl;
-      await supabase.from('profiles').update({ license_url: url, license_status: 'pending' }).eq('id', profile.id);
+      const { error: profileErr } = await supabase.from('profiles').update({ license_url: url, license_status: 'pending', rider_status: 'pending' }).eq('id', profile.id);
+      if (profileErr) { Alert.alert('Save failed', profileErr.message); return; }
       setLicenseUrl(url);
       refetchProfile();
     } catch (e: any) {
@@ -515,7 +516,7 @@ export default function RiderProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.rideRoute} numberOfLines={1}>→ {ride.dropoff_label}</Text>
                 <Text style={styles.rideDate}>
-                  {new Date(ride.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {ride.completed_at ? new Date(ride.completed_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                 </Text>
                 {ride.rating != null && (
                   <Text style={styles.rideRating}>{'★'.repeat(ride.rating)}{'☆'.repeat(5 - ride.rating)}</Text>

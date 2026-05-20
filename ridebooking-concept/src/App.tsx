@@ -4302,7 +4302,7 @@ const RiderProfileScreen = ({
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || "");
   const [coverUrl, setCoverUrl] = useState(profile.cover_photo_url || "");
   const [licenseUrl, setLicenseUrl] = useState(
-    profile.drivers_license_url || "",
+    profile.license_url || "",
   );
   const [orUrl, setOrUrl] = useState(profile.or_url || "");
   const [crUrl, setCrUrl] = useState(profile.cr_url || "");
@@ -4387,8 +4387,8 @@ const RiderProfileScreen = ({
       vehicle_model: vehicleModel,
       vehicle_plate: vehiclePlate,
       vehicle_color: vehicleColor,
-      drivers_license_url: licenseUrl || null,
-      ...(licenseUrl && licenseUrl !== profile.drivers_license_url ? { license_status: 'pending' } : {}),
+      license_url: licenseUrl || null,
+      ...(licenseUrl && licenseUrl !== profile.license_url ? { license_status: 'pending' } : {}),
       or_url: orUrl || null,
       cr_url: crUrl || null,
       vehicle_image_url: vehicleImageUrl || null,
@@ -4415,7 +4415,7 @@ const RiderProfileScreen = ({
     setError("");
     const updated = await updateProfile(profile.id, {
       rider_status: "pending",
-      drivers_license_url: licenseUrl,
+      license_url: licenseUrl,
       or_url: orUrl,
       cr_url: crUrl,
       vehicle_image_url: vehicleImageUrl,
@@ -7961,7 +7961,7 @@ const RiderDashboard = ({
               const missingDocs = [
                 !currentProfile.avatar_url && "Profile photo",
                 !currentProfile.phone && "Contact number",
-                !currentProfile.drivers_license_url && "Driver's license",
+                !currentProfile.license_url && "Driver's license",
                 !currentProfile.or_url && "OR (Official Receipt)",
                 !currentProfile.cr_url && "CR (Certificate of Registration)",
                 !currentProfile.vehicle_image_url && "Vehicle photo",
@@ -8123,7 +8123,7 @@ const RiderDashboard = ({
                                 return;
                               }
                               // Going online — validate license and vehicle
-                              if (!currentProfile?.drivers_license_url) {
+                              if (!currentProfile?.license_url) {
                                 alert("Please upload your Driver's License in your Profile before going online.");
                                 return;
                               }
@@ -14945,9 +14945,9 @@ const AdminDashboard = ({
                               'bg-gray-100 text-gray-500'
                             }`}>{selectedRider.license_status ?? 'unsubmitted'}</span>
                           </div>
-                          {selectedRider.drivers_license_url ? (
-                            <a href={selectedRider.drivers_license_url} target="_blank" rel="noopener noreferrer">
-                              <img src={selectedRider.drivers_license_url} alt="License" className="w-full max-h-48 object-contain bg-gray-100 rounded-xl hover:opacity-90 cursor-zoom-in" />
+                          {selectedRider.license_url ? (
+                            <a href={selectedRider.license_url} target="_blank" rel="noopener noreferrer">
+                              <img src={selectedRider.license_url} alt="License" className="w-full max-h-48 object-contain bg-gray-100 rounded-xl hover:opacity-90 cursor-zoom-in" />
                             </a>
                           ) : (
                             <div className="px-4 py-5 flex items-center gap-2 text-gray-300 border border-gray-100 rounded-xl">
@@ -14955,10 +14955,10 @@ const AdminDashboard = ({
                             </div>
                           )}
                           <div className="flex gap-2 mt-2">
-                            <button onClick={() => handleLicenseStatusChange(selectedRider.id, 'approved')} disabled={licenseUpdating || !selectedRider.drivers_license_url} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-bold disabled:opacity-40">
+                            <button onClick={() => handleLicenseStatusChange(selectedRider.id, 'approved')} disabled={licenseUpdating || !selectedRider.license_url} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-xs font-bold disabled:opacity-40">
                               {licenseUpdating ? '...' : 'Approve License'}
                             </button>
-                            <button onClick={() => handleLicenseStatusChange(selectedRider.id, 'rejected')} disabled={licenseUpdating || !selectedRider.drivers_license_url} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-40">
+                            <button onClick={() => handleLicenseStatusChange(selectedRider.id, 'rejected')} disabled={licenseUpdating || !selectedRider.license_url} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-xs font-bold disabled:opacity-40">
                               Reject License
                             </button>
                           </div>
@@ -15165,7 +15165,7 @@ const AdminDashboard = ({
                                   <td className="px-5 py-4">
                                     <div className="flex gap-1 mb-1">
                                       {[
-                                        r.drivers_license_url,
+                                        r.license_url,
                                         r.or_url,
                                         r.cr_url,
                                         r.vehicle_image_url,
@@ -15184,7 +15184,7 @@ const AdminDashboard = ({
                                     <p className="text-[11px] text-gray-400">
                                       {
                                         [
-                                          r.drivers_license_url,
+                                          r.license_url,
                                           r.or_url,
                                           r.cr_url,
                                           r.vehicle_image_url,
@@ -16691,7 +16691,7 @@ const AdminDashboard = ({
                           {[
                             {
                               label: "Driver's License",
-                              url: userDetailModal.drivers_license_url,
+                              url: userDetailModal.license_url,
                             },
                             {
                               label: "OR (Official Receipt)",
