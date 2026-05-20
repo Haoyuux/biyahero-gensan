@@ -66,7 +66,7 @@ export interface Profile {
   vehicle_model: string | null;
   vehicle_plate: string | null;
   vehicle_color: string | null;
-  drivers_license_url: string | null;
+  license_url: string | null;
   license_status: 'unsubmitted' | 'pending' | 'approved' | 'rejected' | null;
   or_url: string | null;
   cr_url: string | null;
