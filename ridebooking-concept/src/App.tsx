@@ -209,6 +209,26 @@ import { sendRideRequestToTelegram } from "@/src/lib/telegramService";
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
 const RIDER_RIDE_KEY = "biyahero_rider_ride";
+const ERRAND_KEY = "biyahero_active_errand";
+
+function readPersistedErrand() {
+  try {
+    const raw = localStorage.getItem(ERRAND_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return s?.errandId ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveErrandState(data: Record<string, any>) {
+  try { localStorage.setItem(ERRAND_KEY, JSON.stringify(data)); } catch { /* silent */ }
+}
+
+function clearErrandState() {
+  try { localStorage.removeItem(ERRAND_KEY); } catch { /* silent */ }
+}
 
 interface FavoritePlace {
   id: string;
@@ -2494,9 +2514,14 @@ const UserApp = ({
   // ── Lazy-initialise ride state from localStorage so the first render already
   // has the correct state — avoids the useEffect race that wiped the saved booking.
   const _pr = React.useRef(readPersistedUserRide());
+  const _pe = React.useRef(readPersistedErrand());
   const [step, setStep] = useState<
     "home" | "select" | "searching" | "matched" | "review" | "errand"
-  >(() => (_pr.current?.step as any) || "home");
+  >(() => {
+    if (_pr.current?.step) return _pr.current.step as any;
+    if (_pe.current?.errandId && _pe.current?.eStep === "matched") return "errand";
+    return "home";
+  });
   const [completedRider, setCompletedRider] = useState<any>(null);
   const [pickup, setPickup] = useState(
     () => _pr.current?.pickup || "Current Location",
@@ -2549,6 +2574,31 @@ const UserApp = ({
       setPricingConfig(cfg);
       savePricingConfig(cfg);
     });
+  }, []);
+
+  // Cross-browser errand restore — when localStorage is empty (different browser / cleared),
+  // query DB for any active errand belonging to this user.
+  useEffect(() => {
+    if (_pe.current?.errandId) return; // already have local state, skip DB hit
+    (async () => {
+      const { data } = await supabase
+        .from("errands")
+        .select("id, status")
+        .eq("user_id", initialProfile.id)
+        .in("status", ["accepted", "picked_up"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!data) return;
+      const seed = {
+        errandId: data.id,
+        eStep: "matched",
+        errandSubStatus: data.status === "picked_up" ? "going_to_dropoff" : "going_to_pickup",
+      };
+      saveErrandState(seed);
+      _pe.current = seed;
+      setStep("errand");
+    })();
   }, []);
   useEffect(() => {
     // Keep in sync when admin saves in the same tab or another tab
@@ -4060,6 +4110,7 @@ const UserApp = ({
                   pricingConfig={pricingConfig}
                   userVouchers={userVouchers}
                   onClose={() => setStep("home")}
+                  initialErrand={_pe.current}
                 />
               )}
               {step === "searching" && (
@@ -8201,29 +8252,48 @@ const RiderDashboard = ({
                               </span>
                             )}
                           </div>
-                          {/* Description */}
+                          {/* Full route — both stops */}
+                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5 space-y-2">
+                            <div className="flex items-start gap-2">
+                              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_pickup" ? "bg-gray-950 ring-2 ring-gray-300" : "bg-gray-400"}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[8px] font-bold text-gray-400 tracking-widest">PICKUP</p>
+                                <p className="text-xs font-semibold text-gray-900 line-clamp-2">{activeErrand.pickup?.label}</p>
+                              </div>
+                              {errandStatus === "going_to_pickup" && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
+                            </div>
+                            <div className="w-px h-3 bg-gray-200 ml-1" />
+                            <div className="flex items-start gap-2">
+                              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_dropoff" ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-gray-300"}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[8px] font-bold text-gray-400 tracking-widest">DROPOFF</p>
+                                <p className="text-xs font-semibold text-gray-900 line-clamp-2">{activeErrand.dropoff?.label}</p>
+                              </div>
+                              {errandStatus === "going_to_dropoff" && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
+                            </div>
+                          </div>
+                          {/* Task description */}
                           {activeErrand.description && (
-                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-2.5">
+                              <p className="text-[8px] font-bold text-emerald-600 tracking-widest mb-1">TASK</p>
                               <p className="text-xs text-gray-700 line-clamp-2">{activeErrand.description}</p>
+                            </div>
+                          )}
+                          {/* Instructions */}
+                          {activeErrand.instructions && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 mb-2.5">
+                              <p className="text-[8px] font-bold text-amber-600 tracking-widest mb-1">INSTRUCTIONS</p>
+                              <p className="text-xs text-gray-700 line-clamp-2">{activeErrand.instructions}</p>
                             </div>
                           )}
                           {/* Recipient */}
                           {activeErrand.recipient_name && (
-                            <div className="flex items-center gap-2 mb-2.5">
-                              <span className="text-xs font-semibold text-gray-700">👤 {activeErrand.recipient_name}</span>
-                              {activeErrand.recipient_phone && <span className="text-xs text-gray-400">{activeErrand.recipient_phone}</span>}
+                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
+                              <p className="text-[8px] font-bold text-gray-400 tracking-widest mb-1">RECIPIENT</p>
+                              <p className="text-xs font-semibold text-gray-900">👤 {activeErrand.recipient_name}</p>
+                              {activeErrand.recipient_phone && <p className="text-xs text-gray-400 mt-0.5">{activeErrand.recipient_phone}</p>}
                             </div>
                           )}
-                          {/* Location */}
-                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
-                            <div className="flex items-start gap-2">
-                              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_pickup" ? "bg-gray-950" : "bg-emerald-500"}`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[8px] font-bold text-gray-400 tracking-widest">{errandStatus === "going_to_pickup" ? "PICKUP" : "DROPOFF"}</p>
-                                <p className="text-xs font-semibold text-gray-900 line-clamp-2">{errandStatus === "going_to_pickup" ? activeErrand.pickup?.label : activeErrand.dropoff?.label}</p>
-                              </div>
-                            </div>
-                          </div>
                           <button
                             onClick={async () => {
                               const errandId = activeErrand.errandId;
@@ -20299,8 +20369,8 @@ function ErrandLocationStep({
         )}
       </div>
 
-      {/* Map */}
-      <div className="relative">
+      {/* Map — shown on mobile only; desktop uses the main map on the right */}
+      <div className="relative md:hidden">
         <div
           className={`absolute top-2 left-1/2 -translate-x-1/2 z-[500] px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm pointer-events-none ${activeLocType === "pickup" ? "bg-blue-500 text-white" : "bg-emerald-500 text-white"}`}
         >
@@ -20353,6 +20423,22 @@ function ErrandLocationStep({
           <div className="absolute bottom-2 right-2 z-[500] bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow">
             {(routeDistM / 1000).toFixed(1)} km
           </div>
+        )}
+      </div>
+
+      {/* Desktop hint — replaces mini-map */}
+      <div className={`hidden md:flex items-center gap-3 rounded-2xl px-4 py-3 border ${activeLocType === "pickup" ? "bg-blue-50 border-blue-200" : "bg-emerald-50 border-emerald-200"}`}>
+        <span className="text-xl">{activeLocType === "pickup" ? "📍" : "🏁"}</span>
+        <div>
+          <p className={`text-xs font-semibold ${activeLocType === "pickup" ? "text-blue-700" : "text-emerald-700"}`}>
+            {activeLocType === "pickup" ? "Setting pickup point" : "Setting dropoff point"}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">Click anywhere on the map · Drag the pin to adjust</p>
+        </div>
+        {routeDistM > 0 && (
+          <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+            {(routeDistM / 1000).toFixed(1)} km
+          </span>
         )}
       </div>
 
@@ -20409,11 +20495,13 @@ const ErrandPanel = ({
   pricingConfig,
   userVouchers,
   onClose,
+  initialErrand = null,
 }: {
   profile: Profile;
   pricingConfig: any;
   userVouchers: UserVoucher[];
   onClose: () => void;
+  initialErrand?: Record<string, any> | null;
 }) => {
   const [eStep, setEStep] = React.useState<ErrandBookingStep>("type");
   const [errandType, setErrandType] = React.useState<ErrandType | null>(null);
@@ -20441,6 +20529,7 @@ const ErrandPanel = ({
   const [voucherErr, setVoucherErr] = React.useState("");
   const [booking, setBooking] = React.useState(false);
   const [matchedRider, setMatchedRider] = React.useState<any>(null);
+  const [errandSubStatus, setErrandSubStatus] = React.useState<"going_to_pickup" | "going_to_dropoff">("going_to_pickup");
   const [activeErrandId, setActiveErrandId] = React.useState<string | null>(
     null,
   );
@@ -20462,6 +20551,85 @@ const ErrandPanel = ({
     setVoucherDiscount(0);
     setAppliedVoucher(null);
   }, [errandType, vehicleType, routeDistM, pricingConfig]);
+
+  // Restore active errand on mount (handles page refresh)
+  React.useEffect(() => {
+    if (!initialErrand?.errandId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("errands")
+        .select("id, status, pickup_label, dropoff_label, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, description, instructions, recipient_name, recipient_phone, fare, rider_id, errand_type, vehicle_type")
+        .eq("id", initialErrand.errandId)
+        .single();
+      if (!data || ["completed", "cancelled"].includes(data.status)) {
+        clearErrandState();
+        onClose();
+        return;
+      }
+      if (data.status === "pending") {
+        // Cancel stale pending errand and start fresh
+        await supabase.from("errands").update({ status: "cancelled" }).eq("id", data.id);
+        clearErrandState();
+        onClose();
+        return;
+      }
+      // Restore state
+      setPickupLabel(data.pickup_label ?? "");
+      setDropoffLabel(data.dropoff_label ?? "");
+      setPickupCoords([data.pickup_lat, data.pickup_lng]);
+      setDropoffCoords([data.dropoff_lat, data.dropoff_lng]);
+      setDescription(data.description ?? "");
+      setInstructions(data.instructions ?? "");
+      setRecipientName(data.recipient_name ?? "");
+      setRecipientPhone(data.recipient_phone ?? "");
+      setErrandType((data.errand_type as ErrandType) ?? null);
+      setVehicleType((data.vehicle_type as ErrandVehicleType) ?? "moto");
+      const restoredFare = data.fare ?? initialErrand.finalFare ?? 0;
+      setFareBreakdown({ total: restoredFare, baseFare: restoredFare, distanceFee: 0, convenienceFee: 0, distanceKm: 0 } as any);
+      const subStatus = data.status === "picked_up" ? "going_to_dropoff" : "going_to_pickup";
+      setErrandSubStatus(subStatus);
+      // Restore rider info
+      if (initialErrand.matchedRider) {
+        setMatchedRider(initialErrand.matchedRider);
+      } else if (data.rider_id) {
+        const { data: rp } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, vehicle_make, vehicle_model, vehicle_plate, avatar_url, phone")
+          .eq("id", data.rider_id)
+          .single();
+        if (rp) setMatchedRider(rp);
+      }
+      setEStep("matched");
+      // Reconnect channel
+      const errandId = data.id;
+      activeErrandIdRef.current = errandId;
+      setActiveErrandId(errandId);
+      const ch = supabase.channel("errands");
+      channelRef.current = ch;
+      ch.on("broadcast", { event: "ERRAND_PICKED_UP" }, (msg: any) => {
+        if (msg.payload?.errandId !== errandId) return;
+        setErrandSubStatus("going_to_dropoff");
+        saveErrandState({ ...initialErrand, errandSubStatus: "going_to_dropoff" });
+      });
+      ch.on("broadcast", { event: "ERRAND_COMPLETED" }, (msg: any) => {
+        if (msg.payload?.errandId !== errandId) return;
+        clearErrandState();
+        ch.unsubscribe();
+        channelRef.current = null;
+        alert("Your errand has been completed! 🎉");
+        onClose();
+      });
+      ch.on("broadcast", { event: "CANCEL_ERRAND" }, (msg: any) => {
+        if (msg.payload?.errandId !== errandId) return;
+        clearErrandState();
+        ch.unsubscribe();
+        channelRef.current = null;
+        alert("Errand was cancelled by the rider.");
+        onClose();
+      });
+      ch.subscribe();
+    })();
+  }, []); // run once on mount
 
   const searchPlace = async (q: string, type: "pickup" | "dropoff") => {
     if (q.length < 3) {
@@ -20615,26 +20783,53 @@ const ErrandPanel = ({
     }
     const ch = supabase.channel("errands");
     channelRef.current = ch;
+    const baseState = {
+      errandId,
+      eStep: "searching",
+      errandSubStatus: "going_to_pickup",
+      errandType,
+      vehicleType,
+      pickupLabel,
+      dropoffLabel,
+      pickupCoords,
+      dropoffCoords,
+      description: description.trim(),
+      instructions: instructions.trim() || null,
+      recipientName: recipientName.trim() || null,
+      recipientPhone: recipientPhone.trim() || null,
+      finalFare,
+      matchedRider: null,
+    };
+    saveErrandState(baseState);
+
     ch.on("broadcast", { event: "ERRAND_ACCEPTED" }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
       stopBroadcast();
       setMatchedRider(msg.payload.rider);
       setEStep("matched");
+      saveErrandState({ ...baseState, eStep: "matched", matchedRider: msg.payload.rider });
     });
     ch.on("broadcast", { event: "CANCEL_ERRAND" }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
       stopBroadcast();
+      clearErrandState();
       ch.unsubscribe();
       channelRef.current = null;
       alert("Errand was cancelled by the rider.");
       onClose();
     });
+    ch.on("broadcast", { event: "ERRAND_PICKED_UP" }, (msg: any) => {
+      if (msg.payload?.errandId !== errandId) return;
+      setErrandSubStatus("going_to_dropoff");
+      saveErrandState({ ...baseState, eStep: "matched", errandSubStatus: "going_to_dropoff", matchedRider: matchedRider });
+    });
     ch.on("broadcast", { event: "ERRAND_COMPLETED" }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
       stopBroadcast();
+      clearErrandState();
       ch.unsubscribe();
       channelRef.current = null;
-      alert("Your errand has been completed!");
+      alert("Your errand has been completed! 🎉");
       onClose();
     });
     ch.subscribe((status) => {
@@ -20705,6 +20900,7 @@ const ErrandPanel = ({
       }
       channelRef.current?.unsubscribe();
       channelRef.current = null;
+      clearErrandState();
     } catch (e) {
       console.error("[CANCEL_ERRAND:user] caught error:", e);
     } finally {
@@ -20724,7 +20920,7 @@ const ErrandPanel = ({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 80, opacity: 0 }}
       transition={{ type: "spring", damping: 28, stiffness: 360 }}
-      className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20 max-h-[90vh] overflow-y-auto"
+      className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20 max-h-[90vh] overflow-y-auto md:relative md:bottom-auto md:left-auto md:right-auto md:rounded-none md:shadow-none md:flex-1 md:overflow-y-auto md:max-h-full"
     >
       <div className="px-5 pt-4 pb-6">
         {/* Header */}
@@ -21095,36 +21291,54 @@ const ErrandPanel = ({
         {/* Step: Matched */}
         {eStep === "matched" && (
           <div className="space-y-3">
-            {/* Status */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-              <p className="text-amber-600 font-bold text-sm flex-1">On the way to pickup</p>
-              <span className="text-lg">🏍️</span>
+            {/* Status banner */}
+            <div className={`rounded-2xl px-4 py-3 flex items-center gap-2.5 border ${errandSubStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-pulse ${errandSubStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
+              <p className={`font-bold text-sm flex-1 ${errandSubStatus === "going_to_pickup" ? "text-amber-700" : "text-emerald-700"}`}>
+                {errandSubStatus === "going_to_pickup" ? "🏍️ Rider on the way to pickup" : "📦 Item picked up · Heading to dropoff"}
+              </p>
             </div>
+
             {/* Rider card */}
             {matchedRider && (
-              <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
-                <div className="w-11 h-11 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0">
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-3">
+                <div className="w-12 h-12 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0 border-2 border-white shadow">
                   {matchedRider.avatar_url ? (
                     <img src={matchedRider.avatar_url} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-white font-bold text-base">{(matchedRider.first_name?.[0] ?? "R").toUpperCase()}</span>
+                    <span className="text-white font-bold text-lg">{(matchedRider.first_name?.[0] ?? "R").toUpperCase()}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-0.5">YOUR RIDER</p>
-                  <p className="font-bold text-gray-950 truncate">{matchedRider.first_name} {matchedRider.last_name}</p>
+                  <p className="font-bold text-gray-950 text-sm">{matchedRider.first_name} {matchedRider.last_name}</p>
                   <p className="text-xs text-gray-400 mt-0.5 truncate">
                     {[matchedRider.vehicle_make, matchedRider.vehicle_model].filter(Boolean).join(" ")}
                     {matchedRider.vehicle_plate ? ` · ${matchedRider.vehicle_plate}` : ""}
                   </p>
+                  {matchedRider.phone && (
+                    <p className="text-xs text-gray-500 mt-0.5">📞 {matchedRider.phone}</p>
+                  )}
                 </div>
                 <div className="bg-gray-950 rounded-xl px-3 py-2 shrink-0">
                   <p className="text-emerald-400 font-black text-lg leading-none">₱{finalFare}</p>
                 </div>
               </div>
             )}
-            {/* Route */}
+
+            {/* Errand type + status pills */}
+            <div className="flex flex-wrap gap-2">
+              {errandType && (
+                <span className="text-xs font-semibold bg-gray-100 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">
+                  {errandType === "buy" ? "🛍️ Buy Something" : errandType === "pickup_deliver" ? "📦 Pickup & Deliver" : "📋 Other"}
+                </span>
+              )}
+              <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${errandSubStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+                {errandSubStatus === "going_to_pickup" ? "🏍️ On the way" : "✓ Item Picked Up"}
+              </span>
+            </div>
+
+            {/* Route card */}
             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 space-y-2">
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-gray-950 mt-1.5 shrink-0" />
@@ -21142,6 +21356,7 @@ const ErrandPanel = ({
                 </div>
               </div>
             </div>
+
             {/* Task */}
             {description && (
               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
@@ -21149,6 +21364,7 @@ const ErrandPanel = ({
                 <p className="text-sm text-gray-700 line-clamp-3">{description}</p>
               </div>
             )}
+
             {/* Recipient */}
             {recipientName && (
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
@@ -21157,10 +21373,11 @@ const ErrandPanel = ({
                 {recipientPhone && <p className="text-xs text-gray-400 mt-0.5">{recipientPhone}</p>}
               </div>
             )}
+
             <button
               onClick={handleCancelSearch}
               disabled={cancelling}
-              className="w-full py-2 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors"
+              className="w-full py-2.5 text-xs font-semibold text-red-500 hover:text-red-700 border border-red-100 hover:border-red-200 rounded-xl transition-colors"
             >
               {cancelling ? "Cancelling..." : "Cancel Errand"}
             </button>
