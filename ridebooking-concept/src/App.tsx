@@ -612,6 +612,16 @@ function FlyToFirstRiderLocation({
   return null;
 }
 
+// Fit map bounds to show both errand pickup and dropoff markers
+function ErrandMapFit({ pickup, dropoff }: { pickup: [number, number]; dropoff: [number, number] }) {
+  const map = useMap();
+  const key = `${pickup[0]},${pickup[1]},${dropoff[0]},${dropoff[1]}`;
+  useEffect(() => {
+    map.fitBounds(L.latLngBounds([pickup, dropoff]), { padding: [60, 60], maxZoom: 15, animate: true });
+  }, [key]);
+  return null;
+}
+
 // Zoom control at a custom corner (avoids conflicts with existing UI)
 function MapZoomControl({
   position = "bottomright",
@@ -3079,6 +3089,12 @@ const UserApp = ({
   const startLoc = pickupCoords || deviceLocation || DEFAULT_CENTER;
   const endLoc = destinationCoords;
 
+  const [errandMapState, setErrandMapState] = useState<{
+    pickupCoords: [number, number] | null;
+    dropoffCoords: [number, number] | null;
+    routeCoords: [number, number][] | null;
+  }>({ pickupCoords: null, dropoffCoords: null, routeCoords: null });
+
   useEffect(() => {
     const channel = supabase.channel("rides");
 
@@ -4109,8 +4125,9 @@ const UserApp = ({
                   profile={currentProfile}
                   pricingConfig={pricingConfig}
                   userVouchers={userVouchers}
-                  onClose={() => setStep("home")}
+                  onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); }}
                   initialErrand={_pe.current}
+                  onMapChange={setErrandMapState}
                 />
               )}
               {step === "searching" && (
@@ -4172,24 +4189,41 @@ const UserApp = ({
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <Marker
-              position={startLoc}
-              icon={
-                step === "home" || step === "select"
-                  ? draggablePickupIcon
-                  : currentLocationIcon
-              }
-              draggable={step === "home" || step === "select"}
-              eventHandlers={{
-                dragend: async (e) => {
-                  const { lat, lng } = e.target.getLatLng();
-                  setPickupCoords([lat, lng]);
-                  const name = await reverseGeocode(lat, lng);
-                  setPickup(name);
-                },
-              }}
-            />
-            {endLoc && (
+            {/* Errand markers — shown when errand panel is open */}
+            {step === "errand" && errandMapState.pickupCoords && (
+              <Marker position={errandMapState.pickupCoords} icon={draggablePickupIcon} />
+            )}
+            {step === "errand" && errandMapState.dropoffCoords && (
+              <Marker position={errandMapState.dropoffCoords} icon={draggableDestIcon} />
+            )}
+            {step === "errand" && errandMapState.routeCoords && (
+              <Polyline positions={errandMapState.routeCoords} color="#10b981" weight={5} opacity={0.85} />
+            )}
+            {step === "errand" && errandMapState.pickupCoords && errandMapState.dropoffCoords && (
+              <ErrandMapFit pickup={errandMapState.pickupCoords} dropoff={errandMapState.dropoffCoords} />
+            )}
+
+            {/* Regular ride markers — hidden during errand */}
+            {step !== "errand" && (
+              <Marker
+                position={startLoc}
+                icon={
+                  step === "home" || step === "select"
+                    ? draggablePickupIcon
+                    : currentLocationIcon
+                }
+                draggable={step === "home" || step === "select"}
+                eventHandlers={{
+                  dragend: async (e) => {
+                    const { lat, lng } = e.target.getLatLng();
+                    setPickupCoords([lat, lng]);
+                    const name = await reverseGeocode(lat, lng);
+                    setPickup(name);
+                  },
+                }}
+              />
+            )}
+            {step !== "errand" && endLoc && (
               <>
                 <Marker
                   position={endLoc}
@@ -6271,6 +6305,8 @@ const RiderDashboard = ({
   // Errand requests (rider side)
   const [currentErrand, setCurrentErrand] = useState<any>(null);
   const [hasErrand, setHasErrand] = useState(false);
+  const hasErrandRef = React.useRef(false);
+  const currentErrandRef = React.useRef<any>(null);
   const [activeErrand, setActiveErrand] = useState<any>(null);
   const activeErrandRef = React.useRef<any>(null);
   const [errandStatus, setErrandStatus] = useState<
@@ -6379,6 +6415,7 @@ const RiderDashboard = ({
     [number, number] | null
   >(null);
   const riderCurrentLocRef = React.useRef<[number, number] | null>(null);
+  const [errandRouteForMap, setErrandRouteForMap] = useState<[number,number][]|null>(null);
   // Tracks pending setTimeout IDs for priority-delayed requests (keyed by rideId)
   const pendingTimersRef = React.useRef<
     Map<string, ReturnType<typeof setTimeout>>
@@ -7010,17 +7047,21 @@ const RiderDashboard = ({
     };
   }, [isOnline, riderReconnectTick]);
 
-  // Errand channel for rider
+  // Keep refs in sync so channel handlers never see stale state
+  useEffect(() => { hasErrandRef.current = hasErrand; }, [hasErrand]);
+  useEffect(() => { currentErrandRef.current = currentErrand; }, [currentErrand]);
+
+  // Errand channel — created once when online, never recreated on state changes
   useEffect(() => {
     if (!isOnline) return;
     const ch = supabase.channel("errands");
     ch.on("broadcast", { event: "REQUEST_ERRAND" }, ({ payload }) => {
-      if (hasErrand || activeErrand) return;
+      if (hasErrandRef.current || activeErrandRef.current) return;
       setCurrentErrand(payload);
       setHasErrand(true);
     });
     ch.on("broadcast", { event: "CANCEL_ERRAND" }, ({ payload }) => {
-      if ((currentErrand as any)?.errandId === payload.errandId) {
+      if (currentErrandRef.current?.errandId === payload.errandId) {
         setHasErrand(false);
         setCurrentErrand(null);
       }
@@ -7030,13 +7071,39 @@ const RiderDashboard = ({
         setErrandStatus("going_to_pickup");
       }
     });
-    ch.subscribe();
     errandChannelConceptRef.current = ch;
+    ch.subscribe();
     return () => {
       errandChannelConceptRef.current = null;
       supabase.removeChannel(ch);
     };
-  }, [isOnline, hasErrand, activeErrand]);
+  }, [isOnline]);
+
+  // When errand is accepted, draw route from rider's current location to target (pickup/dropoff)
+  useEffect(() => {
+    if (!activeErrand) { setErrandRouteForMap(null); return; }
+    const target = errandStatus === "going_to_dropoff"
+      ? activeErrand.dropoff?.coords
+      : activeErrand.pickup?.coords;
+    if (!target) return;
+    const from = riderCurrentLocRef.current;
+    const to: [number, number] = [target.lat ?? target[0], target.lng ?? target[1]];
+    if (!from) {
+      setErrandRouteForMap([to]); // at least show destination
+      return;
+    }
+    fetch(`https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.routes?.[0]) {
+          const coords: [number,number][] = data.routes[0].geometry.coordinates.map(([lng,lat]: [number,number]) => [lat,lng]);
+          setErrandRouteForMap(coords);
+        } else {
+          setErrandRouteForMap([from, to]);
+        }
+      })
+      .catch(() => { if (from) setErrandRouteForMap([from, to]); });
+  }, [activeErrand?.errandId, errandStatus, riderCurrentLoc]);
 
   useEffect(() => {
     if (incomingRequests.length > 0 && !hasRequest && !requestAccepted) {
@@ -8294,6 +8361,29 @@ const RiderDashboard = ({
                               {activeErrand.recipient_phone && <p className="text-xs text-gray-400 mt-0.5">{activeErrand.recipient_phone}</p>}
                             </div>
                           )}
+                          {/* Navigate to target */}
+                          {(() => {
+                            const target = errandStatus === "going_to_dropoff"
+                              ? activeErrand.dropoff?.coords
+                              : activeErrand.pickup?.coords;
+                            if (!target) return null;
+                            const lat = target.lat ?? target[0];
+                            const lng = target.lng ?? target[1];
+                            const label = errandStatus === "going_to_dropoff"
+                              ? activeErrand.dropoff?.label
+                              : activeErrand.pickup?.label;
+                            return (
+                              <a
+                                href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors"
+                              >
+                                🗺️ Navigate to {errandStatus === "going_to_dropoff" ? "Dropoff" : "Pickup"}
+                                {label ? <span className="font-normal text-blue-500 truncate max-w-[120px]">{label}</span> : null}
+                              </a>
+                            );
+                          })()}
                           <button
                             onClick={async () => {
                               const errandId = activeErrand.errandId;
@@ -20496,12 +20586,14 @@ const ErrandPanel = ({
   userVouchers,
   onClose,
   initialErrand = null,
+  onMapChange,
 }: {
   profile: Profile;
   pricingConfig: any;
   userVouchers: UserVoucher[];
   onClose: () => void;
   initialErrand?: Record<string, any> | null;
+  onMapChange?: (state: { pickupCoords: [number,number]|null; dropoffCoords: [number,number]|null; routeCoords: [number,number][]|null }) => void;
 }) => {
   const [eStep, setEStep] = React.useState<ErrandBookingStep>("type");
   const [errandType, setErrandType] = React.useState<ErrandType | null>(null);
@@ -20552,6 +20644,12 @@ const ErrandPanel = ({
     setAppliedVoucher(null);
   }, [errandType, vehicleType, routeDistM, pricingConfig]);
 
+  // Keep main map in sync with errand pickup/dropoff/route
+  const [errandRouteCoords, setErrandRouteCoords] = React.useState<[number,number][]|null>(null);
+  React.useEffect(() => {
+    onMapChange?.({ pickupCoords, dropoffCoords, routeCoords: errandRouteCoords });
+  }, [pickupCoords, dropoffCoords, errandRouteCoords]);
+
   // Restore active errand on mount (handles page refresh)
   React.useEffect(() => {
     if (!initialErrand?.errandId) return;
@@ -20576,8 +20674,12 @@ const ErrandPanel = ({
       // Restore state
       setPickupLabel(data.pickup_label ?? "");
       setDropoffLabel(data.dropoff_label ?? "");
-      setPickupCoords([data.pickup_lat, data.pickup_lng]);
-      setDropoffCoords([data.dropoff_lat, data.dropoff_lng]);
+      const pCoords: [number,number] = [data.pickup_lat, data.pickup_lng];
+      const dCoords: [number,number] = [data.dropoff_lat, data.dropoff_lng];
+      setPickupCoords(pCoords);
+      setDropoffCoords(dCoords);
+      // Fetch route for main map display
+      fetchRoute(pCoords, dCoords);
       setDescription(data.description ?? "");
       setInstructions(data.instructions ?? "");
       setRecipientName(data.recipient_name ?? "");
@@ -20650,10 +20752,16 @@ const ErrandPanel = ({
   const fetchRoute = async (from: [number, number], to: [number, number]) => {
     try {
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=false`,
+        `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`,
       );
       const data = await res.json();
-      if (data.routes?.[0]) setRouteDistM(data.routes[0].distance);
+      if (data.routes?.[0]) {
+        setRouteDistM(data.routes[0].distance);
+        const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+          ([lng, lat]: [number, number]) => [lat, lng]
+        );
+        setErrandRouteCoords(coords);
+      }
     } catch {
       /* silent */
     }
