@@ -56,6 +56,7 @@ const isInMindanao = (lat: number, lon: number) =>
 const genId = () => `ride_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const FAVORITES_KEY = 'biyahero_favorites';
 const USER_RIDE_KEY = 'biyahero_user_ride';
+const ERRAND_KEY = 'biyahero_active_errand';
 
 interface Props { profile: Profile; onSignOut: () => void; }
 
@@ -256,6 +257,32 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     AsyncStorage.getItem(FAVORITES_KEY).then(val => {
       if (val) setFavorites(JSON.parse(val));
     });
+    // Restore active errand — open ErrandScreen if rider was already matched
+    (async () => {
+      const raw = await AsyncStorage.getItem(ERRAND_KEY);
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw);
+          if (saved?.errandId && ['matched', 'picked_up'].includes(saved?.step)) {
+            setShowErrand(true);
+            return;
+          }
+        } catch { /* ignore */ }
+      }
+      // No local state — query DB for active errand (cross-device support)
+      const { data } = await supabase.from('errands')
+        .select('id, status')
+        .eq('user_id', profile.id)
+        .in('status', ['accepted', 'picked_up'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        const step = data.status === 'picked_up' ? 'picked_up' : 'matched';
+        await AsyncStorage.setItem(ERRAND_KEY, JSON.stringify({ errandId: data.id, step }));
+        setShowErrand(true);
+      }
+    })();
     (async () => {
       const raw = await AsyncStorage.getItem(USER_RIDE_KEY);
       if (!raw) return;

@@ -120,9 +120,9 @@ export default function RiderProfileScreen() {
 
 
   const uploadToStorage = async (uri: string, mimeType: string, bucket: string, path: string) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return supabase.storage.from(bucket).upload(path, blob, { contentType: mimeType, upsert: true });
+    const formData = new FormData();
+    formData.append('file', { uri, name: path.split('/').pop() ?? 'file', type: mimeType } as any);
+    return supabase.storage.from(bucket).upload(path, formData, { upsert: true });
   };
 
   const resolveExt = (asset: { mimeType?: string; uri: string }) => {
@@ -463,33 +463,40 @@ export default function RiderProfileScreen() {
 
         {([
           { key: 'license' as const, label: "Driver's License", url: licenseUrl },
-        ]).map(doc => (
-          <View key={doc.key} style={styles.docRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.docLabel}>{doc.label}</Text>
-              <Text style={[styles.docStatus, doc.url ? styles.docUploaded : styles.docMissing]}>
-                {doc.url ? '✓ Uploaded' : 'Not uploaded'}
-              </Text>
+        ]).map(doc => {
+          const isApproved = profile.license_status === 'approved';
+          const statusColor = profile.license_status === 'approved' ? '#10b981' : profile.license_status === 'rejected' ? '#ef4444' : '#f59e0b';
+          const statusLabel = profile.license_status === 'approved' ? '✓ Approved' : profile.license_status === 'rejected' ? '✗ Rejected' : profile.license_status === 'pending' ? '⏳ Pending review' : 'Not uploaded';
+          return (
+            <View key={doc.key} style={styles.docRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.docLabel}>{doc.label}</Text>
+                <Text style={[styles.docStatus, { color: doc.url ? statusColor : '#9ca3af' }]}>
+                  {statusLabel}
+                </Text>
+              </View>
+              <View style={styles.docActions}>
+                {doc.url ? (
+                  <TouchableOpacity style={styles.docViewBtn} onPress={() => setPreviewDoc({ label: doc.label, url: doc.url })}>
+                    <Text style={styles.docViewText}>View</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {!isApproved && (
+                  <TouchableOpacity
+                    style={styles.docUploadBtn}
+                    onPress={() => pickDocument(doc.key)}
+                    disabled={loadingDoc === doc.key}
+                  >
+                    {loadingDoc === doc.key
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={styles.docUploadText}>{doc.url ? 'Replace' : 'Upload'}</Text>
+                    }
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-            <View style={styles.docActions}>
-              {doc.url ? (
-                <TouchableOpacity style={styles.docViewBtn} onPress={() => setPreviewDoc({ label: doc.label, url: doc.url })}>
-                  <Text style={styles.docViewText}>View</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity
-                style={styles.docUploadBtn}
-                onPress={() => pickDocument(doc.key)}
-                disabled={loadingDoc === doc.key}
-              >
-                {loadingDoc === doc.key
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.docUploadText}>{doc.url ? 'Replace' : 'Upload'}</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* Document preview modal */}
@@ -564,7 +571,7 @@ export default function RiderProfileScreen() {
               <Text style={styles.vehicleViewSection}>VEHICLE DETAILS</Text>
               {([
                 ['Type', viewingVehicle.vehicle_type],
-                ['Make', viewingVehicle.vehicle_make ?? '—'],
+                ['Brand', viewingVehicle.vehicle_make ?? '—'],
                 ['Model', viewingVehicle.vehicle_model ?? '—'],
                 ['Plate', viewingVehicle.vehicle_plate ?? '—'],
                 ['Color', viewingVehicle.vehicle_color ?? '—'],
@@ -622,7 +629,7 @@ export default function RiderProfileScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.fieldLabel}>MAKE (e.g. Honda)</Text>
+            <Text style={styles.fieldLabel}>BRAND (e.g. Honda)</Text>
             <TextInput style={styles.input} value={vehicleForm.vehicle_make} onChangeText={v => setVehicleForm(f => ({ ...f, vehicle_make: v }))} placeholderTextColor="#9ca3af" />
             <Text style={styles.fieldLabel}>MODEL (e.g. Click 125i)</Text>
             <TextInput style={styles.input} value={vehicleForm.vehicle_model} onChangeText={v => setVehicleForm(f => ({ ...f, vehicle_model: v }))} placeholderTextColor="#9ca3af" />

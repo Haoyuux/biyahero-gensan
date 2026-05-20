@@ -224,22 +224,40 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
   useEffect(() => {
     supabase.from('profiles').update({ is_online: false }).eq('id', profile.id);
     unregisterPushToken();
-    // Restore active errand from previous session
-    AsyncStorage.getItem(RIDER_ERRAND_KEY).then(async raw => {
-      if (!raw) return;
-      try {
-        const saved = JSON.parse(raw);
-        if (!saved.errandId) return;
-        const { data } = await supabase.from('errands').select('status, rider_id').eq('id', saved.errandId).single();
-        if (!data || data.rider_id !== profile.id || !['accepted', 'picked_up'].includes(data.status)) {
-          AsyncStorage.removeItem(RIDER_ERRAND_KEY);
-          return;
-        }
-        setActiveErrand(saved);
-        activeErrandRef.current = saved;
+    // Restore active errand from previous session (with cross-device DB fallback)
+    (async () => {
+      const raw = await AsyncStorage.getItem(RIDER_ERRAND_KEY);
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw);
+          if (saved?.errandId) {
+            const { data } = await supabase.from('errands').select('status, rider_id').eq('id', saved.errandId).single();
+            if (data && data.rider_id === profile.id && ['accepted', 'picked_up'].includes(data.status)) {
+              setActiveErrand(saved);
+              activeErrandRef.current = saved;
+              setErrandStatus(data.status === 'picked_up' ? 'going_to_dropoff' : 'going_to_pickup');
+              return;
+            }
+            AsyncStorage.removeItem(RIDER_ERRAND_KEY);
+          }
+        } catch { AsyncStorage.removeItem(RIDER_ERRAND_KEY); }
+      }
+      // No local state — query DB for active errand (cross-device support)
+      const { data } = await supabase.from('errands')
+        .select('id, status, request_data')
+        .eq('rider_id', profile.id)
+        .in('status', ['accepted', 'picked_up'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data?.request_data) {
+        const errand = { ...data.request_data, errandId: data.id };
+        await AsyncStorage.setItem(RIDER_ERRAND_KEY, JSON.stringify(errand));
+        setActiveErrand(errand);
+        activeErrandRef.current = errand;
         setErrandStatus(data.status === 'picked_up' ? 'going_to_dropoff' : 'going_to_pickup');
-      } catch { AsyncStorage.removeItem(RIDER_ERRAND_KEY); }
-    });
+      }
+    })();
   }, []);
 
   // Load approved vehicles
@@ -272,7 +290,6 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
             }
           }
           if (isOnlineRef.current) {
-            // Fire-and-forget — don't block GPS callback on DB round-trip
             supabase.from('profiles')
               .update({ last_lat: latitude, last_lng: longitude })
               .eq('id', profile.id);
@@ -282,7 +299,6 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
                 type: 'broadcast', event: 'RIDER_LOCATION',
                 payload: { rideId: acceptedRideIdRef.current, lat: latitude, lng: longitude },
               });
-              // Redraw route every 3 GPS ticks (~9s) toward current target
               if (riderTargetRef.current) {
                 routeTickRef.current++;
                 if (routeTickRef.current >= 3) {
@@ -291,18 +307,23 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
                 }
               }
             }
-            if (activeErrandRef.current && errandChannelRef.current) {
+          }
+          // Always update DB + broadcast errand location when errand active — independent of isOnline
+          if (activeErrandRef.current) {
+            supabase.from('profiles')
+              .update({ last_lat: latitude, last_lng: longitude })
+              .eq('id', profile.id);
+            if (errandChannelRef.current) {
               errandChannelRef.current.send({
                 type: 'broadcast', event: 'ERRAND_RIDER_LOCATION',
                 payload: { errandId: activeErrandRef.current.errandId, lat: latitude, lng: longitude },
               });
-              // Redraw route every 3 GPS ticks (~9s) toward current target
-              if (riderTargetRef.current) {
-                routeTickRef.current++;
-                if (routeTickRef.current >= 3) {
-                  routeTickRef.current = 0;
-                  fetchRiderRoute({ lat: latitude, lng: longitude }, riderTargetRef.current);
-                }
+            }
+            if (riderTargetRef.current) {
+              routeTickRef.current++;
+              if (routeTickRef.current >= 3) {
+                routeTickRef.current = 0;
+                fetchRiderRoute({ lat: latitude, lng: longitude }, riderTargetRef.current);
               }
             }
           }
@@ -317,6 +338,25 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     })();
     return () => { try { locationSub.current?.remove(); } catch { /* web compat */ } };
   }, [mapReady]);
+
+  // Immediately write current position to DB when errand becomes active (no waiting for 5m move)
+  useEffect(() => {
+    if (!activeErrand?.errandId) return;
+    (async () => {
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const { latitude, longitude } = loc.coords;
+        riderCurrentLocRef.current = { lat: latitude, lng: longitude };
+        await supabase.from('profiles').update({ last_lat: latitude, last_lng: longitude }).eq('id', profile.id);
+        if (errandChannelRef.current) {
+          errandChannelRef.current.send({
+            type: 'broadcast', event: 'ERRAND_RIDER_LOCATION',
+            payload: { errandId: activeErrand.errandId, lat: latitude, lng: longitude },
+          });
+        }
+      } catch { /* silent */ }
+    })();
+  }, [activeErrand?.errandId]);
 
   // Restore map markers + route after app restart mid-ride
   useEffect(() => {
@@ -1081,7 +1121,7 @@ export default function RiderHomeScreen({ profile, onSignOut }: Props) {
     );
   }
 
-  riderSheetSnapRef.current = requestAccepted ? SCREEN_HEIGHT * 0.45 : 180;
+  riderSheetSnapRef.current = requestAccepted ? SCREEN_HEIGHT * 0.45 : activeErrand ? SCREEN_HEIGHT * 0.45 : 180;
 
   return (
     <View style={styles.container}>

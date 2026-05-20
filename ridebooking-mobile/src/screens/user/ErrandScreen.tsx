@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Modal,
   ScrollView, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, Image,
+  Animated, PanResponder, useWindowDimensions,
 } from 'react-native';
 import * as Location from 'expo-location';
 import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
@@ -45,6 +46,30 @@ const ERRAND_KEY = 'biyahero_active_errand';
 
 export default function ErrandScreen({ onClose }: { onClose: () => void }) {
   const { profile } = useProfile();
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+
+  // Draggable bottom sheet for matched/picked_up step
+  const sheetY = useRef(new Animated.Value(0)).current;
+  const sheetSnapRef = useRef(0);
+  const sheetPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onPanResponderMove: (_, gs) => {
+        sheetY.setValue(Math.max(0, Math.min(sheetSnapRef.current, gs.dy)));
+      },
+      onPanResponderRelease: (_, gs) => {
+        const snap = sheetSnapRef.current;
+        const shouldCollapse = gs.dy > snap * 0.3 || gs.vy > 0.5;
+        Animated.spring(sheetY, {
+          toValue: shouldCollapse ? snap : 0,
+          useNativeDriver: true,
+          tension: 120,
+          friction: 14,
+        }).start();
+      },
+    })
+  ).current;
   const [step, setStep] = useState<ErrandStep>('type');
   const [errandType, setErrandType] = useState<ErrandType | null>(null);
   const [pickupLabel, setPickupLabel] = useState('');
@@ -84,6 +109,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
   const broadcastPayloadRef = useRef<any>(null);
   const channelRef = useRef<any>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const riderPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Chat
   const [showChat, setShowChat] = useState(false);
@@ -100,14 +126,14 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
   const lastRiderRouteTimeRef = useRef<number>(0);
   const matchedMapReadyRef = useRef(false);
 
-  useEffect(() => { stepRef.current = step; }, [step]);
+  useEffect(() => { stepRef.current = step; sheetY.setValue(0); }, [step]);
   useEffect(() => { pickupCoordsRef.current = pickupCoords; }, [pickupCoords]);
   useEffect(() => { dropoffCoordsRef.current = dropoffCoords; }, [dropoffCoords]);
 
   // Draw route from rider's current position to pickup (matched) or dropoff (picked_up)
   const drawRiderRoute = useCallback(async (riderLat: number, riderLng: number, forceImmediate = false) => {
     const now = Date.now();
-    if (!forceImmediate && now - lastRiderRouteTimeRef.current < 8000) return;
+    if (!forceImmediate && now - lastRiderRouteTimeRef.current < 4000) return;
     lastRiderRouteTimeRef.current = now;
     const target = stepRef.current === 'picked_up' ? dropoffCoordsRef.current : pickupCoordsRef.current;
     if (!target) return;
@@ -130,6 +156,35 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
       drawRiderRoute(lastRiderPosRef.current.lat, lastRiderPosRef.current.lng, true);
     }
   }, [step, drawRiderRoute]);
+
+  // Poll rider's last_lat/last_lng from DB — reliable fallback when broadcast is missed
+  useEffect(() => {
+    if ((step !== 'matched' && step !== 'picked_up') || !matchedRider?.id) return;
+    const riderId = matchedRider.id;
+    const poll = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('last_lat, last_lng')
+        .eq('id', riderId)
+        .single();
+      if (!data?.last_lat || !data?.last_lng) return;
+      const { last_lat: lat, last_lng: lng } = data;
+      const last = lastRiderPosRef.current;
+      if (last && Math.abs(last.lat - lat) < 0.000005 && Math.abs(last.lng - lng) < 0.000005) return;
+      const isFirst = !lastRiderPosRef.current;
+      lastRiderPosRef.current = { lat, lng };
+      if (matchedMapReadyRef.current) {
+        matchedMapRef.current?.setRiderLocation(lat, lng);
+        if (isFirst) matchedMapRef.current?.flyTo(lat, lng, 14);
+      }
+      drawRiderRoute(lat, lng);
+    };
+    poll();
+    riderPollRef.current = setInterval(poll, 3000);
+    return () => {
+      if (riderPollRef.current) { clearInterval(riderPollRef.current); riderPollRef.current = null; }
+    };
+  }, [step, matchedRider?.id, drawRiderRoute]);
 
   // Subscribe to chat messages when errand is active
   useEffect(() => {
@@ -277,7 +332,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
         if (saved.rider) {
           setMatchedRider(saved.rider);
         } else if (data.rider_id) {
-          supabase.from('profiles').select('first_name, last_name, vehicle_make, vehicle_model, vehicle_plate, avatar_url, phone').eq('id', data.rider_id).single()
+          supabase.from('profiles').select('id, first_name, last_name, vehicle_make, vehicle_model, vehicle_plate, avatar_url, phone').eq('id', data.rider_id).single()
             .then(({ data: rp }) => { if (rp) setMatchedRider(rp); });
         }
         const restoredStep = data.status === 'picked_up' ? 'picked_up' : 'matched';
@@ -854,11 +909,20 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
             lastRiderRouteTimeRef.current = 0;
             drawRiderRoute(lastRiderPosRef.current.lat, lastRiderPosRef.current.lng, true);
           } else {
-            // No rider yet — zoom to show both pickup & dropoff markers and wait for rider
+            // No rider yet — zoom to show both pickup & dropoff markers and draw static route
             if (pickupCoords && dropoffCoords) {
               const midLat = (pickupCoords.lat + dropoffCoords.lat) / 2;
               const midLng = (pickupCoords.lng + dropoffCoords.lng) / 2;
               matchedMapRef.current?.flyTo(midLat, midLng, 13);
+              // Draw pickup→dropoff route immediately so user sees the path right away
+              fetch(`https://router.project-osrm.org/route/v1/driving/${pickupCoords.lng},${pickupCoords.lat};${dropoffCoords.lng},${dropoffCoords.lat}?overview=full&geometries=geojson`)
+                .then(r => r.json())
+                .then(data => {
+                  if (!data.routes?.[0]) return;
+                  const routeCoords: [number, number][] = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
+                  matchedMapRef.current?.drawRoute(routeCoords);
+                })
+                .catch(() => {});
             } else if (pickupCoords) {
               matchedMapRef.current?.flyTo(pickupCoords.lat, pickupCoords.lng, 14);
             }
@@ -873,8 +937,13 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
         </Text>
       </View>
 
-      {/* Bottom panel */}
-      <ScrollView style={s.matchedBottomPanel} contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 20 : 8 }} showsVerticalScrollIndicator={false}>
+      {/* Bottom panel — draggable sheet */}
+      {(() => { sheetSnapRef.current = SCREEN_HEIGHT * 0.48; return null; })()}
+      <Animated.View style={[s.matchedBottomPanel, { transform: [{ translateY: sheetY }] }]}>
+        <View {...sheetPan.panHandlers}>
+          <View style={s.sheetHandle} />
+        </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 20 : 8 }} showsVerticalScrollIndicator={false}>
 
         {/* Rider card */}
         {matchedRider && (
@@ -981,6 +1050,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
           )
         )}
       </ScrollView>
+      </Animated.View>
 
       {/* Chat overlay */}
       {showChat && (
@@ -1135,7 +1205,8 @@ const s = StyleSheet.create({
   // Matched step with map
   matchedTopBadge: { position: 'absolute', top: Platform.OS === 'ios' ? 54 : 12, left: 16, right: 16, backgroundColor: '#f0fdf4', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#bbf7d0', alignItems: 'center' },
   matchedTopBadgeText: { fontSize: 13, fontWeight: '700', color: '#10b981' },
-  matchedBottomPanel: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '55%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 14, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 16, elevation: 10 },
+  matchedBottomPanel: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '55%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 16, elevation: 10 },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginBottom: 10 },
 
   // Rider card
   matchedRiderCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f9fafb', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#f3f4f6' },
