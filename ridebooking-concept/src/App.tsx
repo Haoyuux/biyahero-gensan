@@ -21174,6 +21174,29 @@ const ErrandPanel = ({
   const [errandChatUnread, setErrandChatUnread] = React.useState(0);
   const isErrandChatOpenRef = React.useRef(false);
   isErrandChatOpenRef.current = isErrandChatOpen;
+
+  // Draggable bottom sheet (matched step only)
+  const [sheetOpen, setSheetOpen] = React.useState(true);
+  const [dragOffset, setDragOffset] = React.useState(0);
+  const isDraggingSheet = React.useRef(false);
+  const dragStartYSheet = React.useRef<number | null>(null);
+  React.useEffect(() => { if (eStep === "matched") setSheetOpen(true); }, [eStep]);
+  const onSheetDragStart = (clientY: number) => { isDraggingSheet.current = true; dragStartYSheet.current = clientY; };
+  const onSheetDragMove = (clientY: number) => {
+    if (!isDraggingSheet.current || dragStartYSheet.current === null) return;
+    const dy = clientY - dragStartYSheet.current;
+    if (sheetOpen) setDragOffset(Math.max(0, dy));
+    else setDragOffset(Math.min(0, dy));
+  };
+  const onSheetDragEnd = (clientY: number) => {
+    if (!isDraggingSheet.current || dragStartYSheet.current === null) return;
+    isDraggingSheet.current = false;
+    const dy = clientY - dragStartYSheet.current;
+    if (sheetOpen && dy > 80) setSheetOpen(false);
+    else if (!sheetOpen && dy < -80) setSheetOpen(true);
+    setDragOffset(0);
+    dragStartYSheet.current = null;
+  };
   const [activeErrandId, setActiveErrandId] = React.useState<string | null>(
     null,
   );
@@ -21634,8 +21657,175 @@ const ErrandPanel = ({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 80, opacity: 0 }}
       transition={{ type: "spring", damping: 28, stiffness: 360 }}
-      className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20 max-h-[90vh] overflow-y-auto md:relative md:bottom-auto md:left-auto md:right-auto md:rounded-none md:shadow-none md:flex-1 md:overflow-y-auto md:max-h-full"
+      className={eStep === "matched"
+        ? "absolute bottom-0 left-0 right-0 z-20 overflow-hidden md:relative md:bottom-auto md:left-auto md:right-auto md:overflow-visible md:flex-1"
+        : "absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20 max-h-[90vh] overflow-y-auto md:relative md:bottom-auto md:left-auto md:right-auto md:rounded-none md:shadow-none md:flex-1 md:overflow-y-auto md:max-h-full"
+      }
+      style={eStep === "matched" ? { height: "65vh" } : undefined}
     >
+      {/* Matched step: draggable bottom sheet */}
+      {eStep === "matched" && (
+        <div
+          className="h-full bg-white rounded-t-3xl shadow-2xl flex flex-col md:h-full md:rounded-none md:shadow-none md:overflow-y-auto"
+          style={{
+            transform: sheetOpen
+              ? `translateY(${Math.max(0, dragOffset)}px)`
+              : `translateY(calc(65vh - 88px + ${Math.min(0, dragOffset)}px))`,
+            transition: isDraggingSheet.current ? "none" : "transform 0.3s cubic-bezier(0.32,0.72,0,1)",
+          }}
+        >
+          {/* Drag handle — touch area */}
+          <div
+            className="w-full pt-3 pb-1 flex flex-col items-center cursor-grab active:cursor-grabbing select-none touch-none flex-shrink-0 md:hidden"
+            onMouseDown={e => onSheetDragStart(e.clientY)}
+            onMouseMove={e => onSheetDragMove(e.clientY)}
+            onMouseUp={e => onSheetDragEnd(e.clientY)}
+            onMouseLeave={e => { if (isDraggingSheet.current) onSheetDragEnd(e.clientY); }}
+            onTouchStart={e => onSheetDragStart(e.touches[0].clientY)}
+            onTouchMove={e => { e.preventDefault(); onSheetDragMove(e.touches[0].clientY); }}
+            onTouchEnd={e => onSheetDragEnd(e.changedTouches[0].clientY)}
+          >
+            <div className="w-10 h-1 bg-gray-200 rounded-full" />
+          </div>
+
+          {/* Always-visible summary row (tap to toggle, drag handle on desktop) */}
+          <div
+            className="px-5 pb-2 flex items-center gap-3 cursor-pointer flex-shrink-0 md:hidden"
+            onClick={() => setSheetOpen(o => !o)}
+          >
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-pulse ${errandSubStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
+            <p className={`text-sm font-bold flex-1 truncate ${errandSubStatus === "going_to_pickup" ? "text-amber-700" : "text-emerald-700"}`}>
+              {errandSubStatus === "going_to_pickup" ? "🏍️ Rider on the way to pickup" : "📦 Item picked up · Delivering"}
+            </p>
+            <button onClick={e => { e.stopPropagation(); onClose(); }} className="text-gray-400 hover:text-gray-700 text-lg shrink-0 px-1">✕</button>
+            <ChevronLeft size={18} className={`text-gray-400 transition-transform duration-300 ${sheetOpen ? "rotate-90" : "-rotate-90"} shrink-0`} />
+          </div>
+
+          {/* Desktop header (always visible, not draggable) */}
+          <div className="hidden md:flex items-center justify-between px-5 pt-4 mb-4 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📦</span>
+              <h2 className="text-lg font-bold text-gray-950">Sugo / Errand</h2>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+          </div>
+
+          {/* Scrollable details */}
+          <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3">
+            {/* Status banner */}
+            <div className={`rounded-2xl px-4 py-3 flex items-center gap-2.5 border ${errandSubStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-pulse ${errandSubStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
+              <p className={`font-bold text-sm flex-1 ${errandSubStatus === "going_to_pickup" ? "text-amber-700" : "text-emerald-700"}`}>
+                {errandSubStatus === "going_to_pickup" ? "🏍️ Rider on the way to pickup" : "📦 Item picked up · Heading to dropoff"}
+              </p>
+            </div>
+            {matchedRider && (
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0 border-2 border-white shadow">
+                    {matchedRider.avatar_url ? (
+                      <img src={matchedRider.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white font-bold text-lg">{(matchedRider.first_name?.[0] ?? "R").toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-0.5">YOUR RIDER</p>
+                    <p className="font-bold text-gray-950 text-sm">{matchedRider.first_name} {matchedRider.last_name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                      {[matchedRider.vehicle_make, matchedRider.vehicle_model].filter(Boolean).join(" ")}
+                      {matchedRider.vehicle_plate ? ` · ${matchedRider.vehicle_plate}` : ""}
+                    </p>
+                    {matchedRider.phone ? (
+                      <a href={`tel:${matchedRider.phone}`} className="text-xs text-emerald-600 font-semibold mt-0.5 block hover:underline">
+                        📞 {matchedRider.phone}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-0.5">No contact number</p>
+                    )}
+                  </div>
+                  <div className="bg-gray-950 rounded-xl px-3 py-2 shrink-0">
+                    <p className="text-emerald-400 font-black text-lg leading-none">₱{finalFare}</p>
+                  </div>
+                </div>
+                {matchedRider.vehicle_image_url && (
+                  <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50" style={{ height: 140 }}>
+                    <img src={matchedRider.vehicle_image_url} alt="Rider's vehicle" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  {matchedRider.phone && (
+                    <a href={`tel:${matchedRider.phone}`} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors">
+                      <Phone size={14} /> Call Rider
+                    </a>
+                  )}
+                  <button
+                    onClick={() => { setIsErrandChatOpen(true); setErrandChatUnread(0); }}
+                    className="flex-1 relative flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    <MessageSquare size={14} /> Chat with Rider
+                    {errandChatUnread > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                        {errandChatUnread > 9 ? "9+" : errandChatUnread}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {errandType && (
+                <span className="text-xs font-semibold bg-gray-100 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">
+                  {errandType === "buy" ? "🛍️ Buy Something" : errandType === "pickup_deliver" ? "📦 Pickup & Deliver" : "📋 Other"}
+                </span>
+              )}
+              <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${errandSubStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+                {errandSubStatus === "going_to_pickup" ? "🏍️ On the way" : "✓ Item Picked Up"}
+              </span>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-gray-950 mt-1.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-bold text-gray-400 tracking-widest">PICKUP</p>
+                  <p className="text-sm font-semibold text-gray-900 leading-snug">{pickupLabel}</p>
+                </div>
+              </div>
+              <div className="w-px h-3 bg-gray-200 ml-1" />
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-bold text-gray-400 tracking-widest">DROPOFF</p>
+                  <p className="text-sm font-semibold text-gray-900 leading-snug">{dropoffLabel}</p>
+                </div>
+              </div>
+            </div>
+            {description && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                <p className="text-[9px] font-bold text-emerald-600 tracking-widest mb-1">TASK</p>
+                <p className="text-sm text-gray-700 line-clamp-3">{description}</p>
+              </div>
+            )}
+            {recipientName && (
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-1">RECIPIENT</p>
+                <p className="text-sm font-semibold text-gray-900">👤 {recipientName}</p>
+                {recipientPhone && <p className="text-xs text-gray-400 mt-0.5">{recipientPhone}</p>}
+              </div>
+            )}
+            <button
+              onClick={handleCancelSearch}
+              disabled={cancelling}
+              className="w-full py-2.5 text-xs font-semibold text-red-500 hover:text-red-700 border border-red-100 hover:border-red-200 rounded-xl transition-colors"
+            >
+              {cancelling ? "Cancelling..." : "Cancel Errand"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Non-matched steps: regular scrollable panel */}
+      {eStep !== "matched" && (
       <div className="px-5 pt-4 pb-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -22002,8 +22192,8 @@ const ErrandPanel = ({
           </div>
         )}
 
-        {/* Step: Matched */}
-        {eStep === "matched" && (
+        {/* Step: Matched handled by draggable sheet above */}
+        {false && eStep === "matched" && (
           <div className="space-y-3">
             {/* Status banner */}
             <div className={`rounded-2xl px-4 py-3 flex items-center gap-2.5 border ${errandSubStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
@@ -22137,6 +22327,7 @@ const ErrandPanel = ({
           </div>
         )}
       </div>
+      )}
     </motion.div>
   );
 };
