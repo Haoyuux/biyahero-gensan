@@ -615,9 +615,11 @@ function FlyToFirstRiderLocation({
 // Fly map to a single coordinate (used for errand location pin updates)
 function MapFlyTo({ coords }: { coords: [number, number] | null }) {
   const map = useMap();
-  const key = coords ? `${coords[0]},${coords[1]}` : "";
+  const valid = coords != null && !isNaN(coords[0]) && !isNaN(coords[1]);
+  const key = valid ? `${coords![0]},${coords![1]}` : "";
   useEffect(() => {
-    if (coords && key) map.flyTo(coords, 16, { animate: true, duration: 0.8 });
+    if (!valid || !key) return;
+    map.flyTo(coords!, 16, { animate: true, duration: 0.8 });
   }, [key]);
   return null;
 }
@@ -20815,9 +20817,10 @@ function ErrandLocationStep({
   };
 
   const selectSugg = async (item: any, type: "pickup" | "dropoff") => {
-    const lat = parseFloat(item.lat),
-      lng = parseFloat(item.lon);
-    const label = item.display_name.split(",").slice(0, 2).join(", ");
+    const lat = parseFloat(item.lat ?? item.latitude ?? "");
+    const lng = parseFloat(item.lon ?? item.longitude ?? "");
+    if (isNaN(lat) || isNaN(lng)) return; // guard against malformed Nominatim results
+    const label = (item.display_name ?? "").split(",").slice(0, 2).join(", ").trim() || "Selected location";
     setFlyTarget([lat, lng]);
     if (type === "pickup") {
       setPickupQ(label);
@@ -20833,6 +20836,7 @@ function ErrandLocationStep({
 
   const handleSetLocation = React.useCallback(
     async (lat: number, lng: number, type: "pickup" | "dropoff") => {
+      if (isNaN(lat) || isNaN(lng)) return;
       const name = await reverseGeocode(lat, lng);
       if (type === "pickup") {
         setPickupQ(name);
@@ -20847,19 +20851,35 @@ function ErrandLocationStep({
   );
 
   const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Your browser does not support location access.");
+      return;
+    }
     setLocating(true);
+    const onSuccess = async (pos: GeolocationPosition) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      if (isNaN(lat) || isNaN(lng)) { setLocating(false); return; }
+      setFlyTarget([lat, lng]);
+      await handleSetLocation(lat, lng, "pickup");
+      setLocating(false);
+    };
+    // Try high-accuracy first; fall back to low-accuracy if unavailable/timeout
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
-        setFlyTarget([lat, lng]);
-        await handleSetLocation(lat, lng, "pickup");
-        setLocating(false);
-      },
+      onSuccess,
       () => {
-        alert("Could not get location");
-        setLocating(false);
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          (err) => {
+            const msg = err.code === 1
+              ? "Location access denied. Please allow location in your browser settings, then try again."
+              : "Could not get your location. Please search for your address instead.";
+            alert(msg);
+            setLocating(false);
+          },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+        );
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     );
   };
 
