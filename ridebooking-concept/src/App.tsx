@@ -6241,6 +6241,297 @@ const RiderActiveRide = ({
   );
 };
 
+// ─── Rider Active Errand ─────────────────────────────────────────────────────
+
+const RiderActiveErrand = ({
+  activeErrand,
+  errandStatus,
+  errandRouteForMap,
+  riderCurrentLoc,
+  profile,
+  onPickedUp,
+  onCompleted,
+  onCancel,
+  errandCanceling,
+  onBack,
+}: {
+  activeErrand: any;
+  errandStatus: "going_to_pickup" | "going_to_dropoff";
+  errandRouteForMap: [number, number][] | null;
+  riderCurrentLoc: [number, number] | null;
+  profile: Profile;
+  onPickedUp: () => void;
+  onCompleted: () => void;
+  onCancel: () => void;
+  errandCanceling: boolean;
+  onBack: () => void;
+}) => {
+  const mapRef = React.useRef<any>(null);
+  const [sheetOpen, setSheetOpen] = React.useState(true);
+  const dragStartY = React.useRef<number | null>(null);
+  const [dragOffset, setDragOffset] = React.useState(0);
+  const isDragging = React.useRef(false);
+  const [followKey, setFollowKey] = React.useState(0);
+
+  const pickupPos: [number, number] | null = activeErrand.pickup?.coords
+    ? [activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]]
+    : null;
+  const dropoffPos: [number, number] | null = activeErrand.dropoff?.coords
+    ? [activeErrand.dropoff.coords.lat ?? activeErrand.dropoff.coords[0], activeErrand.dropoff.coords.lng ?? activeErrand.dropoff.coords[1]]
+    : null;
+
+  const mapCenter: [number, number] = riderCurrentLoc ?? pickupPos ?? DEFAULT_CENTER;
+
+  // Re-center map on rider location
+  useEffect(() => {
+    if (!riderCurrentLoc || !mapRef.current) return;
+    mapRef.current.setView(riderCurrentLoc, mapRef.current.getZoom(), { animate: true });
+  }, [followKey]);
+
+  // Drag handlers for bottom sheet
+  const startDrag = (clientY: number) => {
+    isDragging.current = true;
+    dragStartY.current = clientY;
+  };
+  const moveDrag = (clientY: number) => {
+    if (!isDragging.current || dragStartY.current === null) return;
+    const dy = clientY - dragStartY.current;
+    if (sheetOpen && dy > 0) setDragOffset(Math.min(dy, 300));
+    else if (!sheetOpen && dy < 0) setDragOffset(Math.max(dy, -300));
+  };
+  const endDrag = (clientY: number) => {
+    if (!isDragging.current || dragStartY.current === null) return;
+    isDragging.current = false;
+    const dy = clientY - dragStartY.current;
+    if (sheetOpen && dy > 80) setSheetOpen(false);
+    else if (!sheetOpen && dy < -80) setSheetOpen(true);
+    setDragOffset(0);
+    dragStartY.current = null;
+  };
+
+  const target = errandStatus === "going_to_dropoff" ? dropoffPos : pickupPos;
+  const targetLabel = errandStatus === "going_to_dropoff"
+    ? activeErrand.dropoff?.label : activeErrand.pickup?.label;
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-gray-950 flex flex-col">
+      {/* Fullscreen map */}
+      <div className="absolute inset-0">
+        <RotatableMap
+          ref={mapRef}
+          center={mapCenter}
+          zoom={14}
+          zoomControl={false}
+          rotate
+          touchRotate
+          bearingSnap={10}
+          className="w-full h-full"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {riderCurrentLoc && <Marker position={riderCurrentLoc} icon={riderIcon} />}
+          {pickupPos && (
+            <Marker position={pickupPos} icon={pickupIcon} />
+          )}
+          {dropoffPos && (
+            <Marker position={dropoffPos} icon={destinationIcon} />
+          )}
+          {errandRouteForMap && errandRouteForMap.length > 1 && (
+            <Polyline
+              positions={errandRouteForMap}
+              color={errandStatus === "going_to_pickup" ? "#f59e0b" : "#10b981"}
+              weight={5}
+              opacity={0.9}
+            />
+          )}
+          {pickupPos && dropoffPos && (
+            <ErrandMapFit pickup={pickupPos} dropoff={dropoffPos} />
+          )}
+          <MapZoomControl position="bottomright" />
+        </RotatableMap>
+      </div>
+
+      {/* Top controls */}
+      <div className="absolute top-0 left-0 right-0 z-[200] flex items-start justify-between px-4 pt-[env(safe-area-inset-top,12px)] pt-4 pointer-events-none">
+        <button
+          onClick={onBack}
+          className="pointer-events-auto w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <button
+          onClick={() => setFollowKey(k => k + 1)}
+          className="pointer-events-auto w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
+          title="Re-center"
+        >
+          <Navigation size={18} />
+        </button>
+      </div>
+
+      {/* Status badge on map */}
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
+        <div className={`px-4 py-2 rounded-full text-xs font-bold shadow-lg border ${errandStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>
+          {errandStatus === "going_to_pickup" ? "🏍️ On the way to pickup" : "📦 Delivering item"}
+        </div>
+      </div>
+
+      {/* Navigate to target button */}
+      {target && (
+        <div className="absolute z-[200] pointer-events-none" style={{ bottom: sheetOpen ? "calc(62vh + 16px)" : "calc(110px + 16px)", left: 16, right: 16, transition: "bottom 0.3s ease" }}>
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&destination=${target[0]},${target[1]}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pointer-events-auto flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-white shadow-lg border border-gray-200 text-blue-700 text-xs font-bold hover:bg-blue-50 transition-colors"
+          >
+            🗺️ Navigate to {errandStatus === "going_to_dropoff" ? "Dropoff" : "Pickup"}
+            {targetLabel && <span className="font-normal text-blue-500 truncate max-w-[140px]">{targetLabel}</span>}
+          </a>
+        </div>
+      )}
+
+      {/* Draggable bottom sheet */}
+      <div
+        className="absolute bottom-0 left-0 right-0 z-[200] bg-white rounded-t-3xl shadow-2xl"
+        style={{
+          height: sheetOpen ? "62vh" : "110px",
+          transform: `translateY(${dragOffset}px)`,
+          transition: isDragging.current ? "none" : "height 0.3s cubic-bezier(0.32,0.72,0,1), transform 0.15s ease",
+          overflow: "hidden",
+        }}
+      >
+        {/* Drag handle — touch area */}
+        <div
+          className="w-full pt-3 pb-2 flex flex-col items-center cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={e => startDrag(e.clientY)}
+          onMouseMove={e => moveDrag(e.clientY)}
+          onMouseUp={e => endDrag(e.clientY)}
+          onMouseLeave={e => { if (isDragging.current) endDrag(e.clientY); }}
+          onTouchStart={e => startDrag(e.touches[0].clientY)}
+          onTouchMove={e => { e.preventDefault(); moveDrag(e.touches[0].clientY); }}
+          onTouchEnd={e => endDrag(e.changedTouches[0].clientY)}
+        >
+          <div className="w-10 h-1 bg-gray-200 rounded-full" />
+        </div>
+
+        {/* Always-visible summary row */}
+        <div
+          className="px-5 pb-3 flex items-center gap-3 cursor-pointer"
+          onClick={() => setSheetOpen(o => !o)}
+        >
+          <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-pulse ${errandStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-bold truncate ${errandStatus === "going_to_pickup" ? "text-amber-600" : "text-emerald-600"}`}>
+              {errandStatus === "going_to_pickup" ? "On the way to pickup" : "Delivering to recipient"}
+            </p>
+            <p className="text-xs text-gray-400 truncate mt-0.5">
+              {activeErrand.user?.first_name} {activeErrand.user?.last_name}
+            </p>
+          </div>
+          {activeErrand.fare && (
+            <span className="bg-gray-950 text-emerald-400 font-black text-sm px-3 py-1.5 rounded-xl shrink-0">₱{activeErrand.fare}</span>
+          )}
+          <ChevronLeft
+            size={18}
+            className={`text-gray-400 transition-transform duration-300 ${sheetOpen ? "rotate-90" : "-rotate-90"} shrink-0`}
+          />
+        </div>
+
+        {/* Scrollable detail content */}
+        <div className="px-5 overflow-y-auto" style={{ height: "calc(62vh - 100px)", paddingBottom: "env(safe-area-inset-bottom, 20px)" }}>
+          {/* Requester card */}
+          <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-3 mb-3">
+            <div className="w-11 h-11 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0">
+              {activeErrand.user?.avatar_url ? (
+                <img src={activeErrand.user.avatar_url} className="w-full h-full object-cover" alt="" />
+              ) : (
+                <span className="text-white font-bold text-base">{(activeErrand.user?.first_name?.[0] ?? "U").toUpperCase()}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-0.5">REQUESTED BY</p>
+              <p className="font-bold text-gray-950 truncate">{activeErrand.user?.first_name} {activeErrand.user?.last_name}</p>
+              {activeErrand.user?.phone && (
+                <a href={`tel:${activeErrand.user.phone}`} className="text-xs text-emerald-600 font-semibold mt-0.5 block">📞 {activeErrand.user.phone}</a>
+              )}
+            </div>
+            {activeErrand.errand_type && (
+              <span className="text-[10px] font-semibold bg-emerald-50 border border-emerald-100 text-emerald-700 px-2 py-1 rounded-lg shrink-0">
+                {activeErrand.errand_type === "buy" ? "🛍️ Buy" : activeErrand.errand_type === "pickup_deliver" ? "📦 P&D" : "📋 Other"}
+              </span>
+            )}
+          </div>
+
+          {/* Route */}
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 mb-3 space-y-2">
+            <div className="flex items-start gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_pickup" ? "bg-gray-950 ring-2 ring-gray-300" : "bg-gray-300"}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[8px] font-bold text-gray-400 tracking-widest">PICKUP</p>
+                <p className="text-sm font-semibold text-gray-900 line-clamp-2">{activeErrand.pickup?.label}</p>
+              </div>
+              {errandStatus === "going_to_pickup" && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
+            </div>
+            <div className="w-px h-3 bg-gray-200 ml-1" />
+            <div className="flex items-start gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_dropoff" ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-gray-300"}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[8px] font-bold text-gray-400 tracking-widest">DROPOFF</p>
+                <p className="text-sm font-semibold text-gray-900 line-clamp-2">{activeErrand.dropoff?.label}</p>
+              </div>
+              {errandStatus === "going_to_dropoff" && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
+            </div>
+          </div>
+
+          {/* Task */}
+          {activeErrand.description && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3">
+              <p className="text-[8px] font-bold text-emerald-600 tracking-widest mb-1">TASK</p>
+              <p className="text-sm text-gray-700">{activeErrand.description}</p>
+            </div>
+          )}
+
+          {/* Instructions */}
+          {activeErrand.instructions && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-3">
+              <p className="text-[8px] font-bold text-amber-600 tracking-widest mb-1">INSTRUCTIONS</p>
+              <p className="text-sm text-gray-700">{activeErrand.instructions}</p>
+            </div>
+          )}
+
+          {/* Recipient */}
+          {activeErrand.recipient_name && (
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mb-3">
+              <p className="text-[8px] font-bold text-gray-400 tracking-widest mb-1">RECIPIENT</p>
+              <p className="text-sm font-semibold text-gray-900">👤 {activeErrand.recipient_name}</p>
+              {activeErrand.recipient_phone && <p className="text-xs text-gray-400 mt-0.5">{activeErrand.recipient_phone}</p>}
+            </div>
+          )}
+
+          {/* Action button */}
+          <button
+            onClick={errandStatus === "going_to_pickup" ? onPickedUp : onCompleted}
+            className={`w-full py-4 font-bold text-sm rounded-2xl text-white mb-2 transition-colors ${errandStatus === "going_to_pickup" ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-500 hover:bg-emerald-600"}`}
+          >
+            {errandStatus === "going_to_pickup" ? "✓ Mark Picked Up" : "✓ Mark Delivered / Completed"}
+          </button>
+
+          {/* Cancel */}
+          <button
+            onClick={onCancel}
+            disabled={errandCanceling}
+            className="w-full py-2.5 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors disabled:opacity-50 mb-4"
+          >
+            {errandCanceling ? "Cancelling…" : "Cancel Errand"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Rider Dashboard ──────────────────────────────────────────────────────────
 
 const RiderDashboard = ({
@@ -6714,6 +7005,8 @@ const RiderDashboard = ({
   const [showActiveRide, setShowActiveRide] = React.useState<boolean>(
     () => !!_rpr.current?.requestAccepted,
   );
+  const [showActiveErrand, setShowActiveErrand] = React.useState<boolean>(false);
+  useEffect(() => { if (activeErrand) setShowActiveErrand(true); }, [!!activeErrand]);
 
   // Clear the ref after first use
   useEffect(() => {
@@ -7243,6 +7536,44 @@ const RiderDashboard = ({
     }
   };
 
+  const handleErrandPickedUp = async () => {
+    const errandId = activeErrandRef.current?.errandId ?? activeErrand?.errandId;
+    if (!errandId) return;
+    await supabaseAdmin.from("errands").update({ status: "picked_up" }).eq("id", errandId);
+    const ch = errandChannelConceptRef.current ?? supabase.channel("errands");
+    ch.send({ type: "broadcast", event: "ERRAND_PICKED_UP", payload: { errandId } });
+    setErrandStatus("going_to_dropoff");
+  };
+
+  const handleErrandCompleted = async () => {
+    const errandId = activeErrandRef.current?.errandId ?? activeErrand?.errandId;
+    if (!errandId) return;
+    await supabaseAdmin.from("errands").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", errandId);
+    const ch = errandChannelConceptRef.current ?? supabase.channel("errands");
+    ch.send({ type: "broadcast", event: "ERRAND_COMPLETED", payload: { errandId } });
+    setActiveErrand(null);
+    activeErrandRef.current = null;
+    setErrandStatus("going_to_pickup");
+    setShowActiveErrand(false);
+  };
+
+  if (activeErrand && showActiveErrand) {
+    return (
+      <RiderActiveErrand
+        activeErrand={activeErrand}
+        errandStatus={errandStatus}
+        errandRouteForMap={errandRouteForMap}
+        riderCurrentLoc={riderCurrentLoc}
+        profile={currentProfile}
+        onPickedUp={handleErrandPickedUp}
+        onCompleted={handleErrandCompleted}
+        onCancel={handleCancelActiveErrand}
+        errandCanceling={errandCanceling}
+        onBack={() => setShowActiveErrand(false)}
+      />
+    );
+  }
+
   if (showProfile) {
     return (
       <RiderProfileScreen
@@ -7528,6 +7859,34 @@ const RiderDashboard = ({
         </div>
 
         <div className="max-w-xl mx-auto p-4 md:p-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6 space-y-3">
+          {/* Ongoing errand banner — shown when rider minimized the errand view */}
+          <AnimatePresence>
+            {activeErrand && !showActiveErrand && (
+              <motion.div
+                key="rider-ongoing-errand"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <div className="bg-emerald-600 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-emerald-900/30">
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[13px] leading-tight">📦 Active Errand</p>
+                    <p className="text-white/80 text-[11px] truncate mt-0.5">
+                      {errandStatus === "going_to_pickup" ? "On the way to pickup" : "Delivering item"} · {activeErrand.user?.first_name}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowActiveErrand(true)}
+                    className="shrink-0 bg-white/20 hover:bg-white/30 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    View Map
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Ongoing ride banner — shown when rider backed out to dashboard */}
           <AnimatePresence>
             {requestAccepted && currentRequest && (
@@ -8413,8 +8772,8 @@ const RiderDashboard = ({
                     </>
                   )}
 
-                  {/* Active errand */}
-                  {activeErrand && (
+                  {/* Active errand — tap banner above to open fullscreen map view */}
+                  {false && activeErrand && (
                     <>
                     {/* Errand map — rider location, pickup, dropoff, route */}
                     <div className="rounded-2xl overflow-hidden border border-gray-200 mb-2" style={{ height: 220 }}>
