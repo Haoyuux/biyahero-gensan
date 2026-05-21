@@ -204,7 +204,7 @@ import {
   onForegroundMessage,
   clearFCMToken,
 } from "@/src/lib/fcmService";
-import { sendRideRequestToTelegram } from "@/src/lib/telegramService";
+import { sendRideRequestToTelegram, sendErrandRequestToTelegram } from "@/src/lib/telegramService";
 
 // localStorage keys for persisting active ride state across refresh / disconnects
 const USER_RIDE_KEY = "biyahero_user_ride";
@@ -3900,6 +3900,36 @@ const UserApp = ({
             <AnimatePresence mode="wait">
               {step === "home" && (
                 <>
+                  {/* Active errand banner — shown when user minimized the errand panel */}
+                  {(errandStep === "searching" || errandStep === "matched") && (
+                    <motion.div
+                      key="active-errand-banner"
+                      initial={{ y: 40, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className="absolute bottom-[calc(100%+8px)] inset-x-4 z-10 pointer-events-auto md:relative md:bottom-auto md:inset-auto md:mx-0 md:mb-2"
+                    >
+                      <div className="bg-emerald-600 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-xl shadow-emerald-900/30">
+                        <div className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-[13px] leading-tight">📦 Active Errand</p>
+                          <p className="text-white/80 text-[11px] truncate mt-0.5">
+                            {errandStep === "searching"
+                              ? "Searching for a rider…"
+                              : errandSubStatus === "going_to_pickup"
+                                ? "Rider on the way to pickup"
+                                : "Item picked up · Delivering"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setStep("errand")}
+                          className="shrink-0 bg-white/20 hover:bg-white/30 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          View
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* Ongoing-ride banner — blocks new booking and lets user jump back */}
                   {false && currentRideId && (
                     <motion.div
@@ -4201,23 +4231,27 @@ const UserApp = ({
                   }}
                 />
               )}
-              {step === "errand" && (
-                <ErrandPanel
-                  key="errand"
-                  profile={currentProfile}
-                  pricingConfig={pricingConfig}
-                  userVouchers={userVouchers}
-                  onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); setErrandStep("type"); setErrandRiderLoc(null); setErrandRiderRoute(null); setErrandSubStatus("going_to_pickup"); }}
-                  initialErrand={_pe.current}
-                  onMapChange={setErrandMapState}
-                  onStepChange={setErrandStep}
-                  onLocTypeChange={setErrandLocType}
-                  onRiderLocationUpdate={(loc) => { setErrandRiderLoc(loc); if (!loc) setErrandRiderRoute(null); }}
-                  onSubStatusChange={(s) => { setErrandSubStatus(s); setErrandRiderRoute(null); }}
-                  deviceLocation={deviceLocation}
-                  externalPickupDrag={extPickupDrag}
-                  externalDropoffDrag={extDropoffDrag}
-                />
+              {/* Keep ErrandPanel mounted while searching/matched so state persists when minimized */}
+              {(step === "errand" || errandStep === "searching" || errandStep === "matched") && (
+                <div style={{ display: step === "errand" ? undefined : "none" }}>
+                  <ErrandPanel
+                    key="errand"
+                    profile={currentProfile}
+                    pricingConfig={pricingConfig}
+                    userVouchers={userVouchers}
+                    onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); setErrandStep("type"); setErrandRiderLoc(null); setErrandRiderRoute(null); setErrandSubStatus("going_to_pickup"); }}
+                    onMinimize={() => setStep("home")}
+                    initialErrand={_pe.current}
+                    onMapChange={setErrandMapState}
+                    onStepChange={setErrandStep}
+                    onLocTypeChange={setErrandLocType}
+                    onRiderLocationUpdate={(loc) => { setErrandRiderLoc(loc); if (!loc) setErrandRiderRoute(null); }}
+                    onSubStatusChange={(s) => { setErrandSubStatus(s); setErrandRiderRoute(null); }}
+                    deviceLocation={deviceLocation}
+                    externalPickupDrag={extPickupDrag}
+                    externalDropoffDrag={extDropoffDrag}
+                  />
+                </div>
               )}
               {step === "searching" && (
                 <SearchingPanel
@@ -21170,6 +21204,7 @@ const ErrandPanel = ({
   onLocTypeChange,
   onRiderLocationUpdate,
   onSubStatusChange,
+  onMinimize,
   deviceLocation,
   externalPickupDrag,
   externalDropoffDrag,
@@ -21184,6 +21219,7 @@ const ErrandPanel = ({
   onLocTypeChange?: (type: "pickup" | "dropoff") => void;
   onRiderLocationUpdate?: (loc: [number, number] | null) => void;
   onSubStatusChange?: (status: "going_to_pickup" | "going_to_dropoff") => void;
+  onMinimize?: () => void;
   deviceLocation?: [number, number] | null;
   externalPickupDrag?: { coords: [number, number]; v: number } | null;
   externalDropoffDrag?: { coords: [number, number]; v: number } | null;
@@ -21568,6 +21604,19 @@ const ErrandPanel = ({
       setBooking(false);
       return;
     }
+
+    // Notify via Telegram (non-blocking)
+    sendErrandRequestToTelegram({
+      userName: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User",
+      errandType: errandType!,
+      vehicleType,
+      pickup: pickupLabel,
+      dropoff: dropoffLabel,
+      description: description.trim(),
+      fare: finalFare,
+      errandId,
+    });
+
     if (appliedVoucher) {
       const { markVoucherUsed } = await import("./lib/voucherService");
       await markVoucherUsed(appliedVoucher.id, errandId);
@@ -21895,37 +21944,36 @@ const ErrandPanel = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            {eStep !== "type" &&
-              eStep !== "searching" &&
-              eStep !== "matched" && (
-                <button
-                  onClick={() => {
-                    const prev: ErrandBookingStep[] = [
-                      "type",
-                      "location",
-                      "details",
-                      "vehicle",
-                      "confirm",
-                    ];
-                    const idx = prev.indexOf(eStep as any);
-                    if (idx > 0) setEStep(prev[idx - 1]);
-                  }}
-                  className="text-gray-500 hover:text-gray-900"
-                >
-                  ←
-                </button>
-              )}
+            {/* Go-back one step (pre-booking steps) */}
+            {eStep !== "type" && eStep !== "searching" && eStep !== "matched" && (
+              <button
+                onClick={() => {
+                  const prev: ErrandBookingStep[] = ["type", "location", "details", "vehicle", "confirm"];
+                  const idx = prev.indexOf(eStep as any);
+                  if (idx > 0) setEStep(prev[idx - 1]);
+                }}
+                className="text-gray-500 hover:text-gray-900"
+              >
+                ←
+              </button>
+            )}
+            {/* Minimize back to home (searching / matched) */}
+            {(eStep === "searching" || eStep === "matched") && onMinimize && (
+              <button
+                onClick={onMinimize}
+                className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm"
+                title="Go back to map"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
             <h2 className="text-lg font-bold text-gray-950">
               📦 Sugo / Errand
             </h2>
           </div>
-          {eStep !== "searching" && (
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-700 text-xl"
-            >
-              ✕
-            </button>
+          {/* Close only available before searching starts */}
+          {eStep !== "searching" && eStep !== "matched" && (
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
           )}
         </div>
 

@@ -9,6 +9,7 @@ import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
 import { supabase } from '../../lib/supabase';
 import { calculateErrandFare, ErrandFareBreakdown, loadPricingConfigFromDB, PricingConfig, DEFAULT_PRICING } from '../../lib/fareService';
 import { fetchUserVouchers, quoteVoucher, markVoucherUsed, UserVoucher } from '../../lib/voucherService';
+import { sendErrandRequestToTelegram } from '../../lib/telegramService';
 import { useProfile } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage, fetchMessages, sendMessage, subscribeToMessages } from '../../lib/chatService';
@@ -489,6 +490,18 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
       request_data: payload,
     });
     if (insertErr) { Alert.alert('Error', insertErr.message); setBooking(false); return; }
+
+    // Notify via Telegram (non-blocking)
+    sendErrandRequestToTelegram({
+      userName: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'User',
+      errandType: errandType!,
+      vehicleType,
+      pickup: pickupLabel,
+      dropoff: dropoffLabel,
+      description: description.trim(),
+      fare: finalFare,
+      errandId,
+    });
 
     if (selectedVoucher) await markVoucherUsed(selectedVoucher.id, errandId);
 
