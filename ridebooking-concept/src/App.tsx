@@ -612,6 +612,16 @@ function FlyToFirstRiderLocation({
   return null;
 }
 
+// Fly map to a single coordinate (used for errand location pin updates)
+function MapFlyTo({ coords }: { coords: [number, number] | null }) {
+  const map = useMap();
+  const key = coords ? `${coords[0]},${coords[1]}` : "";
+  useEffect(() => {
+    if (coords && key) map.flyTo(coords, 16, { animate: true, duration: 0.8 });
+  }, [key]);
+  return null;
+}
+
 // Fit map bounds to show both errand pickup and dropoff markers
 function ErrandMapFit({ pickup, dropoff }: { pickup: [number, number]; dropoff: [number, number] }) {
   const map = useMap();
@@ -4222,6 +4232,13 @@ const UserApp = ({
                 } : {}}
               />
             )}
+            {/* Pan main map to newly set errand pin (only during location step, only when one pin set) */}
+            {step === "errand" && errandStep === "location" && !errandMapState.dropoffCoords && errandMapState.pickupCoords && (
+              <MapFlyTo coords={errandMapState.pickupCoords} />
+            )}
+            {step === "errand" && errandStep === "location" && errandMapState.dropoffCoords && !errandMapState.pickupCoords && (
+              <MapFlyTo coords={errandMapState.dropoffCoords} />
+            )}
             {step === "errand" && errandMapState.routeCoords && (
               <Polyline positions={errandMapState.routeCoords} color="#10b981" weight={5} opacity={0.85} />
             )}
@@ -6272,6 +6289,20 @@ const RiderActiveErrand = ({
   const [dragOffset, setDragOffset] = React.useState(0);
   const isDragging = React.useRef(false);
   const [followKey, setFollowKey] = React.useState(0);
+  const [isChatOpen, setIsChatOpen] = React.useState(false);
+  const [chatUnread, setChatUnread] = React.useState(0);
+
+  // Count incoming messages while chat is closed
+  const isChatOpenRef = React.useRef(false);
+  isChatOpenRef.current = isChatOpen;
+  useEffect(() => {
+    if (!activeErrand?.errandId) return;
+    const unsub = subscribeToMessages(activeErrand.errandId, (msg) => {
+      if (msg.sender_id === profile.id) return;
+      if (!isChatOpenRef.current) setChatUnread(c => c + 1);
+    });
+    return unsub;
+  }, [activeErrand?.errandId]);
 
   const pickupPos: [number, number] | null = activeErrand.pickup?.coords
     ? [activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]]
@@ -6312,6 +6343,26 @@ const RiderActiveErrand = ({
   const target = errandStatus === "going_to_dropoff" ? dropoffPos : pickupPos;
   const targetLabel = errandStatus === "going_to_dropoff"
     ? activeErrand.dropoff?.label : activeErrand.pickup?.label;
+
+  const errandId = activeErrand.errandId;
+  const riderName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Rider";
+  const userName = `${activeErrand.user?.first_name || ""} ${activeErrand.user?.last_name || ""}`.trim() || "User";
+
+  if (isChatOpen) {
+    return (
+      <div className="fixed inset-0 z-[90] flex flex-col">
+        <RealtimeChat
+          rideId={errandId}
+          senderId={profile.id}
+          senderRole="rider"
+          senderName={riderName}
+          otherName={userName}
+          otherAvatar={activeErrand.user?.avatar_url}
+          onBack={() => { setIsChatOpen(false); setChatUnread(0); }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[90] bg-gray-950 flex flex-col">
@@ -6430,13 +6481,35 @@ const RiderActiveErrand = ({
               {activeErrand.user?.first_name} {activeErrand.user?.last_name}
             </p>
           </div>
-          {activeErrand.fare && (
-            <span className="bg-gray-950 text-emerald-400 font-black text-sm px-3 py-1.5 rounded-xl shrink-0">₱{activeErrand.fare}</span>
-          )}
-          <ChevronLeft
-            size={18}
-            className={`text-gray-400 transition-transform duration-300 ${sheetOpen ? "rotate-90" : "-rotate-90"} shrink-0`}
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            {activeErrand.user?.phone && (
+              <a
+                href={`tel:${activeErrand.user.phone}`}
+                onClick={e => e.stopPropagation()}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors border border-emerald-200"
+              >
+                <Phone size={16} />
+              </a>
+            )}
+            <button
+              onClick={e => { e.stopPropagation(); setIsChatOpen(true); setChatUnread(0); }}
+              className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+            >
+              <MessageSquare size={16} />
+              {chatUnread > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                  {chatUnread > 9 ? "9+" : chatUnread}
+                </span>
+              )}
+            </button>
+            {activeErrand.fare && (
+              <span className="bg-gray-950 text-emerald-400 font-black text-sm px-3 py-1.5 rounded-xl">₱{activeErrand.fare}</span>
+            )}
+            <ChevronLeft
+              size={18}
+              className={`text-gray-400 transition-transform duration-300 ${sheetOpen ? "rotate-90" : "-rotate-90"}`}
+            />
+          </div>
         </div>
 
         {/* Scrollable detail content */}
@@ -6454,7 +6527,10 @@ const RiderActiveErrand = ({
               <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-0.5">REQUESTED BY</p>
               <p className="font-bold text-gray-950 truncate">{activeErrand.user?.first_name} {activeErrand.user?.last_name}</p>
               {activeErrand.user?.phone && (
-                <a href={`tel:${activeErrand.user.phone}`} className="text-xs text-emerald-600 font-semibold mt-0.5 block">📞 {activeErrand.user.phone}</a>
+                <a href={`tel:${activeErrand.user.phone}`} className="text-xs text-emerald-600 font-semibold mt-0.5 block hover:underline">📞 {activeErrand.user.phone}</a>
+              )}
+              {!activeErrand.user?.phone && (
+                <p className="text-xs text-gray-400 mt-0.5">No contact number</p>
               )}
             </div>
             {activeErrand.errand_type && (
@@ -20796,14 +20872,6 @@ function ErrandLocationStep({
     return null;
   }
 
-  function FlyTo({ target }: { target: [number, number] | null }) {
-    const map = useMap();
-    React.useEffect(() => {
-      if (target) map.flyTo(target, 16);
-    }, [target]);
-    return null;
-  }
-
   const center: [number, number] = pickupCoords ??
     dropoffCoords ?? [6.1106, 125.1741];
 
@@ -20914,7 +20982,7 @@ function ErrandLocationStep({
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <ErrandMapEvents />
-            <FlyTo target={flyTarget} />
+            <MapFlyTo coords={flyTarget} />
             {pickupCoords && (
               <Marker
                 position={pickupCoords}
@@ -21062,6 +21130,10 @@ const ErrandPanel = ({
   const [booking, setBooking] = React.useState(false);
   const [matchedRider, setMatchedRider] = React.useState<any>(null);
   const [errandSubStatus, setErrandSubStatus] = React.useState<"going_to_pickup" | "going_to_dropoff">("going_to_pickup");
+  const [isErrandChatOpen, setIsErrandChatOpen] = React.useState(false);
+  const [errandChatUnread, setErrandChatUnread] = React.useState(0);
+  const isErrandChatOpenRef = React.useRef(false);
+  isErrandChatOpenRef.current = isErrandChatOpen;
   const [activeErrandId, setActiveErrandId] = React.useState<string | null>(
     null,
   );
@@ -21092,6 +21164,16 @@ const ErrandPanel = ({
 
   // Notify parent when step changes (so parent can enable/disable map drag)
   React.useEffect(() => { onStepChange?.(eStep); }, [eStep]);
+
+  // Track unread messages from rider when chat is closed
+  React.useEffect(() => {
+    if (!activeErrandId || eStep !== "matched") return;
+    const unsub = subscribeToMessages(activeErrandId, (msg) => {
+      if (msg.sender_id === profile.id) return;
+      if (!isErrandChatOpenRef.current) setErrandChatUnread(c => c + 1);
+    });
+    return unsub;
+  }, [activeErrandId, eStep]);
 
   // Apply pickup drag from desktop map (only during location step)
   React.useEffect(() => {
@@ -21161,7 +21243,7 @@ const ErrandPanel = ({
       } else if (data.rider_id) {
         const { data: rp } = await supabase
           .from("profiles")
-          .select("id, first_name, last_name, vehicle_make, vehicle_model, vehicle_plate, avatar_url, phone")
+          .select("id, first_name, last_name, vehicle_make, vehicle_model, vehicle_plate, vehicle_color, vehicle_type, vehicle_image_url, avatar_url, phone")
           .eq("id", data.rider_id)
           .single();
         if (rp) setMatchedRider(rp);
@@ -21485,6 +21567,25 @@ const ErrandPanel = ({
   const finalFare = fareBreakdown
     ? Math.max(0, fareBreakdown.total - voucherDiscount)
     : 0;
+
+  const userDisplayName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User";
+  const riderDisplayName = `${matchedRider?.first_name || ""} ${matchedRider?.last_name || ""}`.trim() || "Rider";
+
+  if (isErrandChatOpen && activeErrandId) {
+    return (
+      <div className="absolute inset-0 z-30 flex flex-col bg-white md:relative md:flex-1">
+        <RealtimeChat
+          rideId={activeErrandId}
+          senderId={profile.id}
+          senderRole="user"
+          senderName={userDisplayName}
+          otherName={riderDisplayName}
+          otherAvatar={matchedRider?.avatar_url}
+          onBack={() => { setIsErrandChatOpen(false); setErrandChatUnread(0); }}
+        />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -21874,27 +21975,66 @@ const ErrandPanel = ({
 
             {/* Rider card */}
             {matchedRider && (
-              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-3">
-                <div className="w-12 h-12 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0 border-2 border-white shadow">
-                  {matchedRider.avatar_url ? (
-                    <img src={matchedRider.avatar_url} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-white font-bold text-lg">{(matchedRider.first_name?.[0] ?? "R").toUpperCase()}</span>
-                  )}
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0 border-2 border-white shadow">
+                    {matchedRider.avatar_url ? (
+                      <img src={matchedRider.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white font-bold text-lg">{(matchedRider.first_name?.[0] ?? "R").toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-0.5">YOUR RIDER</p>
+                    <p className="font-bold text-gray-950 text-sm">{matchedRider.first_name} {matchedRider.last_name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                      {[matchedRider.vehicle_make, matchedRider.vehicle_model].filter(Boolean).join(" ")}
+                      {matchedRider.vehicle_plate ? ` · ${matchedRider.vehicle_plate}` : ""}
+                    </p>
+                    {matchedRider.phone ? (
+                      <a href={`tel:${matchedRider.phone}`} className="text-xs text-emerald-600 font-semibold mt-0.5 block hover:underline">
+                        📞 {matchedRider.phone}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-0.5">No contact number</p>
+                    )}
+                  </div>
+                  <div className="bg-gray-950 rounded-xl px-3 py-2 shrink-0">
+                    <p className="text-emerald-400 font-black text-lg leading-none">₱{finalFare}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-0.5">YOUR RIDER</p>
-                  <p className="font-bold text-gray-950 text-sm">{matchedRider.first_name} {matchedRider.last_name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">
-                    {[matchedRider.vehicle_make, matchedRider.vehicle_model].filter(Boolean).join(" ")}
-                    {matchedRider.vehicle_plate ? ` · ${matchedRider.vehicle_plate}` : ""}
-                  </p>
+                {/* Vehicle photo */}
+                {matchedRider.vehicle_image_url && (
+                  <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50" style={{ height: 140 }}>
+                    <img
+                      src={matchedRider.vehicle_image_url}
+                      alt="Rider's vehicle"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex gap-2">
                   {matchedRider.phone && (
-                    <p className="text-xs text-gray-500 mt-0.5">📞 {matchedRider.phone}</p>
+                    <a
+                      href={`tel:${matchedRider.phone}`}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                    >
+                      <Phone size={14} /> Call Rider
+                    </a>
                   )}
-                </div>
-                <div className="bg-gray-950 rounded-xl px-3 py-2 shrink-0">
-                  <p className="text-emerald-400 font-black text-lg leading-none">₱{finalFare}</p>
+                  <button
+                    onClick={() => { setIsErrandChatOpen(true); setErrandChatUnread(0); }}
+                    className="flex-1 relative flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    <MessageSquare size={14} /> Chat with Rider
+                    {errandChatUnread > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                        {errandChatUnread > 9 ? "9+" : errandChatUnread}
+                      </span>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
