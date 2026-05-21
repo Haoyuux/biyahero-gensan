@@ -8287,156 +8287,6 @@ const RiderDashboard = ({
 
                       {/* Errand request appears as fixed bottom modal — see below */}
 
-                      {/* Active errand */}
-                      {activeErrand && (
-                        <div className="bg-white border-2 border-emerald-200 rounded-2xl p-3 shadow-sm">
-                          {/* Status + fare */}
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className={`w-2 h-2 rounded-full shrink-0 ${errandStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
-                            <span className={`text-[11px] font-bold flex-1 tracking-wide ${errandStatus === "going_to_pickup" ? "text-amber-500" : "text-emerald-600"}`}>
-                              {errandStatus === "going_to_pickup" ? "On the way to pickup" : "Delivering item"}
-                            </span>
-                            {activeErrand.fare && (
-                              <span className="bg-gray-950 text-emerald-400 font-black text-xs px-2.5 py-1 rounded-lg">₱{activeErrand.fare}</span>
-                            )}
-                          </div>
-                          {/* Requester */}
-                          <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
-                            <div className="w-9 h-9 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0">
-                              {activeErrand.user?.avatar_url ? (
-                                <img src={activeErrand.user.avatar_url} className="w-full h-full object-cover" />
-                              ) : (
-                                <span className="text-white font-bold text-sm">{(activeErrand.user?.first_name?.[0] ?? "U").toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[8px] font-bold text-gray-400 tracking-widest">REQUESTED BY</p>
-                              <p className="text-sm font-bold text-gray-950 truncate">{activeErrand.user?.first_name} {activeErrand.user?.last_name}</p>
-                            </div>
-                            {activeErrand.errand_type && (
-                              <span className="text-[10px] font-semibold bg-emerald-50 border border-emerald-100 text-emerald-700 px-2 py-1 rounded-lg">
-                                {activeErrand.errand_type === "buy" ? "🛍️" : activeErrand.errand_type === "pickup_deliver" ? "📦" : "📋"}
-                              </span>
-                            )}
-                          </div>
-                          {/* Full route — both stops */}
-                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5 space-y-2">
-                            <div className="flex items-start gap-2">
-                              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_pickup" ? "bg-gray-950 ring-2 ring-gray-300" : "bg-gray-400"}`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[8px] font-bold text-gray-400 tracking-widest">PICKUP</p>
-                                <p className="text-xs font-semibold text-gray-900 line-clamp-2">{activeErrand.pickup?.label}</p>
-                              </div>
-                              {errandStatus === "going_to_pickup" && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
-                            </div>
-                            <div className="w-px h-3 bg-gray-200 ml-1" />
-                            <div className="flex items-start gap-2">
-                              <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_dropoff" ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-gray-300"}`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[8px] font-bold text-gray-400 tracking-widest">DROPOFF</p>
-                                <p className="text-xs font-semibold text-gray-900 line-clamp-2">{activeErrand.dropoff?.label}</p>
-                              </div>
-                              {errandStatus === "going_to_dropoff" && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
-                            </div>
-                          </div>
-                          {/* Task description */}
-                          {activeErrand.description && (
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-2.5">
-                              <p className="text-[8px] font-bold text-emerald-600 tracking-widest mb-1">TASK</p>
-                              <p className="text-xs text-gray-700 line-clamp-2">{activeErrand.description}</p>
-                            </div>
-                          )}
-                          {/* Instructions */}
-                          {activeErrand.instructions && (
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 mb-2.5">
-                              <p className="text-[8px] font-bold text-amber-600 tracking-widest mb-1">INSTRUCTIONS</p>
-                              <p className="text-xs text-gray-700 line-clamp-2">{activeErrand.instructions}</p>
-                            </div>
-                          )}
-                          {/* Recipient */}
-                          {activeErrand.recipient_name && (
-                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
-                              <p className="text-[8px] font-bold text-gray-400 tracking-widest mb-1">RECIPIENT</p>
-                              <p className="text-xs font-semibold text-gray-900">👤 {activeErrand.recipient_name}</p>
-                              {activeErrand.recipient_phone && <p className="text-xs text-gray-400 mt-0.5">{activeErrand.recipient_phone}</p>}
-                            </div>
-                          )}
-                          {/* Navigate to target */}
-                          {(() => {
-                            const target = errandStatus === "going_to_dropoff"
-                              ? activeErrand.dropoff?.coords
-                              : activeErrand.pickup?.coords;
-                            if (!target) return null;
-                            const lat = target.lat ?? target[0];
-                            const lng = target.lng ?? target[1];
-                            const label = errandStatus === "going_to_dropoff"
-                              ? activeErrand.dropoff?.label
-                              : activeErrand.pickup?.label;
-                            return (
-                              <a
-                                href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors"
-                              >
-                                🗺️ Navigate to {errandStatus === "going_to_dropoff" ? "Dropoff" : "Pickup"}
-                                {label ? <span className="font-normal text-blue-500 truncate max-w-[120px]">{label}</span> : null}
-                              </a>
-                            );
-                          })()}
-                          <button
-                            onClick={async () => {
-                              const errandId = activeErrand.errandId;
-                              const ch =
-                                errandChannelConceptRef.current ??
-                                supabase.channel("errands");
-                              if (errandStatus === "going_to_pickup") {
-                                await supabaseAdmin
-                                  .from("errands")
-                                  .update({ status: "picked_up" })
-                                  .eq("id", errandId);
-                                ch.send({
-                                  type: "broadcast",
-                                  event: "ERRAND_PICKED_UP",
-                                  payload: { errandId },
-                                });
-                                setErrandStatus("going_to_dropoff");
-                              } else {
-                                await supabaseAdmin
-                                  .from("errands")
-                                  .update({
-                                    status: "completed",
-                                    completed_at: new Date().toISOString(),
-                                  })
-                                  .eq("id", errandId);
-                                ch.send({
-                                  type: "broadcast",
-                                  event: "ERRAND_COMPLETED",
-                                  payload: { errandId },
-                                });
-                                setActiveErrand(null);
-                                activeErrandRef.current = null;
-                                setErrandStatus("going_to_pickup");
-                              }
-                            }}
-                            className="w-full py-3.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
-                          >
-                            {errandStatus === "going_to_pickup"
-                              ? "✓ Mark Picked Up"
-                              : "✓ Mark Delivered / Completed"}
-                          </button>
-                          <button
-                            onClick={handleCancelActiveErrand}
-                            disabled={errandCanceling}
-                            className="w-full mt-2 py-2 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
-                          >
-                            {errandCanceling
-                              ? "Cancelling..."
-                              : "Cancel Errand"}
-                          </button>
-                        </div>
-                      )}
-
                       {/* Active vehicle indicator */}
                       {isOnline && activeVehicle && (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-3">
@@ -8535,6 +8385,156 @@ const RiderDashboard = ({
                         </div>
                       )}
                     </>
+                  )}
+
+                  {/* Active errand */}
+                  {activeErrand && (
+                    <div className="bg-white border-2 border-emerald-200 rounded-2xl p-3 shadow-sm">
+                      {/* Status + fare */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${errandStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
+                        <span className={`text-[11px] font-bold flex-1 tracking-wide ${errandStatus === "going_to_pickup" ? "text-amber-500" : "text-emerald-600"}`}>
+                          {errandStatus === "going_to_pickup" ? "On the way to pickup" : "Delivering item"}
+                        </span>
+                        {activeErrand.fare && (
+                          <span className="bg-gray-950 text-emerald-400 font-black text-xs px-2.5 py-1 rounded-lg">₱{activeErrand.fare}</span>
+                        )}
+                      </div>
+                      {/* Requester */}
+                      <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
+                        <div className="w-9 h-9 rounded-full bg-gray-950 flex items-center justify-center overflow-hidden shrink-0">
+                          {activeErrand.user?.avatar_url ? (
+                            <img src={activeErrand.user.avatar_url} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-white font-bold text-sm">{(activeErrand.user?.first_name?.[0] ?? "U").toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] font-bold text-gray-400 tracking-widest">REQUESTED BY</p>
+                          <p className="text-sm font-bold text-gray-950 truncate">{activeErrand.user?.first_name} {activeErrand.user?.last_name}</p>
+                        </div>
+                        {activeErrand.errand_type && (
+                          <span className="text-[10px] font-semibold bg-emerald-50 border border-emerald-100 text-emerald-700 px-2 py-1 rounded-lg">
+                            {activeErrand.errand_type === "buy" ? "🛍️" : activeErrand.errand_type === "pickup_deliver" ? "📦" : "📋"}
+                          </span>
+                        )}
+                      </div>
+                      {/* Full route — both stops */}
+                      <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_pickup" ? "bg-gray-950 ring-2 ring-gray-300" : "bg-gray-400"}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[8px] font-bold text-gray-400 tracking-widest">PICKUP</p>
+                            <p className="text-xs font-semibold text-gray-900 line-clamp-2">{activeErrand.pickup?.label}</p>
+                          </div>
+                          {errandStatus === "going_to_pickup" && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
+                        </div>
+                        <div className="w-px h-3 bg-gray-200 ml-1" />
+                        <div className="flex items-start gap-2">
+                          <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${errandStatus === "going_to_dropoff" ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-gray-300"}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[8px] font-bold text-gray-400 tracking-widest">DROPOFF</p>
+                            <p className="text-xs font-semibold text-gray-900 line-clamp-2">{activeErrand.dropoff?.label}</p>
+                          </div>
+                          {errandStatus === "going_to_dropoff" && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">NOW</span>}
+                        </div>
+                      </div>
+                      {/* Task description */}
+                      {activeErrand.description && (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-2.5">
+                          <p className="text-[8px] font-bold text-emerald-600 tracking-widest mb-1">TASK</p>
+                          <p className="text-xs text-gray-700 line-clamp-2">{activeErrand.description}</p>
+                        </div>
+                      )}
+                      {/* Instructions */}
+                      {activeErrand.instructions && (
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 mb-2.5">
+                          <p className="text-[8px] font-bold text-amber-600 tracking-widest mb-1">INSTRUCTIONS</p>
+                          <p className="text-xs text-gray-700 line-clamp-2">{activeErrand.instructions}</p>
+                        </div>
+                      )}
+                      {/* Recipient */}
+                      {activeErrand.recipient_name && (
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 mb-2.5">
+                          <p className="text-[8px] font-bold text-gray-400 tracking-widest mb-1">RECIPIENT</p>
+                          <p className="text-xs font-semibold text-gray-900">👤 {activeErrand.recipient_name}</p>
+                          {activeErrand.recipient_phone && <p className="text-xs text-gray-400 mt-0.5">{activeErrand.recipient_phone}</p>}
+                        </div>
+                      )}
+                      {/* Navigate to target */}
+                      {(() => {
+                        const target = errandStatus === "going_to_dropoff"
+                          ? activeErrand.dropoff?.coords
+                          : activeErrand.pickup?.coords;
+                        if (!target) return null;
+                        const lat = target.lat ?? target[0];
+                        const lng = target.lng ?? target[1];
+                        const label = errandStatus === "going_to_dropoff"
+                          ? activeErrand.dropoff?.label
+                          : activeErrand.pickup?.label;
+                        return (
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full py-2.5 mb-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors"
+                          >
+                            🗺️ Navigate to {errandStatus === "going_to_dropoff" ? "Dropoff" : "Pickup"}
+                            {label ? <span className="font-normal text-blue-500 truncate max-w-[120px]">{label}</span> : null}
+                          </a>
+                        );
+                      })()}
+                      <button
+                        onClick={async () => {
+                          const errandId = activeErrand.errandId;
+                          const ch =
+                            errandChannelConceptRef.current ??
+                            supabase.channel("errands");
+                          if (errandStatus === "going_to_pickup") {
+                            await supabaseAdmin
+                              .from("errands")
+                              .update({ status: "picked_up" })
+                              .eq("id", errandId);
+                            ch.send({
+                              type: "broadcast",
+                              event: "ERRAND_PICKED_UP",
+                              payload: { errandId },
+                            });
+                            setErrandStatus("going_to_dropoff");
+                          } else {
+                            await supabaseAdmin
+                              .from("errands")
+                              .update({
+                                status: "completed",
+                                completed_at: new Date().toISOString(),
+                              })
+                              .eq("id", errandId);
+                            ch.send({
+                              type: "broadcast",
+                              event: "ERRAND_COMPLETED",
+                              payload: { errandId },
+                            });
+                            setActiveErrand(null);
+                            activeErrandRef.current = null;
+                            setErrandStatus("going_to_pickup");
+                          }
+                        }}
+                        className="w-full py-3.5 bg-gray-950 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
+                      >
+                        {errandStatus === "going_to_pickup"
+                          ? "✓ Mark Picked Up"
+                          : "✓ Mark Delivered / Completed"}
+                      </button>
+                      <button
+                        onClick={handleCancelActiveErrand}
+                        disabled={errandCanceling}
+                        className="w-full mt-2 py-2 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {errandCanceling
+                          ? "Cancelling..."
+                          : "Cancel Errand"}
+                      </button>
+                    </div>
                   )}
 
                   {/* Team membership card */}
