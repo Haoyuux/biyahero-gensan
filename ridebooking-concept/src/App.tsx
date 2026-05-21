@@ -8389,6 +8389,54 @@ const RiderDashboard = ({
 
                   {/* Active errand */}
                   {activeErrand && (
+                    <>
+                    {/* Errand map — rider location, pickup, dropoff, route */}
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 mb-2" style={{ height: 220 }}>
+                      <RotatableMap
+                        center={
+                          riderCurrentLoc ??
+                          (activeErrand.pickup?.coords
+                            ? [activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]] as [number, number]
+                            : DEFAULT_CENTER)
+                        }
+                        zoom={14}
+                        zoomControl={false}
+                        className="w-full h-full"
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        {riderCurrentLoc && <Marker position={riderCurrentLoc} icon={riderIcon} />}
+                        {activeErrand.pickup?.coords && (
+                          <Marker
+                            position={[activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]] as [number, number]}
+                            icon={pickupIcon}
+                          />
+                        )}
+                        {activeErrand.dropoff?.coords && (
+                          <Marker
+                            position={[activeErrand.dropoff.coords.lat ?? activeErrand.dropoff.coords[0], activeErrand.dropoff.coords.lng ?? activeErrand.dropoff.coords[1]] as [number, number]}
+                            icon={destinationIcon}
+                          />
+                        )}
+                        {errandRouteForMap && errandRouteForMap.length > 1 && (
+                          <Polyline
+                            positions={errandRouteForMap}
+                            color={errandStatus === "going_to_pickup" ? "#f59e0b" : "#10b981"}
+                            weight={5}
+                            opacity={0.9}
+                          />
+                        )}
+                        {activeErrand.pickup?.coords && activeErrand.dropoff?.coords && (
+                          <ErrandMapFit
+                            pickup={[activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]] as [number, number]}
+                            dropoff={[activeErrand.dropoff.coords.lat ?? activeErrand.dropoff.coords[0], activeErrand.dropoff.coords.lng ?? activeErrand.dropoff.coords[1]] as [number, number]}
+                          />
+                        )}
+                        <MapZoomControl position="bottomright" />
+                      </RotatableMap>
+                    </div>
                     <div className="bg-white border-2 border-emerald-200 rounded-2xl p-3 shadow-sm">
                       {/* Status + fare */}
                       <div className="flex items-center gap-2 mb-3">
@@ -8535,6 +8583,7 @@ const RiderDashboard = ({
                           : "Cancel Errand"}
                       </button>
                     </div>
+                    </>
                   )}
 
                   {/* Team membership card */}
