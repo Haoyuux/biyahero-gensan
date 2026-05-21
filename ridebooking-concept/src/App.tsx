@@ -3094,6 +3094,9 @@ const UserApp = ({
     dropoffCoords: [number, number] | null;
     routeCoords: [number, number][] | null;
   }>({ pickupCoords: null, dropoffCoords: null, routeCoords: null });
+  const [errandStep, setErrandStep] = useState<string>("type");
+  const [extPickupDrag, setExtPickupDrag] = useState<{ coords: [number, number]; v: number } | null>(null);
+  const [extDropoffDrag, setExtDropoffDrag] = useState<{ coords: [number, number]; v: number } | null>(null);
 
   useEffect(() => {
     const channel = supabase.channel("rides");
@@ -4125,9 +4128,12 @@ const UserApp = ({
                   profile={currentProfile}
                   pricingConfig={pricingConfig}
                   userVouchers={userVouchers}
-                  onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); }}
+                  onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); setErrandStep("type"); }}
                   initialErrand={_pe.current}
                   onMapChange={setErrandMapState}
+                  onStepChange={setErrandStep}
+                  externalPickupDrag={extPickupDrag}
+                  externalDropoffDrag={extDropoffDrag}
                 />
               )}
               {step === "searching" && (
@@ -4189,12 +4195,32 @@ const UserApp = ({
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {/* Errand markers — shown when errand panel is open */}
+            {/* Errand markers — draggable during location step, locked after booking */}
             {step === "errand" && errandMapState.pickupCoords && (
-              <Marker position={errandMapState.pickupCoords} icon={draggablePickupIcon} />
+              <Marker
+                position={errandMapState.pickupCoords}
+                icon={draggablePickupIcon}
+                draggable={errandStep === "location"}
+                eventHandlers={errandStep === "location" ? {
+                  dragend(e) {
+                    const { lat, lng } = e.target.getLatLng();
+                    setExtPickupDrag({ coords: [lat, lng], v: Date.now() });
+                  },
+                } : {}}
+              />
             )}
             {step === "errand" && errandMapState.dropoffCoords && (
-              <Marker position={errandMapState.dropoffCoords} icon={draggableDestIcon} />
+              <Marker
+                position={errandMapState.dropoffCoords}
+                icon={draggableDestIcon}
+                draggable={errandStep === "location"}
+                eventHandlers={errandStep === "location" ? {
+                  dragend(e) {
+                    const { lat, lng } = e.target.getLatLng();
+                    setExtDropoffDrag({ coords: [lat, lng], v: Date.now() });
+                  },
+                } : {}}
+              />
             )}
             {step === "errand" && errandMapState.routeCoords && (
               <Polyline positions={errandMapState.routeCoords} color="#10b981" weight={5} opacity={0.85} />
@@ -8389,6 +8415,54 @@ const RiderDashboard = ({
 
                   {/* Active errand */}
                   {activeErrand && (
+                    <>
+                    {/* Errand map — rider location, pickup, dropoff, route */}
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 mb-2" style={{ height: 220 }}>
+                      <RotatableMap
+                        center={
+                          riderCurrentLoc ??
+                          (activeErrand.pickup?.coords
+                            ? [activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]] as [number, number]
+                            : DEFAULT_CENTER)
+                        }
+                        zoom={14}
+                        zoomControl={false}
+                        className="w-full h-full"
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        {riderCurrentLoc && <Marker position={riderCurrentLoc} icon={riderIcon} />}
+                        {activeErrand.pickup?.coords && (
+                          <Marker
+                            position={[activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]] as [number, number]}
+                            icon={pickupIcon}
+                          />
+                        )}
+                        {activeErrand.dropoff?.coords && (
+                          <Marker
+                            position={[activeErrand.dropoff.coords.lat ?? activeErrand.dropoff.coords[0], activeErrand.dropoff.coords.lng ?? activeErrand.dropoff.coords[1]] as [number, number]}
+                            icon={destinationIcon}
+                          />
+                        )}
+                        {errandRouteForMap && errandRouteForMap.length > 1 && (
+                          <Polyline
+                            positions={errandRouteForMap}
+                            color={errandStatus === "going_to_pickup" ? "#f59e0b" : "#10b981"}
+                            weight={5}
+                            opacity={0.9}
+                          />
+                        )}
+                        {activeErrand.pickup?.coords && activeErrand.dropoff?.coords && (
+                          <ErrandMapFit
+                            pickup={[activeErrand.pickup.coords.lat ?? activeErrand.pickup.coords[0], activeErrand.pickup.coords.lng ?? activeErrand.pickup.coords[1]] as [number, number]}
+                            dropoff={[activeErrand.dropoff.coords.lat ?? activeErrand.dropoff.coords[0], activeErrand.dropoff.coords.lng ?? activeErrand.dropoff.coords[1]] as [number, number]}
+                          />
+                        )}
+                        <MapZoomControl position="bottomright" />
+                      </RotatableMap>
+                    </div>
                     <div className="bg-white border-2 border-emerald-200 rounded-2xl p-3 shadow-sm">
                       {/* Status + fare */}
                       <div className="flex items-center gap-2 mb-3">
@@ -8535,6 +8609,7 @@ const RiderDashboard = ({
                           : "Cancel Errand"}
                       </button>
                     </div>
+                    </>
                   )}
 
                   {/* Team membership card */}
@@ -20587,6 +20662,9 @@ const ErrandPanel = ({
   onClose,
   initialErrand = null,
   onMapChange,
+  onStepChange,
+  externalPickupDrag,
+  externalDropoffDrag,
 }: {
   profile: Profile;
   pricingConfig: any;
@@ -20594,6 +20672,9 @@ const ErrandPanel = ({
   onClose: () => void;
   initialErrand?: Record<string, any> | null;
   onMapChange?: (state: { pickupCoords: [number,number]|null; dropoffCoords: [number,number]|null; routeCoords: [number,number][]|null }) => void;
+  onStepChange?: (step: ErrandBookingStep) => void;
+  externalPickupDrag?: { coords: [number, number]; v: number } | null;
+  externalDropoffDrag?: { coords: [number, number]; v: number } | null;
 }) => {
   const [eStep, setEStep] = React.useState<ErrandBookingStep>("type");
   const [errandType, setErrandType] = React.useState<ErrandType | null>(null);
@@ -20649,6 +20730,31 @@ const ErrandPanel = ({
   React.useEffect(() => {
     onMapChange?.({ pickupCoords, dropoffCoords, routeCoords: errandRouteCoords });
   }, [pickupCoords, dropoffCoords, errandRouteCoords]);
+
+  // Notify parent when step changes (so parent can enable/disable map drag)
+  React.useEffect(() => { onStepChange?.(eStep); }, [eStep]);
+
+  // Apply pickup drag from desktop map (only during location step)
+  React.useEffect(() => {
+    if (!externalPickupDrag || eStep !== "location") return;
+    const [lat, lng] = externalPickupDrag.coords;
+    reverseGeocode(lat, lng).then((label) => {
+      setPickupLabel(label);
+      setPickupCoords([lat, lng]);
+      if (dropoffCoords) fetchRoute([lat, lng], dropoffCoords);
+    });
+  }, [externalPickupDrag?.v]);
+
+  // Apply dropoff drag from desktop map (only during location step)
+  React.useEffect(() => {
+    if (!externalDropoffDrag || eStep !== "location") return;
+    const [lat, lng] = externalDropoffDrag.coords;
+    reverseGeocode(lat, lng).then((label) => {
+      setDropoffLabel(label);
+      setDropoffCoords([lat, lng]);
+      if (pickupCoords) fetchRoute(pickupCoords, [lat, lng]);
+    });
+  }, [externalDropoffDrag?.v]);
 
   // Restore active errand on mount (handles page refresh)
   React.useEffect(() => {
