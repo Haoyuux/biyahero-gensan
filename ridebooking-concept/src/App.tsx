@@ -546,13 +546,21 @@ function MapBounds({
     // Explicit location selection always overrides user interaction
     userInteracted.current = false;
 
-    if (mapFocus.coords === "route" && routeCoords && routeCoords.length > 0) {
-      map.fitBounds(L.latLngBounds(routeCoords), {
-        padding: [80, 80],
-        animate: true,
-      });
-    } else if (mapFocus.coords !== "route") {
-      map.flyTo(mapFocus.coords, 16, { animate: true, duration: 0.8 });
+    try {
+      const size = map.getSize();
+      if (!size || size.x === 0 || size.y === 0) return;
+      if (mapFocus.coords === "route" && routeCoords && routeCoords.length > 0) {
+        map.fitBounds(L.latLngBounds(routeCoords), {
+          padding: [80, 80],
+          animate: true,
+        });
+      } else if (mapFocus.coords !== "route") {
+        const c = mapFocus.coords as [number, number];
+        if (isNaN(c[0]) || isNaN(c[1])) return;
+        map.flyTo(c, 16, { animate: true, duration: 0.8 });
+      }
+    } catch {
+      // Swallow projection errors
     }
     // Only key changes trigger this — GPS ticks never touch mapFocus so they never move the camera
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -619,7 +627,14 @@ function MapFlyTo({ coords }: { coords: [number, number] | null }) {
   const key = valid ? `${coords![0]},${coords![1]}` : "";
   useEffect(() => {
     if (!valid || !key) return;
-    map.flyTo(coords!, 16, { animate: true, duration: 0.8 });
+    try {
+      // Guard: skip if the map container has zero dimensions (e.g. md:hidden)
+      const size = map.getSize();
+      if (!size || size.x === 0 || size.y === 0) return;
+      map.flyTo(coords!, 16, { animate: true, duration: 0.8 });
+    } catch {
+      // Swallow any projection errors (0-size container, not yet initialised)
+    }
   }, [key]);
   return null;
 }
@@ -629,7 +644,12 @@ function ErrandMapFit({ pickup, dropoff }: { pickup: [number, number]; dropoff: 
   const map = useMap();
   const key = `${pickup[0]},${pickup[1]},${dropoff[0]},${dropoff[1]}`;
   useEffect(() => {
-    map.fitBounds(L.latLngBounds([pickup, dropoff]), { padding: [60, 60], maxZoom: 15, animate: true });
+    if (isNaN(pickup[0]) || isNaN(pickup[1]) || isNaN(dropoff[0]) || isNaN(dropoff[1])) return;
+    try {
+      const size = map.getSize();
+      if (!size || size.x === 0 || size.y === 0) return;
+      map.fitBounds(L.latLngBounds([pickup, dropoff]), { padding: [60, 60], maxZoom: 15, animate: true });
+    } catch { /* hidden or not yet initialised */ }
   }, [key]);
   return null;
 }
