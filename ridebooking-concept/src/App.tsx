@@ -21658,8 +21658,8 @@ const ErrandPanel = ({
       exit={{ y: 80, opacity: 0 }}
       transition={{ type: "spring", damping: 28, stiffness: 360 }}
       className={eStep === "matched"
-        ? "absolute bottom-0 left-0 right-0 z-20 overflow-hidden md:relative md:bottom-auto md:left-auto md:right-auto md:overflow-visible md:flex-1"
-        : "absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20 max-h-[90vh] overflow-y-auto md:relative md:bottom-auto md:left-auto md:right-auto md:rounded-none md:shadow-none md:flex-1 md:overflow-y-auto md:max-h-full"
+        ? "absolute bottom-0 left-0 right-0 z-20 overflow-hidden pointer-events-auto md:relative md:bottom-auto md:left-auto md:right-auto md:overflow-visible md:flex-1"
+        : "absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20 max-h-[90vh] overflow-y-auto pointer-events-auto md:relative md:bottom-auto md:left-auto md:right-auto md:rounded-none md:shadow-none md:flex-1 md:overflow-y-auto md:max-h-full"
       }
       style={eStep === "matched" ? { height: "65vh" } : undefined}
     >
