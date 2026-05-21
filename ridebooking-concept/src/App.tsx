@@ -620,6 +620,23 @@ function FlyToFirstRiderLocation({
   return null;
 }
 
+// Handle map taps to set errand pickup/dropoff (mobile: no mini-map, use main map)
+function ErrandMapTap({ locType, onPickupTap, onDropoffTap }: {
+  locType: "pickup" | "dropoff";
+  onPickupTap: (coords: [number, number]) => void;
+  onDropoffTap: (coords: [number, number]) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      if (isNaN(lat) || isNaN(lng)) return;
+      if (locType === "pickup") onPickupTap([lat, lng]);
+      else onDropoffTap([lat, lng]);
+    },
+  });
+  return null;
+}
+
 // Fly map to a single coordinate (used for errand location pin updates)
 function MapFlyTo({ coords }: { coords: [number, number] | null }) {
   const map = useMap();
@@ -3127,8 +3144,38 @@ const UserApp = ({
     routeCoords: [number, number][] | null;
   }>({ pickupCoords: null, dropoffCoords: null, routeCoords: null });
   const [errandStep, setErrandStep] = useState<string>("type");
+  const [errandLocType, setErrandLocType] = useState<"pickup" | "dropoff">("pickup");
+  const [errandRiderLoc, setErrandRiderLoc] = useState<[number, number] | null>(null);
+  const [errandSubStatus, setErrandSubStatus] = useState<"going_to_pickup" | "going_to_dropoff">("going_to_pickup");
+  const [errandRiderRoute, setErrandRiderRoute] = useState<[number, number][] | null>(null);
   const [extPickupDrag, setExtPickupDrag] = useState<{ coords: [number, number]; v: number } | null>(null);
   const [extDropoffDrag, setExtDropoffDrag] = useState<{ coords: [number, number]; v: number } | null>(null);
+
+  // Fetch route from rider to current target whenever rider location updates
+  useEffect(() => {
+    if (!errandRiderLoc || step !== "errand") { setErrandRiderRoute(null); return; }
+    const target = errandSubStatus === "going_to_dropoff"
+      ? errandMapState.dropoffCoords : errandMapState.pickupCoords;
+    if (!target) { setErrandRiderRoute([errandRiderLoc]); return; }
+    const ctrl = new AbortController();
+    fetch(
+      `https://router.project-osrm.org/route/v1/driving/${errandRiderLoc[1]},${errandRiderLoc[0]};${target[1]},${target[0]}?overview=full&geometries=geojson`,
+      { signal: ctrl.signal },
+    )
+      .then(r => r.json())
+      .then(data => {
+        if (data.routes?.[0]) {
+          const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
+            ([lng, lat]: [number, number]) => [lat, lng],
+          );
+          setErrandRiderRoute(coords);
+        } else {
+          setErrandRiderRoute([errandRiderLoc, target]);
+        }
+      })
+      .catch(() => setErrandRiderRoute([errandRiderLoc, target]));
+    return () => ctrl.abort();
+  }, [errandRiderLoc, errandSubStatus, step]);
 
   useEffect(() => {
     const channel = supabase.channel("rides");
@@ -4160,10 +4207,14 @@ const UserApp = ({
                   profile={currentProfile}
                   pricingConfig={pricingConfig}
                   userVouchers={userVouchers}
-                  onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); setErrandStep("type"); }}
+                  onClose={() => { setStep("home"); setErrandMapState({ pickupCoords: null, dropoffCoords: null, routeCoords: null }); setErrandStep("type"); setErrandRiderLoc(null); setErrandRiderRoute(null); setErrandSubStatus("going_to_pickup"); }}
                   initialErrand={_pe.current}
                   onMapChange={setErrandMapState}
                   onStepChange={setErrandStep}
+                  onLocTypeChange={setErrandLocType}
+                  onRiderLocationUpdate={(loc) => { setErrandRiderLoc(loc); if (!loc) setErrandRiderRoute(null); }}
+                  onSubStatusChange={(s) => { setErrandSubStatus(s); setErrandRiderRoute(null); }}
+                  deviceLocation={deviceLocation}
                   externalPickupDrag={extPickupDrag}
                   externalDropoffDrag={extDropoffDrag}
                 />
@@ -4261,12 +4312,37 @@ const UserApp = ({
             {step === "errand" && errandStep === "location" && errandMapState.dropoffCoords && !errandMapState.pickupCoords && (
               <MapFlyTo coords={errandMapState.dropoffCoords} />
             )}
-            {step === "errand" && errandMapState.routeCoords && (
-              <Polyline positions={errandMapState.routeCoords} color="#10b981" weight={5} opacity={0.85} />
+            {/* Mobile: tap main map to set errand pickup/dropoff */}
+            {step === "errand" && errandStep === "location" && (
+              <ErrandMapTap
+                locType={errandLocType}
+                onPickupTap={(coords) => setExtPickupDrag({ coords, v: Date.now() })}
+                onDropoffTap={(coords) => setExtDropoffDrag({ coords, v: Date.now() })}
+              />
             )}
-            {step === "errand" && errandMapState.pickupCoords && errandMapState.dropoffCoords && (
+            {step === "errand" && errandMapState.routeCoords && !errandRiderLoc && (
+              <Polyline positions={errandMapState.routeCoords} color="#10b981" weight={4} opacity={0.6} dashArray="10 6" />
+            )}
+            {step === "errand" && errandMapState.pickupCoords && errandMapState.dropoffCoords && !errandRiderLoc && (
               <ErrandMapFit pickup={errandMapState.pickupCoords} dropoff={errandMapState.dropoffCoords} />
             )}
+            {/* Live rider marker + route to target */}
+            {step === "errand" && errandRiderLoc && (
+              <Marker position={errandRiderLoc} icon={riderIcon} />
+            )}
+            {step === "errand" && errandRiderRoute && errandRiderRoute.length > 1 && (
+              <Polyline
+                positions={errandRiderRoute}
+                color={errandSubStatus === "going_to_pickup" ? "#f59e0b" : "#10b981"}
+                weight={5}
+                opacity={0.9}
+              />
+            )}
+            {step === "errand" && errandRiderLoc && errandMapState.pickupCoords && errandMapState.dropoffCoords && (() => {
+              const target = errandSubStatus === "going_to_dropoff"
+                ? errandMapState.dropoffCoords! : errandMapState.pickupCoords!;
+              return <ErrandMapFit pickup={errandRiderLoc} dropoff={target} />;
+            })()}
 
             {/* Regular ride markers — hidden during errand */}
             {step !== "errand" && (
@@ -20789,6 +20865,8 @@ function ErrandLocationStep({
   onPickupSet,
   onDropoffSet,
   onConfirm,
+  onLocTypeChange,
+  deviceLocation,
 }: {
   pickupLabel: string;
   dropoffLabel: string;
@@ -20798,7 +20876,13 @@ function ErrandLocationStep({
   onPickupSet: (coords: [number, number], label: string) => void;
   onDropoffSet: (coords: [number, number], label: string) => void;
   onConfirm: () => void;
+  onLocTypeChange?: (type: "pickup" | "dropoff") => void;
+  deviceLocation?: [number, number] | null;
 }) {
+  const setActiveLocTypeWrapped = (type: "pickup" | "dropoff") => {
+    setActiveLocType(type);
+    onLocTypeChange?.(type);
+  };
   const [activeLocType, setActiveLocType] = React.useState<
     "pickup" | "dropoff"
   >("pickup");
@@ -20846,7 +20930,7 @@ function ErrandLocationStep({
       setPickupQ(label);
       setPickupSugg([]);
       onPickupSet([lat, lng], label);
-      if (!dropoffCoords) setActiveLocType("dropoff");
+      if (!dropoffCoords) setActiveLocTypeWrapped("dropoff");
     } else {
       setDropoffQ(label);
       setDropoffSugg([]);
@@ -20861,7 +20945,7 @@ function ErrandLocationStep({
       if (type === "pickup") {
         setPickupQ(name);
         onPickupSet([lat, lng], name);
-        if (!dropoffCoords) setActiveLocType("dropoff");
+        if (!dropoffCoords) setActiveLocTypeWrapped("dropoff");
       } else {
         setDropoffQ(name);
         onDropoffSet([lat, lng], name);
@@ -20870,28 +20954,37 @@ function ErrandLocationStep({
     [onPickupSet, onDropoffSet, dropoffCoords],
   );
 
-  const useMyLocation = () => {
+  const useMyLocation = async () => {
+    // Use already-obtained device location (fastest, most reliable)
+    if (deviceLocation && !isNaN(deviceLocation[0]) && !isNaN(deviceLocation[1])) {
+      setLocating(true);
+      const [lat, lng] = deviceLocation;
+      setFlyTarget([lat, lng]);
+      await handleSetLocation(lat, lng, "pickup");
+      setLocating(false);
+      return;
+    }
+    // Fallback: request location directly from browser
     if (!navigator.geolocation) {
       alert("Your browser does not support location access.");
       return;
     }
     setLocating(true);
-    const onSuccess = async (pos: GeolocationPosition) => {
-      const { latitude: lat, longitude: lng } = pos.coords;
+    const applyLocation = async (lat: number, lng: number) => {
       if (isNaN(lat) || isNaN(lng)) { setLocating(false); return; }
       setFlyTarget([lat, lng]);
       await handleSetLocation(lat, lng, "pickup");
       setLocating(false);
     };
-    // Try high-accuracy first; fall back to low-accuracy if unavailable/timeout
     navigator.geolocation.getCurrentPosition(
-      onSuccess,
+      (pos) => applyLocation(pos.coords.latitude, pos.coords.longitude),
       () => {
+        // High accuracy failed, try low accuracy
         navigator.geolocation.getCurrentPosition(
-          onSuccess,
+          (pos) => applyLocation(pos.coords.latitude, pos.coords.longitude),
           (err) => {
             const msg = err.code === 1
-              ? "Location access denied. Please allow location in your browser settings, then try again."
+              ? "Location access denied. Please allow location in your browser settings."
               : "Could not get your location. Please search for your address instead.";
             alert(msg);
             setLocating(false);
@@ -20927,7 +21020,7 @@ function ErrandLocationStep({
             className="flex-1 text-sm bg-transparent outline-none placeholder-gray-400 text-gray-900"
             placeholder="Search pickup location..."
             value={pickupQ}
-            onFocus={() => setActiveLocType("pickup")}
+            onFocus={() => setActiveLocTypeWrapped("pickup")}
             onChange={(e) => {
               setPickupQ(e.target.value);
               clearTimeout(searchTmr.current!);
@@ -20975,7 +21068,7 @@ function ErrandLocationStep({
             className="flex-1 text-sm bg-transparent outline-none placeholder-gray-400 text-gray-900"
             placeholder="Search dropoff location..."
             value={dropoffQ}
-            onFocus={() => setActiveLocType("dropoff")}
+            onFocus={() => setActiveLocTypeWrapped("dropoff")}
             onChange={(e) => {
               setDropoffQ(e.target.value);
               clearTimeout(searchTmr.current!);
@@ -21001,74 +21094,18 @@ function ErrandLocationStep({
         )}
       </div>
 
-      {/* Map — shown on mobile only; desktop uses the main map on the right */}
-      <div className="relative md:hidden">
-        <div
-          className={`absolute top-2 left-1/2 -translate-x-1/2 z-[500] px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm pointer-events-none ${activeLocType === "pickup" ? "bg-blue-500 text-white" : "bg-emerald-500 text-white"}`}
-        >
-          Tap to pin {activeLocType === "pickup" ? "📍 Pickup" : "🏁 Dropoff"} ·
-          Drag to adjust
-        </div>
-        <div
-          className="rounded-2xl overflow-hidden border border-gray-200"
-          style={{ height: "240px" }}
-        >
-          <MapContainer
-            key="errand-loc-map"
-            center={center}
-            zoom={14}
-            style={{ height: "100%", width: "100%" }}
-            zoomControl={false}
-          >
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <ErrandMapEvents />
-            <MapFlyTo coords={flyTarget} />
-            {pickupCoords && (
-              <Marker
-                position={pickupCoords}
-                icon={draggablePickupIcon}
-                draggable
-                eventHandlers={{
-                  dragend: async (e) => {
-                    const { lat, lng } = e.target.getLatLng();
-                    await handleSetLocation(lat, lng, "pickup");
-                  },
-                }}
-              />
-            )}
-            {dropoffCoords && (
-              <Marker
-                position={dropoffCoords}
-                icon={draggableDestIcon}
-                draggable
-                eventHandlers={{
-                  dragend: async (e) => {
-                    const { lat, lng } = e.target.getLatLng();
-                    await handleSetLocation(lat, lng, "dropoff");
-                  },
-                }}
-              />
-            )}
-          </MapContainer>
-        </div>
-        {routeDistM > 0 && (
-          <div className="absolute bottom-2 right-2 z-[500] bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow">
-            {(routeDistM / 1000).toFixed(1)} km
-          </div>
-        )}
-      </div>
-
-      {/* Desktop hint — replaces mini-map */}
-      <div className={`hidden md:flex items-center gap-3 rounded-2xl px-4 py-3 border ${activeLocType === "pickup" ? "bg-blue-50 border-blue-200" : "bg-emerald-50 border-emerald-200"}`}>
+      {/* Map hint — mobile shows "tap map above", desktop shows "click map" */}
+      <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 border ${activeLocType === "pickup" ? "bg-blue-50 border-blue-200" : "bg-emerald-50 border-emerald-200"}`}>
         <span className="text-xl">{activeLocType === "pickup" ? "📍" : "🏁"}</span>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className={`text-xs font-semibold ${activeLocType === "pickup" ? "text-blue-700" : "text-emerald-700"}`}>
             {activeLocType === "pickup" ? "Setting pickup point" : "Setting dropoff point"}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5">Click anywhere on the map · Drag the pin to adjust</p>
+          <p className="text-xs text-gray-500 mt-0.5 md:hidden">Tap on the map above · Drag the pin to adjust</p>
+          <p className="text-xs text-gray-500 mt-0.5 hidden md:block">Click anywhere on the map · Drag the pin to adjust</p>
         </div>
         {routeDistM > 0 && (
-          <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-full whitespace-nowrap">
+          <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
             {(routeDistM / 1000).toFixed(1)} km
           </span>
         )}
@@ -21130,6 +21167,10 @@ const ErrandPanel = ({
   initialErrand = null,
   onMapChange,
   onStepChange,
+  onLocTypeChange,
+  onRiderLocationUpdate,
+  onSubStatusChange,
+  deviceLocation,
   externalPickupDrag,
   externalDropoffDrag,
 }: {
@@ -21140,6 +21181,10 @@ const ErrandPanel = ({
   initialErrand?: Record<string, any> | null;
   onMapChange?: (state: { pickupCoords: [number,number]|null; dropoffCoords: [number,number]|null; routeCoords: [number,number][]|null }) => void;
   onStepChange?: (step: ErrandBookingStep) => void;
+  onLocTypeChange?: (type: "pickup" | "dropoff") => void;
+  onRiderLocationUpdate?: (loc: [number, number] | null) => void;
+  onSubStatusChange?: (status: "going_to_pickup" | "going_to_dropoff") => void;
+  deviceLocation?: [number, number] | null;
   externalPickupDrag?: { coords: [number, number]; v: number } | null;
   externalDropoffDrag?: { coords: [number, number]; v: number } | null;
 }) => {
@@ -21174,6 +21219,26 @@ const ErrandPanel = ({
   const [errandChatUnread, setErrandChatUnread] = React.useState(0);
   const isErrandChatOpenRef = React.useRef(false);
   isErrandChatOpenRef.current = isErrandChatOpen;
+
+  // Rider location polling (matched step)
+  const riderPollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  React.useEffect(() => {
+    if (eStep !== "matched" || !matchedRider?.id) {
+      onRiderLocationUpdate?.(null);
+      return;
+    }
+    const poll = async () => {
+      const { data } = await supabase
+        .from("profiles").select("last_lat, last_lng").eq("id", matchedRider.id).single();
+      if (data?.last_lat != null && data?.last_lng != null &&
+          !isNaN(data.last_lat) && !isNaN(data.last_lng)) {
+        onRiderLocationUpdate?.([data.last_lat, data.last_lng]);
+      }
+    };
+    poll();
+    riderPollRef.current = setInterval(poll, 3000);
+    return () => { if (riderPollRef.current) clearInterval(riderPollRef.current); };
+  }, [eStep, matchedRider?.id]);
 
   // Draggable bottom sheet (matched step only)
   const [sheetOpen, setSheetOpen] = React.useState(true);
@@ -21321,13 +21386,20 @@ const ErrandPanel = ({
       ch.on("broadcast", { event: "ERRAND_PICKED_UP" }, (msg: any) => {
         if (msg.payload?.errandId !== errandId) return;
         setErrandSubStatus("going_to_dropoff");
+        onSubStatusChange?.("going_to_dropoff");
         saveErrandState({ ...initialErrand, errandSubStatus: "going_to_dropoff" });
+      });
+      ch.on("broadcast", { event: "ERRAND_RIDER_LOCATION" }, (msg: any) => {
+        if (msg.payload?.errandId !== errandId) return;
+        const { lat, lng } = msg.payload;
+        if (!isNaN(lat) && !isNaN(lng)) onRiderLocationUpdate?.([lat, lng]);
       });
       ch.on("broadcast", { event: "ERRAND_COMPLETED" }, (msg: any) => {
         if (msg.payload?.errandId !== errandId) return;
         clearErrandState();
         ch.unsubscribe();
         channelRef.current = null;
+        onRiderLocationUpdate?.(null);
         alert("Your errand has been completed! 🎉");
         onClose();
       });
@@ -21336,6 +21408,7 @@ const ErrandPanel = ({
         clearErrandState();
         ch.unsubscribe();
         channelRef.current = null;
+        onRiderLocationUpdate?.(null);
         alert("Errand was cancelled by the rider.");
         onClose();
       });
@@ -21539,7 +21612,13 @@ const ErrandPanel = ({
     ch.on("broadcast", { event: "ERRAND_PICKED_UP" }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
       setErrandSubStatus("going_to_dropoff");
+      onSubStatusChange?.("going_to_dropoff");
       saveErrandState({ ...baseState, eStep: "matched", errandSubStatus: "going_to_dropoff", matchedRider: matchedRider });
+    });
+    ch.on("broadcast", { event: "ERRAND_RIDER_LOCATION" }, (msg: any) => {
+      if (msg.payload?.errandId !== errandId) return;
+      const { lat, lng } = msg.payload;
+      if (!isNaN(lat) && !isNaN(lng)) onRiderLocationUpdate?.([lat, lng]);
     });
     ch.on("broadcast", { event: "ERRAND_COMPLETED" }, (msg: any) => {
       if (msg.payload?.errandId !== errandId) return;
@@ -21547,6 +21626,7 @@ const ErrandPanel = ({
       clearErrandState();
       ch.unsubscribe();
       channelRef.current = null;
+      onRiderLocationUpdate?.(null);
       alert("Your errand has been completed! 🎉");
       onClose();
     });
@@ -21697,7 +21777,6 @@ const ErrandPanel = ({
             <p className={`text-sm font-bold flex-1 truncate ${errandSubStatus === "going_to_pickup" ? "text-amber-700" : "text-emerald-700"}`}>
               {errandSubStatus === "going_to_pickup" ? "🏍️ Rider on the way to pickup" : "📦 Item picked up · Delivering"}
             </p>
-            <button onClick={e => { e.stopPropagation(); onClose(); }} className="text-gray-400 hover:text-gray-700 text-lg shrink-0 px-1">✕</button>
             <ChevronLeft size={18} className={`text-gray-400 transition-transform duration-300 ${sheetOpen ? "rotate-90" : "-rotate-90"} shrink-0`} />
           </div>
 
@@ -21712,13 +21791,6 @@ const ErrandPanel = ({
 
           {/* Scrollable details */}
           <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3">
-            {/* Status banner */}
-            <div className={`rounded-2xl px-4 py-3 flex items-center gap-2.5 border ${errandSubStatus === "going_to_pickup" ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
-              <div className={`w-2.5 h-2.5 rounded-full shrink-0 animate-pulse ${errandSubStatus === "going_to_pickup" ? "bg-amber-400" : "bg-emerald-500"}`} />
-              <p className={`font-bold text-sm flex-1 ${errandSubStatus === "going_to_pickup" ? "text-amber-700" : "text-emerald-700"}`}>
-                {errandSubStatus === "going_to_pickup" ? "🏍️ Rider on the way to pickup" : "📦 Item picked up · Heading to dropoff"}
-              </p>
-            </div>
             {matchedRider && (
               <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 space-y-2.5">
                 <div className="flex items-center gap-3">
@@ -21813,13 +21885,6 @@ const ErrandPanel = ({
                 {recipientPhone && <p className="text-xs text-gray-400 mt-0.5">{recipientPhone}</p>}
               </div>
             )}
-            <button
-              onClick={handleCancelSearch}
-              disabled={cancelling}
-              className="w-full py-2.5 text-xs font-semibold text-red-500 hover:text-red-700 border border-red-100 hover:border-red-200 rounded-xl transition-colors"
-            >
-              {cancelling ? "Cancelling..." : "Cancel Errand"}
-            </button>
           </div>
         </div>
       )}
@@ -21924,6 +21989,8 @@ const ErrandPanel = ({
               if (pickupCoords) fetchRoute(pickupCoords, coords);
             }}
             onConfirm={() => setEStep("details")}
+            onLocTypeChange={onLocTypeChange}
+            deviceLocation={deviceLocation}
           />
         )}
 
