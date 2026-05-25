@@ -1,9 +1,13 @@
+import { getAppSettings } from './settingsService';
+
 const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN as string | undefined;
 const CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID as string | undefined;
 
 async function sendTelegram(text: string): Promise<void> {
   if (!BOT_TOKEN || !CHAT_ID) return;
   try {
+    const settings = await getAppSettings();
+    if (settings && !settings.telegram_enabled) return;
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

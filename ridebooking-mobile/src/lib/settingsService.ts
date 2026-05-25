@@ -7,6 +7,7 @@ export interface AppSettings {
   app_logo_url: string | null;
   remittance_qr_url: string | null;
   remittance_enabled: boolean;
+  telegram_enabled: boolean;
   maintenance_mode: 'off' | 'half' | 'full';
   maintenance_message: string | null;
   updated_at: string;
