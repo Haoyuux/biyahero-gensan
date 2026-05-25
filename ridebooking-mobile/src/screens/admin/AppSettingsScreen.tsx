@@ -15,6 +15,7 @@ export default function AppSettingsScreen() {
     app_logo_url: '' as string | null,
     remittance_qr_url: '' as string | null,
     remittance_enabled: true,
+    telegram_enabled: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,7 @@ export default function AppSettingsScreen() {
         app_logo_url: s.app_logo_url,
         remittance_qr_url: s.remittance_qr_url,
         remittance_enabled: s.remittance_enabled,
+        telegram_enabled: s.telegram_enabled ?? true,
       });
     }
     setLoading(false);
@@ -72,6 +74,7 @@ export default function AppSettingsScreen() {
         app_logo_url: form.app_logo_url || null,
         remittance_qr_url: form.remittance_qr_url || null,
         remittance_enabled: form.remittance_enabled,
+        telegram_enabled: form.telegram_enabled,
       });
       if (!ok) throw new Error('Update failed');
       Alert.alert('Saved', 'App settings updated successfully.');
@@ -216,6 +219,21 @@ export default function AppSettingsScreen() {
               <Text style={s.clearBtnText}>Remove</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        <Text style={s.sectionLabel}>NOTIFICATIONS</Text>
+        <View style={s.card}>
+          <View style={s.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>Telegram Notifications</Text>
+              <Text style={s.inputHint}>Send new ride and errand requests to the Telegram bot</Text>
+            </View>
+            <Switch
+              value={form.telegram_enabled}
+              onValueChange={v => setForm(f => ({ ...f, telegram_enabled: v }))}
+              trackColor={{ true: '#10b981' }}
+            />
+          </View>
         </View>
 
         {settings && (

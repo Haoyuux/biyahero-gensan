@@ -984,7 +984,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
       const bd = calculateFare(selectedTier, routeDistance, routeDuration, pricingConfig);
       const finalFare = Math.max(0, bd.totalFare - voucherDiscount);
       return (
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { height: '68%' }]}>
           <View style={styles.handle} />
           <View style={styles.selectInner}>
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>

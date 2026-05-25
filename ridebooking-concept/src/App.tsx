@@ -6987,9 +6987,14 @@ const RiderDashboard = ({
     loadPricingConfig(),
   );
   useEffect(() => {
+    loadPricingConfigFromDB().then(setPricingCfg);
     const handler = () => setPricingCfg(loadPricingConfig());
+    window.addEventListener("pricingConfigUpdated", handler);
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("pricingConfigUpdated", handler);
+      window.removeEventListener("storage", handler);
+    };
   }, []);
 
   // Reset remit tab to home when half-maintenance activates
@@ -16630,6 +16635,54 @@ const AdminDashboard = ({
                           </div>
                         ))}
                       </div>
+                      {/* Free distance threshold */}
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                        <div>
+                          <p className="text-xs font-bold text-gray-500">Free Distance Threshold</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">Per-km charges start only after this many km</p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setPricingCfg((p) => ({
+                              ...p,
+                              errand: {
+                                ...p.errand,
+                                [v]: {
+                                  ...p.errand[v],
+                                  freeKmEnabled: !(p.errand[v] as any).freeKmEnabled,
+                                },
+                              },
+                            }))
+                          }
+                          className={`relative shrink-0 ml-3 w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none ${(pricingCfg.errand[v] as any).freeKmEnabled ? "bg-gray-950" : "bg-gray-200"}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${(pricingCfg.errand[v] as any).freeKmEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                        </button>
+                      </div>
+                      {(pricingCfg.errand[v] as any).freeKmEnabled && (
+                        <div className="mt-2">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                            Free KM
+                          </label>
+                          <input
+                            type="number"
+                            value={(pricingCfg.errand[v] as any).freeKm ?? 0}
+                            onChange={(e) =>
+                              setPricingCfg((p) => ({
+                                ...p,
+                                errand: {
+                                  ...p.errand,
+                                  [v]: {
+                                    ...p.errand[v],
+                                    freeKm: parseFloat(e.target.value) || 0,
+                                  },
+                                },
+                              }))
+                            }
+                            className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -19080,6 +19133,48 @@ const AdminDashboard = ({
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                <h3 className="font-normal text-gray-900 text-base mb-5">
+                  Notifications
+                </h3>
+                {/* Telegram notifications toggle */}
+                <div className="flex items-center justify-between mb-5 pb-5 border-b border-gray-100">
+                  <div>
+                    <p className="text-sm font-normal text-gray-900">
+                      Telegram Notifications
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+                      When on, new ride and errand requests are sent to the
+                      configured Telegram bot.
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!appSettings) return;
+                      const prev = appSettings;
+                      const next = {
+                        ...appSettings,
+                        telegram_enabled: !appSettings.telegram_enabled,
+                      };
+                      setAppSettings(next);
+                      const ok = await updateAppSettings({
+                        telegram_enabled: next.telegram_enabled,
+                      });
+                      if (!ok) {
+                        setAppSettings(prev);
+                        return;
+                      }
+                      onRefreshSettings();
+                    }}
+                    className={`relative shrink-0 ml-4 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${appSettings?.telegram_enabled ? "bg-gray-950" : "bg-gray-200"}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${appSettings?.telegram_enabled ? "translate-x-5" : "translate-x-0"}`}
+                    />
+                  </button>
                 </div>
               </div>
 
@@ -23294,15 +23389,17 @@ const MatchedPanel = ({
       : "Rider";
     if (!rideId) return null;
     return (
-      <RealtimeChat
-        rideId={rideId}
-        senderId={userId}
-        senderRole="user"
-        senderName={userName}
-        otherName={riderName}
-        otherAvatar={activeRider?.avatar_url}
-        onBack={() => setIsChatOpen(false)}
-      />
+      <div className="fixed inset-0 z-[60] flex flex-col justify-end pointer-events-auto md:contents">
+        <RealtimeChat
+          rideId={rideId}
+          senderId={userId}
+          senderRole="user"
+          senderName={userName}
+          otherName={riderName}
+          otherAvatar={activeRider?.avatar_url}
+          onBack={() => setIsChatOpen(false)}
+        />
+      </div>
     );
   }
 
