@@ -21860,7 +21860,7 @@ const ErrandPanel = ({
 
   if (isErrandChatOpen && activeErrandId) {
     return (
-      <div className="absolute inset-0 z-30 flex flex-col bg-white md:relative md:flex-1">
+      <div className="fixed inset-0 z-[60] flex flex-col bg-white md:relative md:inset-auto md:z-auto md:flex-1">
         <RealtimeChat
           rideId={activeErrandId}
           senderId={profile.id}
