@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Modal,
   ScrollView, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, Image,
-  Animated, PanResponder, useWindowDimensions,
+  Animated, PanResponder, useWindowDimensions, StatusBar,
 } from 'react-native';
 import * as Location from 'expo-location';
 import OsmMap, { OsmMapHandle } from '../../components/OsmMap';
@@ -1151,7 +1151,7 @@ const s = StyleSheet.create({
   textArea: { minHeight: 80, textAlignVertical: 'top' },
 
   // Map location step
-  mapTopBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingTop: Platform.OS === 'ios' ? 54 : 12, paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
+  mapTopBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingTop: Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 8, paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
   mapBackBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 },
   mapBackText: { fontSize: 20, color: '#030712' },
   distanceBadge: { backgroundColor: '#10b981', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
@@ -1218,7 +1218,7 @@ const s = StyleSheet.create({
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
 
   // Matched step with map
-  matchedTopBadge: { position: 'absolute', top: Platform.OS === 'ios' ? 54 : 12, left: 16, right: 16, backgroundColor: '#f0fdf4', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#bbf7d0', alignItems: 'center' },
+  matchedTopBadge: { position: 'absolute', top: Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 8, left: 16, right: 16, backgroundColor: '#f0fdf4', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#bbf7d0', alignItems: 'center' },
   matchedTopBadgeText: { fontSize: 13, fontWeight: '700', color: '#10b981' },
   matchedBottomPanel: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '55%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 16, elevation: 10 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginBottom: 10 },
@@ -1275,7 +1275,7 @@ const s = StyleSheet.create({
 
   // Chat overlay
   chatOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#fff', zIndex: 100, elevation: 20 },
-  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingTop: Platform.OS === 'ios' ? 54 : 14 },
+  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingTop: Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 10 },
   chatBackBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   chatBackText: { fontSize: 22, color: '#030712' },
   chatAvatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center' },
