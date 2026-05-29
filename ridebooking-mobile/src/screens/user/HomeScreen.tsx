@@ -780,7 +780,8 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
     // CHAT overlay
     if (showChat && step === 'matched') {
       return (
-        <KeyboardAvoidingView style={styles.chatContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.chatContainer}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.chatHeader}>
             <TouchableOpacity onPress={() => setShowChat(false)} style={styles.chatBackBtn}>
               <Text style={styles.chatBackText}>←</Text>
@@ -813,6 +814,7 @@ export default function HomeScreen({ profile, onSignOut }: Props) {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+        </View>
       );
     }
 

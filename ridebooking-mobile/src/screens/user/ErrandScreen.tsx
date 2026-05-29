@@ -1067,9 +1067,10 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
 
       {/* Chat overlay */}
       {showChat && (
+        <View style={s.chatOverlay}>
         <KeyboardAvoidingView
-          style={s.chatOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={s.chatHeader}>
             <TouchableOpacity onPress={() => setShowChat(false)} style={s.chatBackBtn}>
@@ -1122,6 +1123,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+        </View>
       )}
     </View>
   );
