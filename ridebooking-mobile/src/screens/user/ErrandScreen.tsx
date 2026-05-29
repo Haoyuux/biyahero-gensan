@@ -903,7 +903,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
   // ─── STEP: MATCHED / PICKED UP ─────────────────────────────────────────────────
   if (step === 'matched' || step === 'picked_up') return (
     <View style={{ flex: 1 }}>
-      <OsmMap
+      {!showChat && <OsmMap
         ref={matchedMapRef}
         style={{ flex: 1 }}
         onMapReady={() => {
@@ -941,7 +941,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
             }
           }
         }}
-      />
+      />}
 
       {/* Status badge */}
       <View style={s.matchedTopBadge}>
@@ -1066,9 +1066,9 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
       </Animated.View>
 
       {/* Chat overlay */}
-      <Modal visible={showChat} animationType="slide" onRequestClose={() => setShowChat(false)}>
+      {showChat && (
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
+          style={s.chatOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={s.chatHeader}>
@@ -1122,7 +1122,7 @@ export default function ErrandScreen({ onClose }: { onClose: () => void }) {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+      )}
     </View>
   );
 
@@ -1272,7 +1272,7 @@ const s = StyleSheet.create({
   chatBtnText: { fontSize: 13, fontWeight: '700', color: '#10b981' },
 
   // Chat overlay
-  chatOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#fff', zIndex: 100 },
+  chatOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#fff', zIndex: 100, elevation: 20 },
   chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingTop: Platform.OS === 'ios' ? 54 : 14 },
   chatBackBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   chatBackText: { fontSize: 22, color: '#030712' },
