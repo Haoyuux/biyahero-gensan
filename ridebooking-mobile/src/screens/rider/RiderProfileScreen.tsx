@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  ScrollView, Alert, ActivityIndicator, Image, Modal,
+  ScrollView, Alert, ActivityIndicator, Image, Modal, Platform, StatusBar,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase, RiderVehicle } from '../../lib/supabase';
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
   saveModalBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  previewClose: { position: 'absolute', top: 52, right: 20, padding: 10 },
+  previewClose: { position: 'absolute', top: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight ?? 24) + 12, right: 20, padding: 10 },
   previewCloseText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   previewLabel: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 20, textAlign: 'center' },
   previewImage: { width: '100%', height: 420, borderRadius: 12 },

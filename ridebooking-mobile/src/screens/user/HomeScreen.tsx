@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Alert, ActivityIndicator, ScrollView, Animated, PanResponder,
-  KeyboardAvoidingView, Platform, Modal, Image, Linking, useWindowDimensions, Keyboard,
+  KeyboardAvoidingView, Platform, Modal, Image, Linking, useWindowDimensions, Keyboard, StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1765,7 +1765,7 @@ const styles = StyleSheet.create({
   primaryBtnTextInactive: { color: '#9ca3af' },
   // Map overlay buttons
   avatarMapBtn: {
-    position: 'absolute', top: 52, right: 16,
+    position: 'absolute', top: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight ?? 24) + 12, right: 16,
     width: 46, height: 46, borderRadius: 99,
     borderWidth: 2.5, borderColor: '#fff',
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 8,
@@ -1796,7 +1796,7 @@ const styles = StyleSheet.create({
   recenterIcon: { fontSize: 22, color: '#2563eb' },
 
   legend: {
-    position: 'absolute', top: 80, left: 12,
+    position: 'absolute', top: Platform.OS === 'ios' ? 80 : (StatusBar.currentHeight ?? 24) + 48, left: 12,
     backgroundColor: 'rgba(255,255,255,0.93)',
     borderRadius: 12, padding: 10, gap: 6,
     shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 6,
@@ -2022,7 +2022,7 @@ const styles = StyleSheet.create({
 
   // Chat
   chatContainer: { position: 'absolute', inset: 0, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', zIndex: 50 },
-  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingTop: Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 10 },
   chatBackBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   chatBackText: { fontSize: 22, color: '#030712' },
   chatAvatar: { width: 36, height: 36, borderRadius: 99, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
@@ -2073,7 +2073,7 @@ const styles = StyleSheet.create({
   voucherListCheck: { fontSize: 16, color: '#10b981', marginLeft: 8 },
 
   toastBanner: {
-    position: 'absolute', top: 52, left: 16, right: 16,
+    position: 'absolute', top: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight ?? 24) + 12, left: 16, right: 16,
     borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13,
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12,
     elevation: 8, zIndex: 999,
@@ -2084,7 +2084,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
-    backgroundColor: '#fff', paddingTop: 52,
+    backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight ?? 24) + 12,
   },
   newsCloseBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   newsCloseText: { fontSize: 18, color: '#030712' },

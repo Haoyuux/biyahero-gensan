@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Modal,
+  ActivityIndicator, Modal, Platform, StatusBar,
 } from 'react-native';
 import {
   ConversationSummary, ChatMessage,
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
-    backgroundColor: '#fff', paddingTop: 52,
+    backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight ?? 24) + 12,
   },
   headerTab: { paddingTop: 16 },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

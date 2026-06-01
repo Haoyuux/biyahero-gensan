@@ -22686,7 +22686,7 @@ const SelectPanel = ({
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
             className="overflow-hidden md:flex-1 md:flex md:flex-col"
           >
-            <div className="flex flex-col flex-1 max-h-[72vh] md:max-h-none pt-5 px-5 md:px-6 md:pt-6">
+            <div className="flex flex-col flex-1 max-h-[72vh] overflow-hidden md:max-h-none pt-5 px-5 md:px-6 md:pt-6">
               {/* Scrollable content */}
               <div className="flex-1 min-h-0 overflow-y-auto">
                 {/* Back button */}

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput,
   useWindowDimensions, Image, BackHandler, Alert, Vibration,
-  Animated, PanResponder,
+  Animated, PanResponder, StatusBar,
 } from 'react-native';
 import * as KeepAwake from 'expo-keep-awake';
 import * as Location from 'expo-location';
@@ -1740,7 +1740,7 @@ const styles = StyleSheet.create({
   driverName: { fontWeight: '700', color: '#030712' },
   driverMeta: { color: '#9ca3af', marginTop: 1 },
   profileBtn: {
-    position: 'absolute', top: 52, right: 16,
+    position: 'absolute', top: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight ?? 24) + 12, right: 16,
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
